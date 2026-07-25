@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────
+# Android environment — copy to `local.properties` and fill in.
+#
+#   cp android/local.properties.example android/local.properties
+#
+# `local.properties` is gitignored (it holds a machine-specific
+# SDK path and, here, the Supabase keys). Never commit it.
+#
+# Android has no `.env` convention. These entries are read by
+# Gradle and exposed to Kotlin as BuildConfig fields, wired up
+# in M6.1. Referencing them via BuildConfig keeps keys out of
+# source files.
+# ─────────────────────────────────────────────────────────────
+
+
+# ── Android SDK ──────────────────────────────────────────────
+# Written automatically by Android Studio on first open.
+# Windows example (note the escaped backslashes):
+#   sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
+sdk.dir=
+
+
+# ── Supabase ─────────────────────────────────────────────────
+# Same project as the website — Settings → API.
+# Must match web/.env.local, or the app and site disagree.
+
+SUPABASE_URL=
+
+# The ANON key. The admin app authenticates a real user via
+# Supabase Auth (M6.7) and its write permission comes from that
+# session's `admin` role, NOT from the key.
+SUPABASE_ANON_KEY=
+
+# ⚠ The SERVICE ROLE key must NEVER be placed here. It would ship
+#   inside the APK, be extractable in minutes, and grant full
+#   database access with RLS bypassed.
+#   See docs/adr/0004-authentication-and-roles.md
+
+
+# ── Release signing ──────────────────────────────────────────
+# Needed only when building a release variant. Keep the keystore
+# file itself outside the repository — *.keystore is gitignored,
+# but losing it means you can never update a published app.
+# Decided in M6.1 / Open Question 5 (Play Store vs direct APK).
+
+# RELEASE_STORE_FILE=
+# RELEASE_STORE_PASSWORD=
+# RELEASE_KEY_ALIAS=
+# RELEASE_KEY_PASSWORD=

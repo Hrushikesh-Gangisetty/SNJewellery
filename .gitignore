@@ -1,0 +1,79 @@
+# ─────────────────────────────────────────────────────────────
+# Secrets — see docs/deployment/ and CLAUDE.md §9
+# ─────────────────────────────────────────────────────────────
+# Ignore every environment file, then re-admit the templates.
+# Patterns without a slash match at any depth, so this covers
+# web/.env.local, android/.env, and anything added later.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Android secrets and signing material
+local.properties
+*.keystore
+*.jks
+keystore.properties
+google-services.json
+
+# Supabase CLI local state
+.branches
+.temp
+
+# ─────────────────────────────────────────────────────────────
+# Node / Next.js  (web/)
+# ─────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+.eslintcache
+coverage/
+.turbo/
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─────────────────────────────────────────────────────────────
+# Gradle / Android  (android/)
+# ─────────────────────────────────────────────────────────────
+build/
+.gradle/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+lint-results*.html
+lint-results*.xml
+
+# ─────────────────────────────────────────────────────────────
+# Editors and IDEs
+# ─────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+
+# ─────────────────────────────────────────────────────────────
+# Operating system
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/

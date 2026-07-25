@@ -58,8 +58,31 @@ The rendering strategy in M4.7 and the revalidation mechanism in M9 are both con
 | Next.js Pages Router | Older caching primitives and no `generateMetadata`. No reason to choose it for a greenfield project. |
 | A CMS (Sanity, Contentful) as the content layer | The Android app *is* the CMS. Adding another content system duplicates the schema and the admin surface. |
 
+## Implementation note (added M2.1)
+
+`create-next-app@latest` now installs **Next.js 16**, not 15. The scaffold was
+therefore pinned back to **15.5.21** with `--save-exact`, because the PRD
+specifies 15 and this ADR records that decision.
+
+Two consequences worth knowing:
+
+- **Tailwind v4 was installed**, which configures its theme from CSS (`@theme`
+  in `globals.css`) rather than from `tailwind.config.ts`. This changes what
+  M2.4 and [ADR-0008](0008-design-tokens-single-source.md) target — CSS custom
+  properties, not a JS config object.
+- **`eslint-config-next` 15 uses the legacy eslintrc format**, so
+  `eslint.config.mjs` loads it through `FlatCompat`. The Next 16 style of
+  importing `eslint-config-next/core-web-vitals` directly does not resolve in
+  15. Upgrading to 16 would revert that file to direct imports.
+
+**Whether to stay on 15 or move to 16 is open** — see Open Question 15. Right
+now it is a cheap change; after M4 it is not. Next 16's own agent guidance
+warns that its APIs differ from pre-16 knowledge, which is an argument for
+staying on 15 while the project is agent-built.
+
 ## Open sub-questions
 
+- **Next 15 or 16** — Open Question 15. Cheap to change now, expensive after M4.
 - Exact per-route rendering strategy and ISR intervals — decided and documented in **M4.7**.
 - Whether any route genuinely needs dynamic rendering. Search results (M10) are the candidate.
 

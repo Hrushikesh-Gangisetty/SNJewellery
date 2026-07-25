@@ -1,8 +1,8 @@
 # ADR-0007: Android architecture, dependency injection, and HTTP client
 
-- **Status:** 🟡 **Proposed** — needs decisions before M6.4 and M6.5
+- **Status:** ✅ **Accepted** — 2026-07-25
 - **Date:** 2026-07-25
-- **Deciders:** pending — Hrushikesh Gangisetty
+- **Deciders:** Hrushikesh Gangisetty
 - **Affects:** M6, M7, M8
 
 ## Context
@@ -28,12 +28,18 @@ The offline requirement is the architecturally significant one. Drafts surviving
 - **Repositories are the only thing that touches a data source.** View models depend on repositories, never on the Supabase client or the database directly — this is what makes the offline path in M8.9 possible without rewriting screens.
 - **Kotlin models mirror the frozen schema contract** from M3, and a migration updates them in the same change (M6.6).
 
-**Proposed, needing a decision:**
+**Also accepted (decided 2026-07-25):**
 
-| Choice | Recommendation | Reasoning |
+| Choice | Decision | Reasoning |
 |---|---|---|
 | **DI framework** | **Hilt** | Compile-time verified, so a missing binding is a build error rather than a crash on a screen the owner opens once a week. Google-endorsed with the better Compose integration. Koin is lighter and simpler to learn; Hilt's annotation processing costs build time. For an app whose failure mode is "the shop owner cannot upload", compile-time safety is worth more than build speed. |
-| **HTTP client** | **The Supabase Kotlin SDK, which uses Ktor** | The decision largely resolves itself: the official SDK is built on Ktor, so choosing Retrofit means running both. Ktor is Kotlin-first, coroutine-native, and shares idioms with the SDK. Retrofit is more widely known and better documented, which matters if unfamiliar. |
+| **HTTP client** | **Ktor**, via the Supabase Kotlin SDK | The decision largely resolves itself: the official SDK is built on Ktor, so choosing Retrofit means running both. Ktor is Kotlin-first, coroutine-native, and shares idioms with the SDK. Retrofit is more widely known and better documented, which matters if unfamiliar. |
+| **Distribution** | **Direct APK** | Single-owner internal tool. Avoids a developer account, store listing, privacy policy, and review delays. Requires a documented install and update path the owner can follow, and release signing configured in M6.1. |
+
+**Testing target:** a modern device on the latest Android version. That
+simplifies M7.3/M7.4, which only need the Android 13+ granular media
+permission model rather than branching across legacy permission schemes —
+though `minSdk` still needs setting deliberately in M6.1.
 
 ## Consequences
 

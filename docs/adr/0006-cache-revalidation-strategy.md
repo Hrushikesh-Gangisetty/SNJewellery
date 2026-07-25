@@ -1,8 +1,8 @@
 # ADR-0006: Cache revalidation strategy
 
-- **Status:** 🟡 **Proposed** — needs a decision before M9.1
+- **Status:** ✅ **Accepted** — 2026-07-25
 - **Date:** 2026-07-25
-- **Deciders:** pending — Hrushikesh Gangisetty
+- **Deciders:** Hrushikesh Gangisetty
 - **Affects:** M4.7, M9
 
 ## Context
@@ -21,7 +21,7 @@ Three mechanisms are available:
 
 ## Decision
 
-**Proposed:** option 1 — **a Supabase database webhook calling a secret-protected Next.js revalidation route**, with tag-scoped invalidation and a **conservative ISR interval as a fallback safety net**.
+**Accepted:** option 1 — **a Supabase database webhook calling a secret-protected Next.js revalidation route**, with tag-scoped invalidation and a **conservative ISR interval as a fallback safety net**.
 
 The recommendation rests on three things:
 
@@ -60,6 +60,7 @@ Cache tags must be placed correctly during M4.7, before M9 exists. Retrofitting 
 
 ## Open sub-questions
 
+- ~~The mechanism itself~~ — **decided 2026-07-25: webhook + `revalidateTag`.**
 - **The fallback ISR interval.** Long enough not to waste rebuilds, short enough to bound a webhook failure. Set in M9.5.
 - Whether image reordering and status toggles need distinct tags or can share a product-level tag. Decided in M9.3.
 - Whether to alert on revalidation failure, or only log it (M9.5).

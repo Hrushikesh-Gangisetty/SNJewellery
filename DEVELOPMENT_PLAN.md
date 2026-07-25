@@ -152,16 +152,16 @@ Establish the repository, its documentation structure, and its working rules, so
 
 ### Tasks
 
-- **`M0.1` Fix the git repository root** — `S`
-  The repository is currently rooted at `C:/`, which tracks the entire system drive. Initialise git inside the project directory and investigate the stray `C:/.git`.
+- **`M0.1` Fix the git repository root** — `S` — ✅ **complete**
+  The repository is now correctly rooted in the project directory, with a remote on `main`. The stray `C:/.git` still exists but is empty (0 commits, 0 tracked files); removing it is pending approval.
   *Done when:* `git rev-parse --show-toplevel` returns the project directory, and `git status` lists only project files.
 
-- **`M0.2` Monorepo skeleton and ignore rules** — `S`
+- **`M0.2` Monorepo skeleton and ignore rules** — `S` — ✅ **complete**
   Create `web/`, `android/`, `supabase/{migrations,policies,seed}`. Write a combined `.gitignore` covering Node (`node_modules`, `.next`, `.vercel`), Gradle (`build/`, `.gradle/`, `local.properties`, `*.keystore`), Supabase CLI (`.branches`, `.temp`), and `.env*` with an explicit `!.env.example` exception.
   *Done when:* `git check-ignore` confirms each pattern; `.env.example` remains trackable.
 
-- **`M0.3` Environment variable templates** — `S`
-  Author `web/.env.example` (Supabase URL, anon key, site URL) and document the Android equivalent (`local.properties` entries or `BuildConfig` fields). Placeholder values only.
+- **`M0.3` Environment variable templates** — `S` — ✅ **complete**
+  `web/.env.example` and `android/local.properties.example`, both documenting every variable with a comment, and both carrying an explicit warning that the service-role key must never appear.
   *Done when:* every variable either client needs is present with a placeholder and a comment explaining it.
 
 - **`M0.4` Documentation structure** — `S` — ✅ **complete**
@@ -180,8 +180,8 @@ Establish the repository, its documentation structure, and its working rules, so
   Thin entry point: what the project is, the layout, prerequisites, and links into `docs/`. No content duplicated from `docs/`.
   *Done when:* README links to the PRD, this plan, CLAUDE.md, and the documentation index.
 
-- **`M0.8` Branch strategy and commit convention** — `S`
-  Decide and document the branch model and commit message format (see [CLAUDE.md](CLAUDE.md) Git conventions).
+- **`M0.8` Branch strategy and commit convention** — `S` — ◐ **documented, one decision open**
+  The convention is stated in [CLAUDE.md](CLAUDE.md) §10 and is not restated here (one home per fact). Open: whether to branch per task or commit directly to `main` on a solo repo.
   *Done when:* the convention is documented and the first commit follows it.
 
 ### Dependencies
@@ -226,7 +226,7 @@ This milestone exists because the PRD demands a "clean and premium browsing expe
 
 - **`M1.1` Brand discovery** — `M`
   Gather what already exists: shop name and its correct treatment, any logo, signage, existing print material, business cards, existing social media presence. Review reference points in luxury jewellery retail and articulate what this brand is and is not.
-  *Done when:* `docs/design/brand.md` records the shop's real name, existing assets inventory, three-to-five brand attributes, and an explicit list of visual clichés to avoid. **Blocked on Open Question 9.**
+  *Done when:* `docs/design/brand.md` records the shop's real name, existing assets inventory, three-to-five brand attributes, and an explicit list of visual clichés to avoid.
 
 - **`M1.2` Brand identity direction** — `M`
   Define logo usage rules (clear space, minimum size, placement), the wordmark treatment, tagline if any, and tone of voice for all customer-facing copy.
@@ -246,7 +246,7 @@ This milestone exists because the PRD demands a "clean and premium browsing expe
 
 - **`M1.6` Design tokens as a single source of truth** — `M`
   Express everything from M1.3–M1.5 as a platform-neutral token definition, with a documented path to consume it in Tailwind (`web`) and in a Compose theme (`android`). Record the sharing mechanism decision in an ADR.
-  *Done when:* the token file exists in `docs/design/`, [ADR-0008](docs/adr/0008-design-tokens-single-source.md) is moved from Proposed to Accepted, and the consumption path for each platform is documented. **Needs Open Question 10 resolved.**
+  *Done when:* the token file exists in `docs/design/`, the generator emits both platform artefacts, and the consumption path for each is documented.
 
 - **`M1.7` Component inventory** — `M`
   Enumerate every component both platforms need, before either is built. For each: purpose, variants, and all states (default, hover, focus, active, disabled, loading, empty, error). Mark each as web-only, Android-only, or shared-concept.
@@ -274,7 +274,7 @@ This milestone exists because the PRD demands a "clean and premium browsing expe
 
 ### Dependencies
 
-**M0** — needs the repository and `docs/design/` structure. Blocked in part on Open Questions 9 and 10.
+**M0** — needs the repository and `docs/design/` structure. All inputs received; nothing outstanding.
 
 ### Estimated complexity
 
@@ -315,16 +315,16 @@ Stand up the Next.js application with the design system rendered as working code
 
 ### Tasks
 
-- **`M2.1` Scaffold the Next.js application** — `S`
-  Next.js 15 App Router in `web/`, TypeScript in strict mode.
+- **`M2.1` Scaffold the Next.js application** — `S` — ✅ **complete**
+  Next.js **15.5.21** (pinned exactly — `create-next-app` now ships 16) with React 19, Tailwind v4, App Router, TypeScript strict. Scaffold demo content, default palette, and Geist fonts were removed rather than kept, so M1 is not designing against values it would have to undo. See the implementation note in [ADR-0002](docs/adr/0002-nextjs-app-router.md).
   *Done when:* `npm run dev` serves a page and `npm run build` succeeds.
 
-- **`M2.2` Tooling and verification script** — `S`
-  ESLint, Prettier, a `typecheck` script, and a single `verify` script that runs lint, format check, and typecheck together.
+- **`M2.2` Tooling and verification script** — `S` — ✅ **complete**
+  ESLint (via `FlatCompat`, which Next 15's legacy config format requires), Prettier with the Tailwind class-sorting plugin, and `npm run verify` = typecheck + lint + format:check.
   *Done when:* `npm run verify` passes with zero errors and is documented in the README.
 
-- **`M2.3` Validated environment configuration** — `S`
-  A config module that reads and validates environment variables at startup, so nothing accesses `process.env` directly.
+- **`M2.3` Validated environment configuration** — `S` — ✅ **complete**
+  `web/lib/config/env.ts` is the only place `process.env` is read. Validation is **lazy and memoised** rather than eager: eager validation would make the app unrunnable until M3.1 supplies Supabase credentials, blocking M2.5–M2.10, which need no database. The failure is still immediate and still names the variable.
   *Done when:* a missing or malformed variable fails at startup with a message naming the variable.
 
 - **`M2.4` Tokens into Tailwind** — `M`
@@ -846,7 +846,7 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
 - **`M8.5` Status toggles** — `M`
   Featured, Sold, and Archive as the three distinct actions the PRD names, with optimistic UI and rollback on failure. Document what each means for website visibility.
-  *Done when:* each toggle is reflected on the website per the documented rules, and a failed toggle rolls the UI back to the true state. **Needs Open Question 6 resolved.**
+  *Done when:* each toggle is reflected on the website per the documented rules — **sold stays visible with a badge, archived disappears from the site but remains in the app** — and a failed toggle rolls the UI back to the true state.
 
 - **`M8.6` Category create, edit, delete** — `M`
   Full CRUD on categories.
@@ -913,7 +913,7 @@ Close the loop between the two clients and prove the PRD's headline promise: a p
 
 - **`M9.1` Choose the mechanism** — `S`
   Decide between a database webhook or Edge Function calling a secured revalidation route, and Supabase Realtime. Record the trade-offs.
-  *Done when:* [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md) moves from Proposed to Accepted with the reasoning recorded. **Needs Open Question 13 resolved.**
+  *Done when:* the mechanism is implemented as [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md) specifies — webhook plus `revalidateTag`.
 
 - **`M9.2` Secured revalidation endpoint** — `M`
   Implement it with a shared secret so third parties cannot trigger it, and make it idempotent.
@@ -1003,8 +1003,10 @@ Make a large catalogue navigable — the first Phase 2 objective — with search
   *Done when:* page 500 is no slower than page 1.
 
 - **`M10.7` Scale testing and latency budget** — `M`
-  Seed roughly 100,000 synthetic products in a scratch environment; measure search, each filter, and deep pagination; add indexes until the stated budget is met.
+  Seed a synthetic dataset an order of magnitude above the real target — roughly **10,000 products**, against a real catalogue of 500 growing to ~1,000 (resolved question 3) — then measure search, each filter, and deep pagination.
   *Done when:* measurements are recorded in the repository and every path meets the documented budget.
+
+  **Note on the revised target.** The PRD's 100,000+ figure is aspirational; the real catalogue is ~500 at launch and ~1,000 within a year. Testing at 10,000 keeps a 10× safety margin without the effort of engineering for a scale that will not arrive. Keyset pagination (M10.6) is retained anyway — it is no harder than `OFFSET` and removes the question permanently. What this *does* justify dropping is trigram/fuzzy indexing and any query-cost work beyond a GIN index, unless measurement shows a real problem.
 
 - **`M10.8` Filter chips and clear-all** — `S`
   Active filters as removable chips with a clear-all action.
@@ -1280,26 +1282,41 @@ These apply to **every** milestone and every task, in addition to their own crit
 
 ---
 
+# Resolved Decisions
+
+Answered by the project owner on **2026-07-25**. Recorded here because several
+of them change scope or schema, and the reasoning should not be lost.
+
+| # | Question | Answer |
+|:---:|---|---|
+| 1 | Shop details and copy | **Name:** SN Jewellery & Silver Palace. **Address:** 4-394/A, Temple Street, Markapur – 523316. **Phone / WhatsApp:** +91 9440248401 (same number). **Hours:** 10:00–21:00, open every day. Maps, social links, email, logo, About copy, and business history arrive later — build against configurable defaults ([ADR-0010](docs/adr/0010-configurable-site-content.md)). |
+| 2 | Supabase tier | Development project **SNJewellery** already exists and is the primary development environment. All schema changes go through migrations; the dashboard is only for provider and bucket configuration. Storage/egress projection still needed before M5. |
+| 3 | Catalogue size | **~500 at launch, 800–1,000 within a year.** Optimise for the low thousands, **not** 100,000+. This materially reduces M10 — see the note in that milestone. |
+| 4 | Admin users | **3–4 administrators, all with full permissions in v1.** Design so role-based permissions can be added later without major change. |
+| 5 | Android distribution | **Direct APK.** Needs a documented install/update path and release signing in M6.1. |
+| 6 | `sold` vs `archived` | **Sold: visible to customers with a clear "Sold" badge.** **Archived: hidden from customers, still visible in the admin app.** Two different queries and two different policies. |
+| 7 | Weight and purity | **Show weight in grams.** Purity at launch: 22K Gold, 18K Gold, Silver — extensible without redesign, so a `purities` lookup table rather than a CHECK constraint. |
+| 8 | Analytics | **Vercel Analytics.** No cookie banner required. |
+| 9 | Brand assets | Name confirmed. Logo and existing brand material arrive later; no tagline. Direction: **traditional jewellery store, modern premium digital presence.** All brand assets configurable. |
+| 10 | Design tokens | **Single source of truth, generated per platform** — [ADR-0008](docs/adr/0008-design-tokens-single-source.md) accepted. |
+| 11 | Android DI | **Hilt** — [ADR-0007](docs/adr/0007-android-architecture.md) accepted. |
+| 12 | Android HTTP | **Ktor** — ADR-0007 accepted. |
+| 13 | Revalidation | **Webhook + `revalidateTag`** — [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md) accepted. |
+| 14 | Typefaces | **Open-source only.** Must permit web self-hosting and Android bundling. |
+| — | Repository workflow | Commit after every completed task, directly to `main`. Stray `C:/.git` deleted. |
+| — | Design references | Tanishq, Candere, Palmonas, Apple. Direction: premium, elegant, modern luxury, minimal, large product photography, excellent mobile. Palette: **white, gold, black, subtle neutrals**; avoid bright or flashy colours. |
+
 # Risks & Open Questions
 
-These are genuinely unresolved. They are recorded as questions rather than assumed away, and each names the milestone it blocks. Questions 1–8 carry over from version 1.0; 9–14 are new, and most concern the design and architecture decisions this version introduces.
+What remains genuinely unresolved. Each names the milestone it blocks.
 
 | # | Question | Blocks | Impact if unanswered |
 |:---:|---|:---:|---|
-| 1 | **Real shop details and copy.** The PRD specifies Contact and About pages but supplies no address, phone number, WhatsApp number, business hours, social handles, shop history, or certifications. | M4, M5 | Pages ship with visible placeholders. M4.9 centralises everything into one module so filling these in is a one-file change — but the site cannot go public with placeholder contact details. |
-| 2 | **Supabase tier limits.** High-resolution jewellery photography is storage- and bandwidth-heavy. The free tier's storage and egress ceilings may be reached quickly. | M3, M5 | Uploads or image delivery could fail in production without warning. Needs a projected estimate — average image size × images per product × expected catalogue size — and a tier decision before launch. |
-| 3 | **Actual initial catalogue size.** The PRD's non-functional requirements target 100,000+ products, but the shop's real starting catalogue is likely in the hundreds. | M10 | Decides whether M10's indexed search and keyset pagination are needed on day one or can be simplified. Building for 100,000 when the answer is 500 is wasted effort; the reverse is a rewrite. |
-| 4 | **Single admin or multiple users.** The schema has a `users.role` field, but the PRD describes one shop owner. | M3, M6 | Decides how much the role model must carry. If staff accounts with narrower permissions are ever wanted, the policies are far cheaper to design for now than to retrofit. |
-| 5 | **Android distribution.** The PRD does not say whether the admin app goes on the Play Store or is sideloaded. | M6, M8 | Play Store means a developer account, store listing, privacy policy, and review delays. Direct APK means a documented install and update path. Affects release planning and signing setup. |
-| 6 | **What `sold` means for visibility.** The PRD lists Mark Sold and Archive as separate actions but never says whether a sold item stays visible with a badge or disappears. | M4, M8.5 | Changes the M4.1 queries and the M8.5 toggle semantics. A jewellery shop may well want sold items visible as portfolio pieces — this needs the owner's answer. |
-| 7 | **Weight and purity display.** Weight is optional in the PRD, and gold prices fluctuate. | M4 | Whether weight is shown to customers at all, and in what unit, is a business decision with pricing implications. |
-| 8 | **Analytics and privacy.** M12 adds analytics, and M13.6's recommendations would track browsing history. | M12, M13 | Determines whether a cookie consent mechanism and privacy policy are needed — which depends on the audience's jurisdiction. |
-| 9 | **Brand assets and shop name.** M1 cannot define an identity without knowing the shop's exact registered name, whether a logo exists, and whether existing signage or print material sets a direction to honour. The directory is named `SNJewellery`, which is not a confirmed brand name. | **M1.1, M1.2** | This is the earliest blocker in the project. Designing an identity from scratch and then discovering an established one exists means discarding M1's output. |
-| 10 | **Design token sharing mechanism.** Tokens can be hand-mirrored into Tailwind and Compose, or generated from one machine-readable source. | **M1.6, M2.4, M6.2** | Hand-mirroring is simpler now and drifts later — and drift between platforms is exactly what a design system exists to prevent. Generation costs a build step. See [ADR-0008](docs/adr/0008-design-tokens-single-source.md). |
-| 11 | **Hilt or Koin.** The PRD offers both. | M6.4 | Hilt is compile-time-verified and the Google-endorsed default; Koin is lighter with a gentler learning curve. Low switching cost early, high cost once every view model depends on it. |
-| 12 | **Ktor or Retrofit.** The PRD offers both. | M6.5 | Retrofit is the established Android choice; Ktor is Kotlin-first and shares idioms with the Supabase Kotlin SDK. Worth deciding once rather than mixing. |
-| 13 | **Revalidation mechanism.** Webhook plus `revalidateTag`, or Supabase Realtime. | M9.1 | Determines how the PRD's one-minute freshness promise is met and how it fails. See [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md). |
-| 14 | **Typeface licensing budget.** A luxury identity often wants a licensed display serif rather than an open-source one. | M1.4 | Licensing must permit both web self-hosting and Android bundling. Choosing a face before confirming the budget and licence risks rework across both platforms. |
+| 15 | **Next.js 15 or 16.** The PRD and [ADR-0002](docs/adr/0002-nextjs-app-router.md) specify 15, but `create-next-app` now installs 16. M2.1 pinned 15 to honour the PRD. | M2 onward | Cheap to change now, expensive after M4. Next 16's own agent guidance warns its APIs differ from pre-16 knowledge, which favours staying on 15 while the project is agent-built. Against that, 15 is a major version behind and will age out of support sooner. |
+| 16 | **Should the owner edit shop details and About copy themselves, in the Android app?** | M8, and the acceptance of [ADR-0010](docs/adr/0010-configurable-site-content.md) | "Configurable without code changes" only truly holds if there is an admin surface to edit it. Yes → M8 gains a settings screen and `site_settings` is a real table. No → a typed config module is far cheaper and `site_settings` is unnecessary. Roughly one extra M8 task either way. Does not block M1–M4. |
+| 17 | **Storage and egress projection.** Roughly 500 products × how many photographs each, at what average size? | M5 | Decides the Supabase tier before launch. High-resolution jewellery photography is heavy on both storage and egress, and the free tier's ceilings are reachable. Feeds the compression target in M7.6. |
+| 18 | **Google Maps location and social links.** Pending from the owner. | M4.10, M11.3 | Both sections hide cleanly without them per ADR-0010, so nothing is blocked — but `LocalBusiness` structured data in M11.3 wants a real geo location. |
+| 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
 
 ---
 

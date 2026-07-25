@@ -336,13 +336,19 @@ Reference the task (`M4.3`) so the commit ties back to the plan.
 
 ### Branches
 
-`type/short-description` — `feat/product-gallery`, `fix/upload-rollback`.
+**Commit directly to `main`.** Decided by the project owner for this solo
+repository: branch-per-task ceremony costs more than it returns with one
+committer and no PR review step. Revisit if a second developer joins.
 
-Never commit directly to `main`. Branch first.
+If a change is genuinely risky or experimental, branch for it —
+`type/short-description`, e.g. `feat/product-gallery` — but that is the
+exception, not the default.
 
 ### Rules for the agent specifically
 
-- **Commit and push only when asked.** Do not commit as a reflex at the end of a task.
+- **Commit after every completed task.** Standing instruction from the project
+  owner. One commit per task, referencing it (`Refs: M2.3`). Do not batch
+  several tasks into one commit, and do not leave finished work uncommitted.
 - Never use `--no-verify`. Never bypass signing. If a hook fails, fix the cause.
 - Never force-push a shared branch.
 - Never commit a generated file that should be ignored, or a `.env`.

@@ -42,21 +42,43 @@ One repository, deliberately — both clients code against one database schema, 
 
 ## Prerequisites
 
-Not yet pinned — versions are set in M0.3 and M6.1.
+| Tool | Needed for | Verified with |
+|---|---|---|
+| Node.js ≥ 20 (built on 22.20) | `web/` | ✅ installed |
+| npm ≥ 10 (built on 11.6) | `web/` | ✅ installed |
+| JDK 17+ and Android Studio | `android/` — from M6.1 | ⬜ not yet installed |
+| Supabase CLI | `supabase/` — from M3.1 | ⬜ not yet installed |
 
-- Node.js and npm — for `web/`
-- JDK and Android Studio — for `android/`
-- Supabase CLI — for `supabase/`
+The last two are not needed yet. Install them when their milestones begin.
 
 ## Setup
 
-Setup steps arrive with the code they set up:
+### Website
 
-- **Website** — M2.1. Will be `cd web && npm install && npm run dev`, with `web/.env.example` copied to `web/.env.local`.
-- **Backend** — M3.1, via the Supabase CLI.
-- **Android** — M6.1, opened in Android Studio.
+```bash
+cd web
+npm install
+cp .env.example .env.local     # then fill in the values
+npm run dev                    # http://localhost:3000
+```
 
-Until then there is nothing to install.
+The site runs without Supabase credentials for now — environment variables are
+validated on first use, not at startup, precisely so the shell and component
+work can proceed before the database exists (M3.1).
+
+**Scripts:**
+
+| Command | Does |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run verify` | **Typecheck + lint + format check** — run before every commit |
+| `npm run format` | Apply Prettier |
+| `npm run lint:fix` | Apply ESLint fixes |
+
+### Backend and Android
+
+Setup steps arrive with the code they set up — Supabase in M3.1, Android in M6.1.
 
 ## Working on this project
 

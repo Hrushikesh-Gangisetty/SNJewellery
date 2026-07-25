@@ -1,8 +1,8 @@
 # ADR-0008: Design tokens as a shared single source of truth
 
-- **Status:** 🟡 **Proposed** — needs a decision before M1.6
+- **Status:** ✅ **Accepted** — 2026-07-25
 - **Date:** 2026-07-25
-- **Deciders:** pending — Hrushikesh Gangisetty
+- **Deciders:** Hrushikesh Gangisetty
 - **Affects:** M1.6, M2.4, M6.2
 
 ## Context
@@ -17,7 +17,7 @@ There is a real asymmetry worth noting: the two platforms share very little UI. 
 
 ## Decision
 
-**Proposed:** define tokens once in a **platform-neutral machine-readable file** (JSON) under `docs/design/`, and generate the platform artefacts from it — Tailwind theme extensions for `web/`, and a Kotlin theme file for `android/`.
+**Accepted:** define tokens once in a **platform-neutral machine-readable file** (JSON) under `docs/design/`, and generate the platform artefacts from it — a CSS `@theme` block for `web/`, and a Kotlin theme file for `android/`.
 
 The generation step would be a small script committed to the repository and run when tokens change, with its output committed so neither build depends on the generator at build time.
 
@@ -54,9 +54,26 @@ Either way, the rule stands: **no component on either platform may use a raw col
 | Figma as the source of truth with token export | Correct at team scale with a designer in the loop. Here it adds a tool dependency and a manual export step to a solo build. |
 | Tailwind config as the source, Compose reads it | Makes the website's tooling authoritative over the Android app for no principled reason, and Compose cannot consume a JS config without generation anyway — so this is generation with a worse source format. |
 
+## Implementation note (added M2.1)
+
+**Tailwind v4 is installed**, and it configures its theme from CSS rather than
+from `tailwind.config.ts`. Tokens on the web side therefore live in an `@theme`
+block in `web/app/globals.css` as CSS custom properties.
+
+This shifts the recommendation's cost slightly in favour of generation. CSS
+custom properties and Compose theme values are both simple key/value forms, so
+a generator emitting the two from one JSON source is a smaller job than it
+would have been against a JS config object. It also means the web side needs no
+build step of its own — the CSS *is* the config.
+
+`web/app/globals.css` currently contains only the Tailwind import and a comment
+recording that tokens arrive in M2.4. The scaffold's default palette and Geist
+fonts were deliberately removed rather than kept, so that M1 is not designing
+against values it would have to undo.
+
 ## Open sub-questions
 
-- **The mechanism itself** — Open Question 10, needed before M1.6.
+- ~~The mechanism itself~~ — **decided 2026-07-25: single source of truth, generated.**
 - Token naming convention. Must read naturally as both a Tailwind utility and a Compose property. Decided in M1.6.
 - Whether motion durations and easings are tokens too, or documentation only. They should be tokens — M12.8 and both platforms' reduced-motion rules depend on them being consistent.
 - Whether Material 3's dynamic colour is honoured on Android or overridden by the brand palette. M6.2 decides; a luxury identity usually overrides.

@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens are deliberately absent from this file.
+ *
+ * Tailwind v4 configures its theme from CSS rather than from a
+ * JS config file, so this is where the M1 design tokens will be
+ * declared — in an `@theme` block — during M2.4.
+ *
+ * The scaffold's default palette and Geist fonts were removed
+ * rather than kept: they are visual decisions, and M1 owns those.
+ * Inventing a palette here would only mean M1 has to undo it.
+ *
+ * Until M2.4 lands, the app renders with Tailwind's own defaults
+ * and no brand styling. That is intentional, not unfinished.
+ *
+ * See docs/design/ and docs/adr/0008-design-tokens-single-source.md
+ */
