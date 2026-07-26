@@ -6,9 +6,16 @@ A jewellery catalogue platform: a customer-facing website that showcases collect
 
 ## Status
 
-**Planning complete. No application code written yet.**
+| Milestone | State |
+|---|---|
+| M0 Repository setup | ✅ complete |
+| M1 Design system | ✅ complete — [docs/design/](docs/design/) |
+| M2 Website foundation | ✅ complete — shell, primitives, data boundary |
+| M3 Supabase backend | ◐ SQL written, **not yet applied** (needs the project linked) |
+| M4 onward | not started |
 
-The next milestone is **M1 · Design System**, which is blocked on Open Question 9 — the shop's exact name and any existing brand assets. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md#risks--open-questions).
+The website currently renders a fixture catalogue. Swapping in Supabase is
+one line in `web/lib/data/index.ts` — see [ADR-0009](docs/adr/0009-website-first-with-mock-data-adapter.md).
 
 ## Start here
 
@@ -19,7 +26,7 @@ The next milestone is **M1 · Design System**, which is blocked on Open Question
 | [CLAUDE.md](CLAUDE.md) | Repository instructions and working rules for Claude Code |
 | [docs/](docs/) | Documentation index — architecture, ADRs, design, database, deployment |
 
-Architectural decisions are recorded as ADRs in [docs/adr/](docs/adr/). Three are currently **Proposed** and need a decision before their milestones can proceed.
+Architectural decisions are recorded as ADRs in [docs/adr/](docs/adr/). All ten are **Accepted**.
 
 ## Layout
 
@@ -46,10 +53,14 @@ One repository, deliberately — both clients code against one database schema, 
 |---|---|---|
 | Node.js ≥ 20 (built on 22.20) | `web/` | ✅ installed |
 | npm ≥ 10 (built on 11.6) | `web/` | ✅ installed |
+| Supabase CLI | `supabase/` | ✅ pinned as a repo devDependency — use `npx supabase` |
+| Docker Desktop | Optional — only for a *local* database | ⬜ not installed |
 | JDK 17+ and Android Studio | `android/` — from M6.1 | ⬜ not yet installed |
-| Supabase CLI | `supabase/` — from M3.1 | ⬜ not yet installed |
 
-The last two are not needed yet. Install them when their milestones begin.
+The Supabase CLI is pinned in the root `package.json` rather than installed
+globally, so the schema stays reproducible from a clone. Docker is only needed
+if you want a local database; applying migrations to the hosted project needs
+no Docker.
 
 ## Setup
 
@@ -76,9 +87,37 @@ work can proceed before the database exists (M3.1).
 | `npm run format` | Apply Prettier |
 | `npm run lint:fix` | Apply ESLint fixes |
 
-### Backend and Android
+### Backend
 
-Setup steps arrive with the code they set up — Supabase in M3.1, Android in M6.1.
+From the repository root:
+
+```bash
+npm install                    # installs the pinned Supabase CLI
+npx supabase login             # opens a browser; one-time
+npx supabase link --project-ref <your-project-ref>
+npm run db:push                # applies every migration
+npm run db:types               # regenerates web/lib/data/database.types.ts
+```
+
+The project ref is the subdomain of your Supabase URL — for
+`https://abcdefgh.supabase.co` it is `abcdefgh`. Find it under
+**Project Settings → General**.
+
+| Command | Does |
+|---|---|
+| `npm run db:push` | Apply pending migrations to the linked project |
+| `npm run db:diff` | Show what differs between local migrations and the remote schema |
+| `npm run db:types` | Regenerate the TypeScript types from the live schema |
+| `npm run db:reset` | **Local only** — drop, re-migrate, re-seed. Needs Docker |
+
+`npm run db:reset` runs `supabase/seed.sql`. **Never run it against
+production** — M5.6 enters the real catalogue there.
+
+The seed is safe to run against the *development* project and is idempotent.
+
+### Android
+
+Setup arrives with the code, in M6.1.
 
 ## Working on this project
 
