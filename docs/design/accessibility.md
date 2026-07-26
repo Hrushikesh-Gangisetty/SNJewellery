@@ -24,9 +24,9 @@ Measured values are recorded in [colour.md](colour.md) and enforced by
 
 Two consequences already baked into the tokens:
 
-- **`accent` gold is decorative only** on light surfaces (2.42:1). It may never be
+- **`accent` gold is decorative only** on light surfaces (2.38:1). It may never be
   text, a meaningful icon, or the sole boundary of a control. `accent-text`
-  (5.49:1) exists for anything semantic.
+  (5.59:1) exists for anything semantic.
 - **`border` and `border-strong` are decorative** (1.26:1, 1.49:1).
   `border-interactive` (3.15:1) is the only border token permitted on a form field
   or control outline.

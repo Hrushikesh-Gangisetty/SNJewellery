@@ -22,6 +22,7 @@ before using any gold anywhere.
 |---|---:|---|
 | `#D4AF37` classic gold | **2.10:1** | Fails everything |
 | `#C9A227` | **2.42:1** | Fails everything |
+| `#C2A55C` **(adopted `accent`)** | **2.38:1** | Fails everything — decorative only, by design |
 | `#B8860B` dark goldenrod | **3.25:1** | Large text / UI only |
 | `#A67C00` | **3.82:1** | Large text / UI only |
 | `#8B6914` | **5.09:1** | Passes AA body |
