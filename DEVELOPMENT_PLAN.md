@@ -68,9 +68,10 @@ SNJewellery/
 │   ├── design/                  # Design system: brand, tokens, components, UX
 │   └── README.md                # Documentation index
 ├── supabase/
-│   ├── migrations/              # Versioned SQL — the schema contract
-│   ├── policies/                # RLS policy definitions
-│   └── seed/                    # Categories and sample products
+│   ├── migrations/              # Versioned SQL — the schema contract,
+│   │                            #   including RLS policies
+│   ├── config.toml              # Local stack + auth configuration
+│   └── seed.sql                 # Categories, purities, sample products
 ├── web/                         # Next.js 15 + TypeScript customer website
 ├── CLAUDE.md                    # Permanent repository instructions for Claude Code
 ├── DEVELOPMENT_PLAN.md          # This document

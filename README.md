@@ -26,7 +26,7 @@ Architectural decisions are recorded as ADRs in [docs/adr/](docs/adr/). Three ar
 ```
 ├── web/          Next.js 15 + TypeScript customer website
 ├── android/      Kotlin + Jetpack Compose admin application
-├── supabase/     Migrations, RLS policies, seed data
+├── supabase/     Migrations (schema + RLS), config, seed data
 └── docs/         All other documentation
 ```
 
