@@ -224,23 +224,23 @@ This milestone exists because the PRD demands a "clean and premium browsing expe
 
 ### Tasks
 
-- **`M1.1` Brand discovery** — `M`
+- **`M1.1` Brand discovery** — `M` — ✅ **complete**
   Gather what already exists: shop name and its correct treatment, any logo, signage, existing print material, business cards, existing social media presence. Review reference points in luxury jewellery retail and articulate what this brand is and is not.
   *Done when:* `docs/design/brand.md` records the shop's real name, existing assets inventory, three-to-five brand attributes, and an explicit list of visual clichés to avoid.
 
-- **`M1.2` Brand identity direction** — `M`
+- **`M1.2` Brand identity direction** — `M` — ✅ **complete**
   Define logo usage rules (clear space, minimum size, placement), the wordmark treatment, tagline if any, and tone of voice for all customer-facing copy.
   *Done when:* `docs/design/brand.md` covers identity usage, and tone of voice includes three do/don't copy examples.
 
-- **`M1.3` Colour palette** — `M`
+- **`M1.3` Colour palette** — `M` — ✅ **complete**
   Build the palette: restrained neutrals as the foundation, metallic accents appropriate to gold and silver merchandise, and semantic roles (surface, surface-raised, text-primary, text-muted, border, accent, focus, success, warning, danger). Define light and dark variants — the Android app requires dark mode per the PRD, and the website should honour it.
   *Done when:* every colour has a name, a role, light and dark values, and a recorded contrast ratio against the surfaces it is used on; every text/surface pair meets WCAG AA.
 
-- **`M1.4` Typography** — `M`
+- **`M1.4` Typography** — `M` — ✅ **complete**
   Select the typefaces — the usual luxury pairing is a high-contrast serif for display and a quiet sans for UI — and define the type scale, weights, line heights, letter spacing, and the specific role of each step (page title, section heading, product name, price/spec, body, caption, label). Confirm licensing permits both web self-hosting and Android bundling.
   *Done when:* `docs/design/typography.md` defines every step with size, weight, line height, tracking, and usage rule, and licensing is confirmed for both platforms.
 
-- **`M1.5` Spacing, shape, elevation, and layout grid** — `S`
+- **`M1.5` Spacing, shape, elevation, and layout grid** — `S` — ✅ **complete** (`docs/design/layout.md`, which is also the canonical home for breakpoint values)
   Define the spacing scale, corner radii, border weights, shadow/elevation levels, and the responsive layout grid including maximum content width and gutters.
   *Done when:* each scale is enumerated with names and values, and the grid is specified at every breakpoint from M1.8.
 
@@ -1304,6 +1304,7 @@ of them change scope or schema, and the reasoning should not be lost.
 | 13 | Revalidation | **Webhook + `revalidateTag`** — [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md) accepted. |
 | 14 | Typefaces | **Open-source only.** Must permit web self-hosting and Android bundling. |
 | — | Repository workflow | Commit after every completed task, directly to `main`. Stray `C:/.git` deleted. |
+| 16 | Configurable site content | **Typed config module**, not a database table. The owner will send updated details for a developer to apply. No  table, no admin settings screen — [ADR-0010](docs/adr/0010-configurable-site-content.md) accepted. |
 | — | Design references | Tanishq, Candere, Palmonas, Apple. Direction: premium, elegant, modern luxury, minimal, large product photography, excellent mobile. Palette: **white, gold, black, subtle neutrals**; avoid bright or flashy colours. |
 
 # Risks & Open Questions
@@ -1313,7 +1314,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | # | Question | Blocks | Impact if unanswered |
 |:---:|---|:---:|---|
 | 15 | **Next.js 15 or 16.** The PRD and [ADR-0002](docs/adr/0002-nextjs-app-router.md) specify 15, but `create-next-app` now installs 16. M2.1 pinned 15 to honour the PRD. | M2 onward | Cheap to change now, expensive after M4. Next 16's own agent guidance warns its APIs differ from pre-16 knowledge, which favours staying on 15 while the project is agent-built. Against that, 15 is a major version behind and will age out of support sooner. |
-| 16 | **Should the owner edit shop details and About copy themselves, in the Android app?** | M8, and the acceptance of [ADR-0010](docs/adr/0010-configurable-site-content.md) | "Configurable without code changes" only truly holds if there is an admin surface to edit it. Yes → M8 gains a settings screen and `site_settings` is a real table. No → a typed config module is far cheaper and `site_settings` is unnecessary. Roughly one extra M8 task either way. Does not block M1–M4. |
+
 | 17 | **Storage and egress projection.** Roughly 500 products × how many photographs each, at what average size? | M5 | Decides the Supabase tier before launch. High-resolution jewellery photography is heavy on both storage and egress, and the free tier's ceilings are reachable. Feeds the compression target in M7.6. |
 | 18 | **Google Maps location and social links.** Pending from the owner. | M4.10, M11.3 | Both sections hide cleanly without them per ADR-0010, so nothing is blocked — but `LocalBusiness` structured data in M11.3 wants a real geo location. |
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |

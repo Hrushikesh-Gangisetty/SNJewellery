@@ -1,9 +1,9 @@
 # ADR-0010: Where configurable brand and site content lives
 
-- **Status:** 🟡 **Proposed** — one scope question for the owner (see Open sub-questions)
-- **Date:** 2026-07-25
+- **Status:** ✅ **Accepted** — 2026-07-26
+- **Date:** 2026-07-25 (decision revised 2026-07-26)
 - **Deciders:** Hrushikesh Gangisetty
-- **Affects:** M3.2, M4.9–M4.11, M8, M1
+- **Affects:** M3.2, M4.9–M4.11, M1
 
 ## Context
 
@@ -30,78 +30,87 @@ question is which rule assigns content to which:
 
 ## Decision
 
+**Revised 2026-07-26.** The owner confirmed they will send updated details for a
+developer to apply, rather than editing them in the app. So there is **no
+`site_settings` table and no admin settings screen** — the cheaper option, and
+the one that adds no scope.
+
 Content is assigned by **who changes it and how often**:
 
 | Content | Home | Why |
 |---|---|---|
-| Categories | `categories` table | Already decided; owner manages them in the app (M8.6) |
+| Categories | `categories` table | Owner manages them in the app (M8.6) |
 | Products, images | `products`, `product_images` | The catalogue |
-| Shop name, address, phone, WhatsApp, hours, social links, Maps location | **`site_settings` table**, seeded by migration | Owner-editable without a developer. Values arrive later. |
-| About page prose, business history, certifications | **`site_settings`** (long-text values) | Owner-authored, arrives later, changes over time |
-| Logo and brand imagery | **Supabase Storage**, path held in `site_settings` | An asset, not a string. Same delivery path as product images. |
 | Purity values | **`purities` table**, not a CHECK constraint | Owner asked for extensibility without redesign. A lookup table adds a row; a CHECK constraint needs a migration. |
+| Shop name, address, phone, WhatsApp, hours, social links, Maps location | **Typed config module** — `web/lib/config/site.ts` | Changes rarely, and a developer applies it. Type-safe and reviewable in git. |
+| About page prose, business history, certifications | **Typed config module**, same file | Same cadence, same author |
+| Logo and brand imagery | **`web/public/`**, path referenced from the config module | A build-time asset. Storage is for product photography, which is user-generated; the logo is neither. |
 | Photography standards, design tokens, brand attributes | `docs/design/` | Guidance for humans and build-time input. Never read at runtime. |
 
-Two rules follow:
+Three rules follow, and they are what actually deliver the owner's requirement:
 
 1. **No component hard-codes any of it.** Not the shop name, not the phone
-   number, not a category. M4's acceptance criteria already test this for the
-   phone number by grep.
-2. **Every setting has a seeded default**, so the site renders before the owner
-   has supplied a real value. A missing setting is never a crash — it is either
-   a sensible default or a cleanly hidden section.
+   number, not an opening hour. M4's acceptance criteria test this for the phone
+   number by grep, and the same rule covers every other value.
+2. **Every value is optional where it can be, with a defined absent-state.** A
+   missing social handle, Maps location, founding year, or About section renders
+   as *nothing* — a cleanly hidden section, never an empty box, a broken link, or
+   a crash. This is what lets M4 ship before the owner has supplied the content.
+3. **The config module is the single source.** Structured data in M11.3 reads
+   address and hours from it, not from duplicated constants.
 
-`site_settings` is a **single-row table with typed columns**, not a key/value
-pair table. Key/value forces every read through a lookup that returns `string`,
-losing type safety and making a typo a runtime bug. One row with real columns
-generates proper TypeScript types like every other table.
+The distinction that matters: **product data is database, site content is config,
+design decisions are documentation.** Anything the owner changes routinely is in
+the database and editable in the app. Anything that changes once a year is
+config.
 
 ## Consequences
 
 ### What this makes easier
 
-- The site can be built now and populated later, by the owner, without a deploy.
-- One place to look for any shop detail, on both clients.
-- Adding a purity or a category is a row, not a migration.
-- Sections with no content yet (social links, Maps) hide themselves cleanly
-  rather than rendering an empty box.
+- The site can be built now against a typed shape and populated later, with no
+  schema work and no admin screen.
+- Type safety: a missing required field is a build error, not a blank page. A
+  database settings table could not offer that.
+- One place to look for any shop detail. Changes are reviewable in git with
+  history, which a database row is not.
+- Adding a purity or a category is still a row, not a migration.
+- No caching or revalidation concern — config is inlined at build time, so it
+  cannot go stale relative to the deployed site.
 
 ### What this makes harder
 
-- **It adds scope the PRD does not describe.** The PRD's Android app manages
-  products and categories; it says nothing about editing shop details or About
-  copy. Making settings owner-editable means an admin settings screen, which is
-  new work in M8 — see the open question below.
-- Every setting read is a database read, so the settings row must be cached and
-  tied into the M9 revalidation map, or the site will not reflect an edit.
-- A single-row table needs a constraint enforcing that exactly one row exists.
+- **Updating shop details requires a developer and a redeploy.** This does not
+  literally satisfy "without code changes" — it satisfies "without *component*
+  changes", which the owner confirmed is what they meant. Worth restating plainly
+  so nobody is surprised: changing the phone number is a one-line edit, a
+  commit, and a deploy.
+- If the owner later wants self-service editing, that is a migration plus an M8
+  settings screen. The config module's shape makes the port mechanical, but it is
+  not free.
 
 ### What this commits us to
 
-Content is data. Any future feature wanting to display a shop detail reads it
-from `site_settings` rather than introducing a constant — including M11's
-structured data, which needs address and hours for `LocalBusiness`.
+The config module's shape becomes the contract that pages, the footer, the
+Contact page, and M11's `LocalBusiness` structured data all read from. Adding a
+field is trivial; moving the whole thing into the database later is not.
 
 ## Alternatives considered
 
 | Alternative | Why not |
 |---|---|
-| Typed config module in the repository | Simplest and type-safe, and what M4.9 originally specified. Rejected as the primary home because editing it is a commit and a redeploy — it does not meet "without code changes". Still correct for genuinely build-time values. |
+| **`site_settings` table + admin settings screen** | The originally proposed decision, and the only option that literally means "no code changes". Rejected 2026-07-26: the owner is content to send details for a developer to apply, and this adds a table, RLS policies, a cache-invalidation concern, and an M8 screen the PRD never asked for. |
 | Key/value settings table | Flexible but untyped. Every read returns `string`, and a mistyped key fails at runtime instead of compile time. |
-| Markdown content files in the repository | Good for long prose and reviewable in git, but still a commit and a redeploy. |
+| Markdown content files | Good for long prose and reviewable in git, but adds a parsing step for content that fits comfortably in typed objects. Reconsider if the About page grows into several pages of prose. |
 | A headless CMS | Solves this properly at the cost of a second vendor, a second bill, and a second admin surface — for one shop with one page of prose. |
 
 ## Open sub-questions
 
-- **Does the owner want to edit shop details and About copy themselves, in the
-  Android app?** If yes, M8 needs a settings screen and this ADR stands as
-  written. If they are content to send updated details for a developer to apply,
-  the far cheaper answer is a typed config module and `site_settings` is
-  unnecessary. **This is the one question blocking the ADR's acceptance** — it
-  is the difference between roughly one extra M8 task and none.
-- Whether `site_settings` should be readable by anonymous users for all fields,
-  or whether some are admin-only. Decided with the M3.7 policies.
-- How the settings row interacts with M9's cache tags. Decided in M9.3.
+- ~~Does the owner want to edit shop details themselves?~~ **Decided
+  2026-07-26: no. Typed config module.**
+- Whether the About page's prose eventually justifies markdown files rather than
+  string fields. Revisit at M4.11 once the owner supplies the actual copy — a few
+  paragraphs is fine as strings; several sections with headings is not.
 
 ## References
 

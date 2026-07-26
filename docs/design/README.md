@@ -15,17 +15,23 @@ Defining it once, first, as documentation, costs one milestone and removes both 
 
 ## Documents
 
-| Document | Contents | Task |
-|---|---|---|
-| `brand.md` | Shop identity, brand attributes, logo usage, tone of voice | M1.1, M1.2 |
-| `colour.md` | Palette with semantic roles, light and dark, measured contrast ratios | M1.3 |
-| `typography.md` | Typefaces, type scale, weights, roles, licensing confirmation | M1.4 |
-| `tokens.*` | Platform-neutral token definition plus per-platform consumption path | M1.5, M1.6 |
-| `components.md` | Full component inventory with variants and every state | M1.7 |
-| `responsive.md` | Breakpoints, grid, image aspect ratios, touch targets | M1.8 |
-| `motion.md` | Duration scale, easings, permitted animations, reduced-motion rule | M1.9 |
-| `ux.md` | Product photography standards, CTA hierarchy, loading/empty/error patterns | M1.10 |
-| `accessibility.md` | WCAG 2.1 AA target and the concrete rules that follow from it | M1.11 |
+| Document | Contents | Task | Status |
+|---|---|---|---|
+| [brand.md](brand.md) | Shop identity, brand attributes, logo usage, tone of voice, anti-patterns | M1.1, M1.2 | ✅ |
+| [colour.md](colour.md) | Palette with semantic roles, light and dark, **measured** contrast ratios | M1.3 | ✅ |
+| [typography.md](typography.md) | Typefaces, type scale, weights, roles, licensing confirmation | M1.4 | ✅ |
+| [layout.md](layout.md) | Spacing, radii, elevation, **breakpoints**, layout grid, touch targets | M1.5 | ✅ |
+| `tokens.json` | Platform-neutral token definition plus the generator | M1.6 | ⬜ |
+| `components.md` | Full component inventory with variants and every state | M1.7 | ⬜ |
+| `responsive.md` | Component reflow behaviour, image aspect ratios | M1.8 | ⬜ |
+| `motion.md` | Duration scale, easings, permitted animations, reduced-motion rule | M1.9 | ⬜ |
+| `ux.md` | Product photography standards, CTA hierarchy, loading/empty/error patterns | M1.10 | ⬜ |
+| `accessibility.md` | WCAG 2.1 AA target and the concrete rules that follow from it | M1.11 | ⬜ |
+
+**Note on `layout.md` vs `responsive.md`:** breakpoint *values* live in
+[layout.md](layout.md), because the layout grid is defined against them.
+`responsive.md` will cover how components *behave* at each breakpoint without
+redefining the numbers.
 
 ## How each platform consumes this
 
