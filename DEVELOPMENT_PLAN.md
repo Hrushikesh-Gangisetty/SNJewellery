@@ -244,7 +244,7 @@ This milestone exists because the PRD demands a "clean and premium browsing expe
   Define the spacing scale, corner radii, border weights, shadow/elevation levels, and the responsive layout grid including maximum content width and gutters.
   *Done when:* each scale is enumerated with names and values, and the grid is specified at every breakpoint from M1.8.
 
-- **`M1.6` Design tokens as a single source of truth** — `M`
+- **`M1.6` Design tokens as a single source of truth** — `M` — ✅ **complete**
   Express everything from M1.3–M1.5 as a platform-neutral token definition, with a documented path to consume it in Tailwind (`web`) and in a Compose theme (`android`). Record the sharing mechanism decision in an ADR.
   *Done when:* the token file exists in `docs/design/`, the generator emits both platform artefacts, and the consumption path for each is documented.
 

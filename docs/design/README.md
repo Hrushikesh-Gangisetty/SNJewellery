@@ -38,13 +38,21 @@ redefining the numbers.
 - **Web** (`web/`) — tokens become Tailwind theme extensions in M2.4. No component may use a colour, size, or duration literal.
 - **Android** (`android/`) — tokens become a Compose Material 3 theme in M6.2, with light and dark schemes. Same rule.
 
-The mechanism for keeping both in step — hand-mirrored, or generated from one machine-readable source — is [ADR-0008](../adr/0008-design-tokens-single-source.md) and is currently **Proposed**. It needs a decision before M1.6.
+Both are kept in step by generation from one source — [ADR-0008](../adr/0008-design-tokens-single-source.md), **Accepted**. See the token pipeline section below.
 
-## Blocked on
+## Still awaited
 
-**Open Question 9** in [DEVELOPMENT_PLAN.md](../../DEVELOPMENT_PLAN.md#risks--open-questions) — the shop's exact registered name and any existing brand assets (logo, signage, print material, existing social presence). M1.1 cannot start without it. The repository directory is named `SNJewellery`, which is not a confirmed brand name.
+The shop name and design direction have been supplied. Outstanding, none of it blocking:
 
-Designing an identity from scratch and then discovering an established one exists means discarding this milestone's output, so this is the earliest blocking question in the project.
+| Item | Affects | Until then |
+|---|---|---|
+| **Logo** (SVG, plus a reversed version for dark backgrounds) | Header, footer, social previews | Wordmark renders instead |
+| **Existing signage / packaging photos** | [colour.md](colour.md) — the palette was derived from the owner's stated preference, not sampled from real assets | Reconcile `accent` against any established gold **before M2.4 consumes the tokens**, and recompute every ratio if it changes |
+| **5–10 unedited product photographs** | `ux.md` (M1.10) photography standard, and the M7.6 compression target | M1.10 writes the standard against configurable guidelines |
+| Year established, business history, certifications | About page (M4.11) | Sections hide cleanly, per [ADR-0010](../adr/0010-configurable-site-content.md) |
+
+The signage question is the one with real rework attached: a different established
+gold changes every measured ratio in `colour.md` and every generated artefact.
 
 ## Notes for whoever fills this in
 
