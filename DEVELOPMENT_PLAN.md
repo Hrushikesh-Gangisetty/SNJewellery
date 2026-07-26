@@ -331,7 +331,7 @@ Stand up the Next.js application with the design system rendered as working code
   Consume the M1.6 token definition as Tailwind theme extensions — colours with semantic names, spacing scale, radii, shadows, breakpoints. Configure light/dark.
   *Done when:* every M1 token is reachable as a Tailwind utility, and no colour or spacing literal appears in any component.
 
-- **`M2.5` Data-access interface and fixtures** — `M`
+- **`M2.5` Data-access interface and fixtures** — `M` — ✅ **complete** (35 contract tests, wired into `npm run verify`)
   Define the domain types by hand as the **draft schema contract** (product, category, product image), and the data-access interface: featured products, newest products, products by category, product by slug, related products, visible categories. Provide a fixture implementation with realistic sample data.
   *Done when:* the interface is fully typed, a fixture implementation satisfies it, and `docs/api/data-access.md` documents both. This task is M3's input — flag any schema question it raises.
 

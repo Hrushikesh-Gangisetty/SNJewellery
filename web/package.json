@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "tokens": "node ../tools/generate-tokens.mjs",
     "tokens:check": "node ../tools/generate-tokens.mjs --check",
-    "verify": "npm run tokens:check && npm run typecheck && npm run lint && npm run format:check"
+    "verify": "npm run tokens:check && npm run typecheck && npm run lint && npm run format:check && npm run test:data",
+    "test:data": "node --experimental-strip-types --import ../tools/register-ts.mjs lib/data/__tests__/catalogue-contract.mjs"
   },
   "dependencies": {
     "next": "15.5.21",

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-hidden="true">
+  <rect width="400" height="400" fill="#F5F3F0"/>
+  <g fill="none" stroke="#C2A55C" stroke-width="2" opacity="0.5">
+    <circle cx="200" cy="200" r="58"/>
+    <circle cx="200" cy="200" r="72"/>
+  </g>
+  <text x="200" y="290" text-anchor="middle" font-family="Georgia, serif"
+        font-size="15" letter-spacing="3" fill="#6B645F">SN</text>
+</svg>
