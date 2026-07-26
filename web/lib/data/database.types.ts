@@ -71,7 +71,7 @@ export type Database = {
       }
       product_images: {
         Row: {
-          aspect: string
+          aspect: Database["public"]["Enums"]["product_image_aspect"]
           created_at: string
           display_order: number
           id: string
@@ -80,7 +80,7 @@ export type Database = {
           url: string
         }
         Insert: {
-          aspect?: string
+          aspect?: Database["public"]["Enums"]["product_image_aspect"]
           created_at?: string
           display_order?: number
           id?: string
@@ -89,7 +89,7 @@ export type Database = {
           url: string
         }
         Update: {
-          aspect?: string
+          aspect?: Database["public"]["Enums"]["product_image_aspect"]
           created_at?: string
           display_order?: number
           id?: string
@@ -209,7 +209,7 @@ export type Database = {
           email: string | null
           id: string
           name: string | null
-          role: string
+          role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
         Insert: {
@@ -217,7 +217,7 @@ export type Database = {
           email?: string | null
           id: string
           name?: string | null
-          role?: string
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Update: {
@@ -225,7 +225,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string | null
-          role?: string
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Relationships: []
@@ -238,7 +238,8 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      product_image_aspect: "product" | "product-portrait"
+      user_role: "admin" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -368,6 +369,9 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      product_image_aspect: ["product", "product-portrait"],
+      user_role: ["admin", "staff"],
+    },
   },
 } as const

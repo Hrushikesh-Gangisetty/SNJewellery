@@ -398,47 +398,47 @@ Stand up the backend and **freeze the schema contract** both clients code agains
 
 ### Tasks
 
-- **`M3.1` Provision projects and local development** — `S`
+- **`M3.1` Provision projects and local development** — `S` — ✅ **complete** (CLI pinned in-repo; dev project linked. Docker not installed, so no local stack — migrations go straight to the dev project)
   Create the development Supabase project, install and configure the CLI, and establish the local development workflow.
   *Done when:* the CLI links to the project and a local instance runs from the repository.
 
-- **`M3.2` Categories and products migrations** — `M`
+- **`M3.2` Categories and products migrations** — `M` — ✅ **complete**
   `categories` (`id`, `name`, `slug`, `display_order`, `is_visible`, timestamps) and `products` (`id`, `name`, `slug`, `description`, `category_id` FK, `purity`, `weight`, `featured`, `sold`, `created_at`, `updated_at`) per the PRD's Database Design section.
   *Done when:* both migrations apply to an empty database and match the M2.5 draft types.
 
-- **`M3.3` Product images and users migrations** — `S`
+- **`M3.3` Product images and users migrations** — `S` — ✅ **complete**
   `product_images` (`id`, `product_id` FK cascade-delete, `image_url`, `storage_path`, `display_order`) and `users` (`id` FK to `auth.users`, `name`, `email`, `role`).
   *Done when:* deleting a product cascades to its image rows.
 
-- **`M3.4` Schema-gap fields** — `S`
+- **`M3.4` Schema-gap fields** — `S` — ✅ **complete** (included at table creation rather than patched in, each with a SQL comment citing the PRD requirement)
   Add the four fields the PRD's feature list requires but its Database Design section omits, each with a migration comment explaining why: `products.tags` (search by tags, Add Product form), `products.archived` (Archive is distinct from Delete and Sold), `products.slug` (SEO URLs and canonicals in M11), `products.colours` (optional available colours on the detail page).
   *Done when:* each field exists and its comment cites the PRD requirement driving it.
 
-- **`M3.5` Indexes and timestamp trigger** — `S`
+- **`M3.5` Indexes and timestamp trigger** — `S` — ✅ **complete**
   Indexes on `products.category_id`, `products.featured`, `products.created_at DESC`, unique `products.slug`, and `product_images(product_id, display_order)`. An `updated_at` trigger so the timestamp is maintained by the database, not client code.
   *Done when:* `EXPLAIN` shows index use for the catalogue and category queries, and an update changes `updated_at` without client involvement.
 
-- **`M3.6` Storage buckets and rendition pipeline** — `M`
+- **`M3.6` Storage buckets and rendition pipeline** — `M` — ◐ **bucket + policies done**; rendition parameters verified in M4.1 when real images are served
   Create the product image bucket with a documented path convention (`products/{product_id}/{image_id}.webp`) and configure the thumbnail, mobile, and optimised renditions the PRD requires.
   *Done when:* all three renditions are retrievable for a test image, and the convention is recorded in [ADR-0005](docs/adr/0005-image-storage-and-renditions.md).
 
-- **`M3.7` RLS policies** — `M`
+- **`M3.7` RLS policies** — `M` — ✅ **complete** (24 adversarial checks against the live database, all passing)
   Public role: `SELECT` only, and only where the product is not archived and its category `is_visible`. Admin role: full write on products, images, categories. Storage: public read, admin-only write. `users`: self-read only, role not self-assignable.
   *Done when:* the adversarial checks in this milestone's acceptance criteria all pass.
 
-- **`M3.8` Authentication configuration** — `S`
+- **`M3.8` Authentication configuration** — `S` — ◐ **config.toml done**; the hosted project still needs signup disabled and the first admin created in the dashboard
   Email/password enabled, public sign-up disabled, first admin user created with `role = 'admin'`.
   *Done when:* the admin can authenticate and a self-service sign-up attempt is rejected.
 
-- **`M3.9` Seed data** — `S`
+- **`M3.9` Seed data** — `S` — ✅ **complete** (applied to the dev project)
   The eleven categories the PRD names — Gold Rings, Earrings, Chains, Necklaces, Pendants, Bangles, Bracelets, Bridal Jewellery, Diamond Jewellery, Silver Jewellery, Kids Collection — plus sample products with images.
   *Done when:* the seed script runs idempotently against an empty database and produces renderable data.
 
-- **`M3.10` Generated types and contract reconciliation** — `M`
+- **`M3.10` Generated types and contract reconciliation** — `M` — ✅ **complete** (one real finding: `aspect` and `role` were text+CHECK and generated as `string`, losing the draft's unions — converted to enums)
   Generate TypeScript types from the schema and reconcile them against the M2.5 hand-written draft, resolving every difference deliberately. Document the equivalent Kotlin data classes for M6.6.
   *Done when:* generated types compile, the M2.5 draft is replaced by generated types with no component changes required, and every reconciliation difference is explained in the commit.
 
-- **`M3.11` Schema contract documentation** — `S`
+- **`M3.11` Schema contract documentation** — `S` — ✅ **complete** (`docs/database/schema.md`)
   Write `docs/database/schema.md` recording the frozen contract, the rule that changes require updating both clients, and the migration workflow.
   *Done when:* the document exists and CLAUDE.md's schema-change rule references it.
 
