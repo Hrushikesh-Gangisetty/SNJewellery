@@ -158,10 +158,10 @@ function buildCss(tokens) {
   L.push("");
   L.push(`  /* Font families */`);
   L.push(
-    `  --font-display: "${font.family.display}", ui-serif, Georgia, serif;`,
+    `  --font-display: var(${font.family.displayLoadedVar}), ${font.family.displayFallback};`,
   );
   L.push(
-    `  --font-body: "${font.family.body}", ui-sans-serif, system-ui, sans-serif;`,
+    `  --font-body: var(${font.family.bodyLoadedVar}), ${font.family.bodyFallback};`,
   );
 
   L.push("");

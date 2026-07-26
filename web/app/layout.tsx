@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
+import { fontVariables } from "@/lib/fonts";
+import { site } from "@/lib/config/site";
 import "./globals.css";
 
-/*
- * Typefaces are deliberately not configured here.
- *
- * The scaffold's Geist fonts were removed: choosing a typeface is
- * M1.4's decision, and wiring it up via `next/font` is M2.6. The
- * app shell — header, footer, mobile drawer — arrives in M2.7.
- *
- * The metadata below is provisional. Real per-page titles,
- * descriptions, and Open Graph tags are M11's work, and the brand
- * name itself is blocked on Open Question 9.
+/**
+ * Per-page titles, Open Graph tags, and structured data are M11's work.
+ * This is the baseline: a real title and description sourced from the
+ * site config, never a hard-coded string.
  */
 export const metadata: Metadata = {
-  title: "Jewellery Catalogue",
-  description:
-    "Browse our jewellery collections. Visit our store or contact us to enquire.",
+  title: {
+    default: site.name,
+    template: `%s · ${site.shortName}`,
+  },
+  description: site.description,
 };
 
 export default function RootLayout({
@@ -24,8 +22,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">{children}</body>
+    <html lang="en" className={`${fontVariables} h-full antialiased`}>
+      <body className="bg-surface text-text-primary flex min-h-full flex-col">
+        {/*
+         * First focusable element on the page, visually hidden until
+         * focused. Required by docs/design/accessibility.md §2.
+         */}
+        <a
+          href="#main"
+          className="bg-surface text-text-primary focus:ring-focus sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-4 focus:py-2 focus:ring-2"
+        >
+          Skip to content
+        </a>
+        {children}
+      </body>
     </html>
   );
 }
