@@ -1,4 +1,8 @@
-import { fixtureCategories, fixtureProducts, fixturePurities } from "./fixtures";
+import {
+  fixtureCategories,
+  fixtureProducts,
+  fixturePurities,
+} from "./fixtures";
 import { DEFAULT_PAGE_SIZE, type CatalogueSource } from "./source";
 import type { Category, Page, PageRequest, Product, Purity } from "./types";
 
@@ -75,9 +79,7 @@ export const fixtureCatalogueSource: CatalogueSource = {
   },
 
   getCategoryBySlug(slug: string): Promise<Category | null> {
-    const found = fixtureCategories.find(
-      (c) => c.slug === slug && c.isVisible,
-    );
+    const found = fixtureCategories.find((c) => c.slug === slug && c.isVisible);
     return settle(found ?? null);
   },
 
@@ -88,7 +90,11 @@ export const fixtureCatalogueSource: CatalogueSource = {
   },
 
   getFeaturedProducts(limit = 8): Promise<readonly Product[]> {
-    return settle(publicProducts().filter((p) => p.featured).slice(0, limit));
+    return settle(
+      publicProducts()
+        .filter((p) => p.featured)
+        .slice(0, limit),
+    );
   },
 
   getNewestProducts(limit = 8): Promise<readonly Product[]> {
@@ -119,10 +125,7 @@ export const fixtureCatalogueSource: CatalogueSource = {
     return settle(found ?? null);
   },
 
-  getRelatedProducts(
-    product: Product,
-    limit = 4,
-  ): Promise<readonly Product[]> {
+  getRelatedProducts(product: Product, limit = 4): Promise<readonly Product[]> {
     return settle(
       publicProducts()
         .filter(

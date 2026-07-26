@@ -1,10 +1,4 @@
-import type {
-  Category,
-  Page,
-  PageRequest,
-  Product,
-  Purity,
-} from "./types";
+import type { Category, Page, PageRequest, Product, Purity } from "./types";
 
 /**
  * THE data-access boundary for the website.
