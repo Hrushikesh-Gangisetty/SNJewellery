@@ -51,3 +51,35 @@ Designing an identity from scratch and then discovering an established one exist
 - Jewellery photography is the content. The design system's job is to get out of its way — restrained neutrals, generous whitespace, and motion that supports the imagery rather than competing with it.
 - The photography standard in `ux.md` is the one document the shop owner will use directly. Write it for someone holding a phone, not for a designer.
 - Record contrast ratios as measured numbers, not as assertions. M12.8 verifies against them.
+
+## Token pipeline (M1.6)
+
+[tokens.json](tokens.json) is the **single source of truth** for every design
+value. Both platform artefacts are generated from it:
+
+```bash
+node tools/generate-tokens.mjs           # write the artefacts
+node tools/generate-tokens.mjs --check   # verify they are current
+```
+
+| Generated file | Consumed by |
+|---|---|
+| `web/app/globals.css` | Tailwind v4 `@theme` block — M2.4 |
+| `android/design-tokens/Tokens.kt` | Compose theme — M6.2 |
+
+**Never edit a generated file by hand.** Both carry a banner saying so. Edit
+`tokens.json` and re-run. `npm run verify` in `web/` runs `--check`, so a
+hand-edit or a stale artefact fails the build.
+
+### The contrast guard
+
+Before emitting anything, the generator validates every contrast assertion in
+`tokens.json` against the WCAG 2.1 formula — 32 pairs across light and dark. **A
+palette change that breaks accessibility fails the generator and writes
+nothing.** This is the concrete payoff of generating rather than hand-mirroring,
+and it is verified: reintroducing the two defects found during M1.3 (a muted grey
+that fails on the sunken surface, and gold used as body text) both correctly
+fail with a non-zero exit.
+
+`accent` is deliberately excluded from the light-mode non-text checks. At 2.42:1
+on white it is decorative-only by design — see [colour.md](colour.md) §1.
