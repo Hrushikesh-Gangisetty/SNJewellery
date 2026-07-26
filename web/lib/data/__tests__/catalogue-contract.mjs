@@ -101,8 +101,21 @@ ok("images are in ascending displayOrder",
 
 // ── Alt text ─────────────────────────────────────────────────────────
 ok("alt text includes name, purity and category",
-   productImageAlt(soldItem) === "Diamond Cut Jhumka Earrings — 22K Gold Earrings",
+   productImageAlt(soldItem) === "Diamond Cut Jhumka Earrings — 22K Earrings",
    productImageAlt(soldItem));
+// Purity and category names overlap in this catalogue; a naive join reads
+// aloud as "18K Gold Gold Rings" / "Silver Silver Jewellery".
+const ring = await catalogue.getProductBySlug("mens-signet-ring");
+ok("alt text does not repeat 'Gold' for an 18K gold ring",
+   productImageAlt(ring) === "Men's Signet Ring — 18K Gold Rings",
+   productImageAlt(ring));
+const anklet = await catalogue.getProductBySlug("silver-anklet-pair");
+ok("alt text does not repeat 'Silver' for silver jewellery",
+   productImageAlt(anklet) === "Silver Anklet Pair — Silver Jewellery",
+   productImageAlt(anklet));
+ok("no alt text contains a consecutive repeated word",
+   all.items.flatMap(p => p.images.map((_, i) => productImageAlt(p, i)))
+     .every(a => !/(\w+)\s+/i.test(a)));
 ok("alt text numbers additional views",
    productImageAlt(soldItem, 1).endsWith(", view 2"));
 ok("no alt text is empty",

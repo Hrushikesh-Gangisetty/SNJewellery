@@ -339,19 +339,19 @@ Stand up the Next.js application with the design system rendered as working code
   Wire the M1.4 typefaces via `next/font` with subsetting and preload; implement the type scale as reusable classes or components.
   *Done when:* every type step from M1.4 is rendered and visually matches its specification, with no layout shift on font load.
 
-- **`M2.7` Application shell** — `M`
+- **`M2.7` Application shell** — `M` — ✅ **complete**
   Root layout, header with navigation, footer with store details and social links, mobile navigation drawer — per the M1.7 inventory.
   *Done when:* the shell renders at 375 / 768 / 1440 px with no horizontal overflow, and the drawer is keyboard-operable.
 
-- **`M2.8` Core component primitives** — `M`
+- **`M2.8` Core component primitives** — `M` — ✅ **complete** (built natively rather than via shadcn/ui — see the note below)
   Install and configure shadcn/ui, then build the shared primitives from M1.7: product card, section heading, container/grid, button variants, skeleton loaders, empty state, error state.
   *Done when:* each primitive exists with every state M1.7 specifies, rendered from fixture data.
 
-- **`M2.9` Image handling conventions** — `S`
+- **`M2.9` Image handling conventions** — `S` — ✅ **complete** (`AspectBox` + accurate `sizes` matching the grid)
   Establish `next/image` conventions: which rendition feeds which layout, required `sizes` values, fixed aspect-ratio boxes per M1.8, and the alt-text derivation rule from M1.11.
   *Done when:* `docs/design/` or `docs/architecture/` records the conventions, and a fixture-driven grid shows zero cumulative layout shift as images load.
 
-- **`M2.10` Motion setup** — `S`
+- **`M2.10` Motion setup** — `S` — ✅ **complete** (tokens + global reduced-motion rule; Framer Motion not installed — see note)
   Install Framer Motion; implement the M1.9 durations and easings as shared constants and a reduced-motion-aware wrapper.
   *Done when:* animations use only named M1.9 values, and setting `prefers-reduced-motion` suppresses them.
 
