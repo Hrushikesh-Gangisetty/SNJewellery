@@ -7,8 +7,18 @@
 // they are checked from EVERY entry point rather than once. When M4.1
 // swaps in the Supabase implementation, this file should pass unchanged
 // against it - that is how we know RLS reproduces the fixture behaviour.
-const { catalogue, productImageAlt } = await import("../index.ts");
+const mod = await import("../index.ts");
+const { productImageAlt } = mod;
 const { fixtureProducts } = await import("../fixtures.ts");
+
+// Which source to exercise. `fixture` needs nothing; `supabase` needs
+// web/.env.local and a seeded database.
+const WHICH = process.env.CONTRACT_SOURCE ?? "fixture";
+const catalogue =
+  WHICH === "supabase" ? mod.supabaseCatalogueSource : mod.fixtureCatalogueSource;
+console.log(`
+CatalogueSource contract — source: ${WHICH}
+`);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = "") => {
@@ -16,7 +26,17 @@ const ok = (name, cond, detail = "") => {
   else { fail++; console.log(`  FAIL  ${name}${detail ? "  -> " + detail : ""}`); }
 };
 
-const ARCHIVED = "pr-13", HIDDEN = "pr-14", SOLD = "pr-03";
+// Identify products by SLUG, never by id.
+//
+// The fixture ids ("pr-13") do not exist in Supabase, where ids are
+// UUIDs. An assertion like `!items.some(p => p.id === "pr-13")` is
+// therefore trivially TRUE against Supabase regardless of what RLS does —
+// it would pass even if the archived product were fully exposed. Slugs
+// are identical in both sources, so they are the only sound identity here.
+const ARCHIVED = "discontinued-pendant-design";
+const HIDDEN = "unreleased-festival-collection-piece";
+const SOLD = "diamond-cut-jhumka-earrings";
+const NEWEST = "temple-design-bridal-necklace";
 
 // ── Rule 1 & 2: archived and hidden-category never leak ──────────────
 const cats = await catalogue.getVisibleCategories();
@@ -28,17 +48,17 @@ ok("getCategoryBySlug returns null for unknown slug",
    (await catalogue.getCategoryBySlug("no-such-thing")) === null);
 
 const all = await catalogue.getAllProducts({ limit: 100 });
-ok("archived absent from getAllProducts", !all.items.some(p => p.id === ARCHIVED));
+ok("archived absent from getAllProducts", !all.items.some(p => p.slug === ARCHIVED));
 ok("hidden-category product absent from getAllProducts",
-   !all.items.some(p => p.id === HIDDEN));
+   !all.items.some(p => p.slug === HIDDEN));
 
 const featured = await catalogue.getFeaturedProducts(50);
 ok("featured product in a hidden category does NOT leak (the trap case)",
-   !featured.some(p => p.id === HIDDEN),
-   featured.map(p => p.id).join(","));
+   !featured.some(p => p.slug === HIDDEN),
+   featured.map(p => p.slug).join(","));
 
 const newest = await catalogue.getNewestProducts(50);
-ok("archived absent from getNewestProducts", !newest.some(p => p.id === ARCHIVED));
+ok("archived absent from getNewestProducts", !newest.some(p => p.slug === ARCHIVED));
 ok("getProductBySlug returns null for archived",
    (await catalogue.getProductBySlug("discontinued-pendant-design")) === null);
 ok("getProductBySlug returns null for hidden-category product",
@@ -52,15 +72,15 @@ ok("getProductsByCategory on unknown slug yields empty (not everything)",
 const necklace = await catalogue.getProductBySlug("gold-mangalsutra-black-beads");
 const related = await catalogue.getRelatedProducts(necklace, 50);
 ok("related products exclude archived sibling in same category",
-   !related.some(p => p.id === ARCHIVED), related.map(p=>p.id).join(","));
+   !related.some(p => p.slug === ARCHIVED), related.map(p=>p.slug).join(","));
 ok("related products exclude the product itself",
    !related.some(p => p.id === necklace.id));
 
 // ── Rule 3: sold products ARE returned ───────────────────────────────
 const soldItem = await catalogue.getProductBySlug("diamond-cut-jhumka-earrings");
 ok("sold product IS returned by getProductBySlug", soldItem !== null && soldItem.sold === true);
-ok("sold product IS present in getAllProducts", all.items.some(p => p.id === SOLD));
-ok("sold product IS present in featured", featured.some(p => p.id === SOLD));
+ok("sold product IS present in getAllProducts", all.items.some(p => p.slug === SOLD));
+ok("sold product IS present in featured", featured.some(p => p.slug === SOLD));
 
 // ── Rule 4: null, not throw ──────────────────────────────────────────
 ok("unknown product slug returns null", (await catalogue.getProductBySlug("zzz")) === null);
@@ -69,7 +89,7 @@ ok("unknown product slug returns null", (await catalogue.getProductBySlug("zzz")
 const a = (await catalogue.getAllProducts({ limit: 100 })).items.map(p => p.id).join(",");
 const b = (await catalogue.getAllProducts({ limit: 100 })).items.map(p => p.id).join(",");
 ok("ordering is deterministic across calls", a === b);
-ok("newest-first ordering", all.items[0].id === "pr-01");
+ok("newest-first ordering", all.items[0].slug === NEWEST, all.items[0].slug);
 
 const p1 = await catalogue.getAllProducts({ limit: 5 });
 const p2 = await catalogue.getAllProducts({ limit: 5, cursor: p1.nextCursor });

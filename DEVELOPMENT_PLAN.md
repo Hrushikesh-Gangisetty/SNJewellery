@@ -485,7 +485,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
 
 ### Tasks
 
-- **`M4.1` Real data-access implementation** — `M`
+- **`M4.1` Real data-access implementation** — `M` — ✅ **complete** (the same 38 contract tests pass unchanged against both fixtures and the live database)
   Implement the M2.5 interface against Supabase, replacing the fixture implementation. All queries live in this layer; no page queries Supabase inline.
   *Done when:* every interface method is backed by a real query, fixtures are retained for tests only, and no component changed.
 
