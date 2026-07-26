@@ -19,6 +19,7 @@ google-services.json
 # Supabase CLI local state
 .branches
 .temp
+.supabase/
 
 # ─────────────────────────────────────────────────────────────
 # Node / Next.js  (web/)
