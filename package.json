@@ -10,7 +10,8 @@
     "db:diff": "supabase db diff",
     "db:reset": "supabase db reset",
     "db:seed": "supabase db reset",
-    "db:types": "supabase gen types typescript --linked > web/lib/data/database.types.ts"
+    "db:types": "supabase gen types typescript --linked > web/lib/data/database.types.ts",
+    "db:test-rls": "node supabase/tests/rls.mjs --from-cli"
   },
   "devDependencies": {
     "supabase": "2.109.1"
