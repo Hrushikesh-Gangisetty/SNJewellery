@@ -50,13 +50,14 @@ The shop name and design direction have been supplied. Outstanding, none of it b
 
 | Item | Affects | Until then |
 |---|---|---|
-| **Logo** (SVG, plus a reversed version for dark backgrounds) | Header, footer, social previews | Wordmark renders instead |
-| **Existing signage / packaging photos** | [colour.md](colour.md) — the palette was derived from the owner's stated preference, not sampled from real assets | Reconcile `accent` against any established gold **before M2.4 consumes the tokens**, and recompute every ratio if it changes |
+| **Logo SVG**, monogram SVG, reversed version | Header, footer, favicon, social previews | Raster mockup received 2026-07-26; wordmark renders until vectors arrive — see [brand.md](brand.md) §4 |
+| **Signage / packaging photos** | Confirms whether the mockup's teal is a brand colour | Gold now sampled from the logo and all 32 ratios revalidated. Teal deliberately not adopted — [brand.md](brand.md) §4 |
 | **5–10 unedited product photographs** | `ux.md` (M1.10) photography standard, and the M7.6 compression target | M1.10 writes the standard against configurable guidelines |
 | Year established, business history, certifications | About page (M4.11) | Sections hide cleanly, per [ADR-0010](../adr/0010-configurable-site-content.md) |
 
-The signage question is the one with real rework attached: a different established
-gold changes every measured ratio in `colour.md` and every generated artefact.
+The gold reconciliation that carried rework risk is **done** — `accent` came from
+the logo before any component consumed it, which is exactly the window ADR-0009
+and M1 were sequenced to protect.
 
 ## Notes for whoever fills this in
 
@@ -93,5 +94,5 @@ and it is verified: reintroducing the two defects found during M1.3 (a muted gre
 that fails on the sunken surface, and gold used as body text) both correctly
 fail with a non-zero exit.
 
-`accent` is deliberately excluded from the light-mode non-text checks. At 2.42:1
+`accent` is deliberately excluded from the light-mode non-text checks. At 2.38:1
 on white it is decorative-only by design — see [colour.md](colour.md) §1.

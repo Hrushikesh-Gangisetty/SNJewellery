@@ -36,18 +36,18 @@ interchangeable:**
 
 | Token | Value | Job |
 |---|---|---|
-`accent` | `#C9A227` | **Decorative only** on light surfaces. Fills, rules, hover washes, and as a background *behind* dark text. Never text, never an icon that carries meaning, never the sole indicator of an interactive control. |
-| `accent-text` | `#856404` | Anything semantic — gold-coloured text, meaningful icons, links.
+| `accent` | `#C2A55C` | **Decorative only** on light surfaces. Fills, rules, hover washes, and as a background *behind* dark text. Never text, never an icon that carries meaning, never the sole indicator of an interactive control. |
+| `accent-text` | `#7D6524` | Anything semantic — gold-coloured text, meaningful icons, links.
 
-`accent` at 2.42:1 on white is below the 3:1 that WCAG 1.4.11 requires for
+`accent` at 2.38:1 on white is below the 3:1 that WCAG 1.4.11 requires for
 non-text contrast. **That is acceptable precisely because it is decorative** —
 1.4.11 applies to UI component boundaries and to graphics needed to understand
 content, neither of which `accent` may be used for. This is a rule, not a
 loophole: if gold ever becomes the only thing distinguishing a button from its
 background, the design is wrong.
 
-Gold behaves much better in dark mode — `#D4AF37` on `#0F0F0F` measures
-**9.12:1** — so dark mode may use gold far more freely.
+Gold behaves much better in dark mode — `#C9A961` on `#0F0F0F` measures
+**8.52:1** — so dark mode may use gold far more freely.
 
 ---
 
@@ -64,8 +64,8 @@ Gold behaves much better in dark mode — `#D4AF37` on `#0F0F0F` measures
 | `border` | `#E7E5E4` | Decorative dividers, card edges |
 | `border-strong` | `#D6D3D1` | Emphasised separation |
 | `border-interactive` | `#96908B` | **Form fields, control outlines** — the only border token that meets 3:1 |
-| `accent` | `#C9A227` | Brand gold — decorative only (§1) |
-| `accent-text` | `#856404` | Gold for text and meaningful icons |
+| `accent` | `#C2A55C` | Brand gold, sampled from the logo — decorative only (§1) |
+| `accent-text` | `#7D6524` | Gold for text and meaningful icons |
 | `on-accent` | `#1C1917` | Text placed on a gold fill |
 | `focus` | `#1C1917` | Focus ring |
 | `success` | `#15803D` | Confirmation |
@@ -80,7 +80,7 @@ AA body text requires **4.5:1**. All pass.
 | `text-primary` | 17.49 | 16.62 | 15.79 |
 | `text-secondary` | 7.63 | 7.25 | 6.89 |
 | `text-muted` | 5.81 | 5.52 | **5.25** |
-| `accent-text` | 5.49 | 5.22 | **4.96** |
+| `accent-text` | 5.59 | 5.31 | **5.04** |
 | `success` | 5.02 | 4.77 | **4.53** |
 | `danger` | 6.47 | 6.15 | 5.84 |
 
@@ -102,8 +102,8 @@ Non-text contrast (WCAG 1.4.11) requires **3:1** for UI component boundaries.
 | `border-interactive` on `surface` | **3.15** | Passes — use for form fields |
 | `border-strong` on `surface` | 1.49 | Decorative only |
 | `border` on `surface` | 1.26 | Decorative only |
-| `accent` on `surface` | 2.42 | Decorative only (§1) |
-| `on-accent` on `accent` | **7.23** | Dark text on gold is safe |
+| `accent` on `surface` | 2.38 | Decorative only (§1) |
+| `on-accent` on `accent` | **7.35** | Dark text on gold is safe |
 | `focus` on `surface` | 17.49 | Focus ring is unmissable |
 
 ---
@@ -123,8 +123,8 @@ Required by the PRD for the Android app, and honoured on the website.
 | `border` | `#292524` | Dividers |
 | `border-strong` | `#3F3B39` | Emphasised separation |
 | `border-interactive` | `#6B6560` | Form fields — meets 3:1 |
-| `accent` | `#D4AF37` | Brand gold — usable far more freely here (9.12:1) |
-| `accent-text` | `#E0BC4A` | Gold text |
+| `accent` | `#C9A961` | Brand gold — usable far more freely here (8.52:1) |
+| `accent-text` | `#DCC077` | Gold text |
 | `on-accent` | `#0F0F0F` | Text on a gold fill |
 | `focus` | `#FAF9F7` | Focus ring |
 | `success` | `#4ADE80` | Confirmation |
@@ -139,7 +139,7 @@ All pass 4.5:1.
 | `text-primary` | 18.22 | 16.70 | 19.03 |
 | `text-secondary` | 7.60 | 6.97 | 7.94 |
 | `text-muted` | 5.25 | **4.81** | 5.48 |
-| `accent-text` | 10.46 | 9.59 | 10.93 |
+| `accent-text` | 10.82 | 9.91 | 11.30 |
 | `success` | 11.00 | 10.08 | 11.49 |
 | `danger` | 6.93 | 6.35 | 7.24 |
 
@@ -148,8 +148,8 @@ All pass 4.5:1.
 | Pair | Ratio | Verdict |
 |---|---:|---|
 | `border-interactive` on `surface` | **3.34** | Passes |
-| `accent` on `surface` | **9.12** | Passes — gold is safe in dark mode |
-| `on-accent` on `accent` | 9.12 | Safe |
+| `accent` on `surface` | **8.52** | Passes — gold is safe in dark mode |
+| `on-accent` on `accent` | 8.52 | Safe |
 | `focus` on `surface` | 18.22 | Unmissable |
 
 ---
@@ -212,13 +212,44 @@ loudly rather than silently.
 
 ---
 
-## 6 · Open
+## 6 · Sampled from the real logo
 
-**These values were derived from the owner's stated preference, not sampled from
-real brand assets**, because no logo, signage, or packaging has been supplied
-yet ([brand.md](brand.md) §7).
+**Resolved 2026-07-26.** The owner supplied the logo, and `accent` is now taken
+from it rather than from a stated preference.
 
-If existing material uses a specific gold, reconcile `accent` against it **before
-M2.4 consumes the tokens** — and recompute every ratio in this document, since a
-different gold changes all of them. That is the one avoidable rework in this
-milestone.
+The mark's lettering is a **metallic gradient**, not a flat colour — it runs from
+a pale highlight through a mid gold to a dark shadow, because it is rendered as
+brushed metal. No single hex is "the" brand gold, so `accent` is a flat value
+chosen to read as the same family: warm, slightly muted, antique rather than
+saturated yellow.
+
+The previous `#C9A227` was noticeably more saturated and yellower than the mark.
+`#C2A55C` sits closer to its mid-tone.
+
+| | Was | Now |
+|---|---|---|
+| `accent` (light) | `#C9A227` | **`#C2A55C`** |
+| `accent-text` (light) | `#856404` | **`#7D6524`** |
+| `accent` (dark) | `#D4AF37` | **`#C9A961`** |
+| `accent-text` (dark) | `#E0BC4A` | **`#DCC077`** |
+
+All 32 contrast pairs were revalidated by the generator after the change.
+
+### Two things still to settle
+
+1. **An SVG of the logo.** These values were read from a compressed raster
+   mockup with studio lighting on the metal, which is not a reliable source for
+   an exact colour. An SVG would let us take the gradient stops directly. The
+   change above is a one-token edit if it needs adjusting.
+2. **The teal background is not in the palette, deliberately.** The mockup shows
+   the logo on a deep teal wall. That reads as a presentation backdrop chosen by
+   whoever made the mockup, and adopting it would contradict the brief — white,
+   gold, black, subtle neutrals, nothing that competes with the jewellery. **If
+   teal is actually a brand colour** — on signage, packaging, or bill books — say
+   so, because that is a real palette decision and not one to infer from a
+   mockup.
+
+**Logos are exempt from WCAG contrast requirements**, so the gold mark may sit on
+white even though `accent` as a colour may not be used for text there. It will
+look lighter on white than it does on teal; if that reads as washed out, the
+answer is a dark-surface header band, not darkening the logo.

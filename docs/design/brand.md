@@ -19,7 +19,7 @@ Part of the [design system](README.md). Produced by M1.1 and M1.2.
 | **Location** | 4-394/A, Temple Street, Markapur – 523316 |
 | **Tagline** | None. Do not invent one. |
 | **Established** | Not yet supplied |
-| **Logo** | Not yet supplied — see §4 |
+| **Logo** | Supplied 2026-07-26 as a raster mockup — see §4 |
 
 ### The name is doing two jobs
 
@@ -33,8 +33,8 @@ It is also **28 characters**, which is long for a mobile header at 375 px. So:
 | Context | Treatment |
 |---|---|
 | Page metadata, footer, About, structured data | Full name, always |
-| Desktop header | Full name (logo lockup when supplied) |
-| Mobile header | **Short form**, or logo mark alone once a logo exists |
+| Desktop header | Full logo lockup |
+| Mobile header | **Winged SN monogram** — see §4 |
 | Social previews (M11.2) | Full name |
 
 Never abbreviate to "SNJ" or "SN J&SP". Never render the ampersand as "and".
@@ -84,10 +84,84 @@ screen — applied to a traditional Indian jewellery catalogue.
 
 ---
 
-## 4 · Logo rules
+## 4 · Logo
 
-The logo has not been supplied. These rules apply when it is, and the layout
-must work **before** it exists — the header falls back to the wordmark.
+**Supplied 2026-07-26** as a raster mockup: the mark on a deep teal wall, gold
+lettering rendered as brushed metal.
+
+### What the mark contains
+
+Three parts, and the separation matters:
+
+1. **A winged "SN" monogram** — the letters interlocked, with a stylised pair of
+   wings above.
+2. **"Jewellery"** — a high-contrast classical serif, set large.
+3. **"& Silver Palace"** — the same serif, much smaller, beneath.
+
+### The monogram solves the mobile-header problem
+
+§1 flagged that the 28-character trading name is unusable in a mobile header.
+**The winged SN monogram is the answer.** It is compact, distinctive, and legible
+at small sizes in a way the full lockup is not.
+
+Revised from §1:
+
+| Context | Treatment |
+|---|---|
+| Mobile header | **Winged SN monogram alone** |
+| Desktop header | Full logo lockup |
+| Favicon / app icon | **Winged SN monogram** |
+| Footer, About, social previews | Full logo lockup |
+| Page metadata, structured data | Full name as text |
+
+This needs the monogram **exported as its own asset**, separate from the lockup —
+cropping it out of the full logo will not scale cleanly.
+
+### The serif validates the typeface choice
+
+The wordmark is a high-contrast classical serif with pronounced thick/thin
+stroke modulation — the same family of letterform as **Cormorant Garamond**,
+chosen independently in [typography.md](typography.md). The site's headings will
+sit naturally beside the logo rather than fighting it.
+
+It also confirms the 28 px floor for Cormorant: the logo's own serif has exactly
+the delicate hairlines that disappear at small sizes, which is why the wordmark
+in the mark is set large and "& Silver Palace" is set in a heavier optical weight.
+
+### The gold
+
+The lettering is a **metallic gradient**, not a flat colour — pale highlight
+through mid gold to dark shadow, because it is rendered as brushed metal. No
+single hex is "the" brand gold.
+
+`accent` was resampled from its mid-tone: `#C9A227` → **`#C2A55C`**, a warmer and
+less saturated gold. See [colour.md](colour.md) §6 for all four revised values
+and the revalidated ratios.
+
+### The teal is not adopted
+
+The mockup's deep teal background reads as a **presentation backdrop** chosen by
+whoever produced the mockup, not a brand colour. It has deliberately not been
+added to the palette: it would contradict the brief — white, gold, black, subtle
+neutrals, nothing competing with the jewellery.
+
+**If teal is genuinely a brand colour** — on signage, packaging, or bill books —
+that is a real palette decision and needs saying, because it cannot be inferred
+from a mockup.
+
+### Still needed
+
+| Asset | Why |
+|---|---|
+| **SVG of the full lockup** | The raster mockup has studio lighting on the metal, so it is not a reliable colour source and will not scale. An SVG also lets us take the gradient stops exactly. |
+| **SVG of the monogram alone** | Mobile header and favicon |
+| **A version that works on white** | The current asset is gold-on-teal. Logos are exempt from WCAG contrast rules, so gold on white is permitted — but it will read lighter than on teal. If that looks washed out, the fix is a dark header band, not darkening the logo. |
+| **A reversed / single-colour version** | Dark-mode surfaces, and print |
+
+### Usage rules
+
+These apply now that the asset exists, and the layout must still work **without**
+it — the header falls back to the wordmark while only a raster is available.
 
 - **Clear space:** minimum equal to the cap height of the logo on all sides.
   Nothing intrudes.
@@ -165,7 +239,7 @@ implementing it quietly.
 
 | Item | Blocks | Workaround until supplied |
 |---|---|---|
-| Logo (SVG, plus reversed version) | Nothing hard | Header and footer render the wordmark |
+| Logo **SVG** + monogram SVG + reversed version | Nothing hard | Wordmark renders; see §4 |
 | Existing signage / packaging / print photos | Nothing hard | Palette derived from the owner's stated preference (white, gold, black, neutrals) rather than sampled from real assets — see [colour.md](colour.md) |
 | Year established | About page, trust signals | Section hidden |
 | Business history, certifications | About page (M4.11) | Section hidden, per ADR-0010 |
