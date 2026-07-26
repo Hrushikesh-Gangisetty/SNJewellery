@@ -21,17 +21,21 @@ Defining it once, first, as documentation, costs one milestone and removes both 
 | [colour.md](colour.md) | Palette with semantic roles, light and dark, **measured** contrast ratios | M1.3 | ✅ |
 | [typography.md](typography.md) | Typefaces, type scale, weights, roles, licensing confirmation | M1.4 | ✅ |
 | [layout.md](layout.md) | Spacing, radii, elevation, **breakpoints**, layout grid, touch targets | M1.5 | ✅ |
-| `tokens.json` | Platform-neutral token definition plus the generator | M1.6 | ⬜ |
-| `components.md` | Full component inventory with variants and every state | M1.7 | ⬜ |
-| `responsive.md` | Component reflow behaviour, image aspect ratios | M1.8 | ⬜ |
-| `motion.md` | Duration scale, easings, permitted animations, reduced-motion rule | M1.9 | ⬜ |
-| `ux.md` | Product photography standards, CTA hierarchy, loading/empty/error patterns | M1.10 | ⬜ |
-| `accessibility.md` | WCAG 2.1 AA target and the concrete rules that follow from it | M1.11 | ⬜ |
+| [tokens.json](tokens.json) | Platform-neutral token definition plus the generator | M1.6 | ✅ |
+| [components.md](components.md) | Full component inventory with variants and every state | M1.7 | ✅ |
+| [responsive.md](responsive.md) | Component reflow behaviour, image aspect ratios | M1.8 | ✅ |
+| [motion.md](motion.md) | Duration scale, easings, permitted animations, reduced-motion rule | M1.9 | ✅ |
+| [ux.md](ux.md) | Product photography standards, CTA hierarchy, loading/empty/error patterns | M1.10 | ✅ |
+| [accessibility.md](accessibility.md) | WCAG 2.1 AA target and the concrete rules that follow from it | M1.11 | ✅ |
 
-**Note on `layout.md` vs `responsive.md`:** breakpoint *values* live in
+**M1 is complete.** All eleven documents plus the token pipeline exist, and
+`web/` and `android/` both have generated artefacts to build against.
+
+**Note on `layout.md` vs `responsive.md`:** breakpoint *values*, the spacing
+scale, container widths, grid columns, and touch-target minimums live in
 [layout.md](layout.md), because the layout grid is defined against them.
-`responsive.md` will cover how components *behave* at each breakpoint without
-redefining the numbers.
+[responsive.md](responsive.md) covers how components *behave* at each breakpoint
+without redefining the numbers.
 
 ## How each platform consumes this
 

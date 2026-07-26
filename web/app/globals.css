@@ -26,6 +26,15 @@
   --sn-focus: #1C1917;
   --sn-success: #15803D;
   --sn-danger: #B91C1C;
+
+  /* Motion durations. Tailwind v4 has no --duration-* theme
+   * namespace, so these are plain variables, used as
+   * duration-[var(--sn-duration-base)] or in bespoke CSS. */
+  --sn-duration-instant: 0ms;
+  --sn-duration-fast: 120ms;
+  --sn-duration-base: 200ms;
+  --sn-duration-slow: 320ms;
+  --sn-duration-deliberate: 480ms;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -186,6 +195,17 @@
   --container-prose: 42.5rem;
   --container-content: 80rem;
   --container-wide: 96rem;
+
+  /* Easing */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+  /* Image aspect ratios */
+  --aspect-product: 1 / 1;
+  --aspect-product-portrait: 4 / 5;
+  --aspect-hero: 16 / 9;
+  --aspect-hero-mobile: 4 / 5;
 }
 
 /* Scale entries carrying more than Tailwind's theme keys allow. */
@@ -218,4 +238,18 @@ body {
 :focus-visible {
   outline: 2px solid var(--sn-focus);
   outline-offset: 2px;
+}
+
+/* Honour reduced-motion globally rather than per component, so a
+ * missed check in one component cannot reintroduce motion.
+ * See motion.md and accessibility.md. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

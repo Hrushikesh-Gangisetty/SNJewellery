@@ -248,27 +248,27 @@ This milestone exists because the PRD demands a "clean and premium browsing expe
   Express everything from M1.3–M1.5 as a platform-neutral token definition, with a documented path to consume it in Tailwind (`web`) and in a Compose theme (`android`). Record the sharing mechanism decision in an ADR.
   *Done when:* the token file exists in `docs/design/`, the generator emits both platform artefacts, and the consumption path for each is documented.
 
-- **`M1.7` Component inventory** — `M`
+- **`M1.7` Component inventory** — `M` — ✅ **complete**
   Enumerate every component both platforms need, before either is built. For each: purpose, variants, and all states (default, hover, focus, active, disabled, loading, empty, error). Mark each as web-only, Android-only, or shared-concept.
   *Done when:* `docs/design/components.md` covers at minimum — web: header, mobile drawer, footer, product card, image gallery, category chip, filter control, search input, button variants, skeleton, empty state, error state, pagination; Android: top bar, bottom navigation, form field, category picker, image picker tile, upload progress, status badge, confirmation dialog, list row, snackbar.
 
-- **`M1.8` Responsive design principles** — `S`
+- **`M1.8` Responsive design principles** — `S` — ✅ **complete**
   Define breakpoints, how the catalogue grid reflows at each, product image aspect ratios (fixed, to prevent layout shift), minimum touch target size, and the mobile-first authoring rule the PRD requires.
   *Done when:* `docs/design/responsive.md` specifies column counts per breakpoint, image aspect ratios, and a minimum touch target in both `dp` and `px`.
 
-- **`M1.9` Animation and motion guidelines** — `S`
+- **`M1.9` Animation and motion guidelines** — `S` — ✅ **complete**
   Define duration scale, easing curves, which interactions animate and which deliberately do not, page and gallery transition behaviour, and the `prefers-reduced-motion` / Android reduced-animation requirement. Jewellery photography should be the focus; motion supports it rather than competing with it.
   *Done when:* `docs/design/motion.md` gives named durations and easings, a list of permitted animations, and the reduced-motion rule.
 
-- **`M1.10` UX guidelines** — `M`
+- **`M1.10` UX guidelines** — `M` — ✅ **complete**
   Define product photography standards (background, framing, minimum resolution, consistency across the catalogue — this directly constrains what the owner shoots), imagery rules, CTA hierarchy on the product page, and the standard patterns for loading, empty, and error states.
   *Done when:* `docs/design/ux.md` covers photography standards, CTA hierarchy, and a canonical pattern for each of loading/empty/error.
 
-- **`M1.11` Accessibility standard** — `S`
+- **`M1.11` Accessibility standard** — `S` — ✅ **complete**
   State the target (WCAG 2.1 AA), and the concrete rules that follow: contrast minimums, visible focus indicator specification, minimum touch target, alt-text derivation rule for product images, heading hierarchy rule, and keyboard/screen-reader expectations.
   *Done when:* `docs/design/accessibility.md` states the target and each rule as a checkable statement, and M12's audit criteria reference it.
 
-- **`M1.12` Publish and cross-reference** — `S`
+- **`M1.12` Publish and cross-reference** — `S` — ✅ **complete**
   Assemble `docs/design/README.md` as the design system index, and cross-reference it from CLAUDE.md and this plan.
   *Done when:* every design document is reachable from `docs/design/README.md`, and M2 and M6 both cite it as their visual source of truth.
 

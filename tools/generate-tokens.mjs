@@ -88,8 +88,17 @@ function cssVar(name) {
 }
 
 function buildCss(tokens) {
-  const { colour, font, space, radius, elevation, breakpoint, container } =
-    tokens;
+  const {
+    colour,
+    font,
+    space,
+    radius,
+    elevation,
+    breakpoint,
+    container,
+    motion,
+    aspect,
+  } = tokens;
   const L = [];
 
   L.push(`/* ${BANNER}`);
@@ -113,6 +122,13 @@ function buildCss(tokens) {
   L.push(` * explicit data-theme attribute overrides both. */`);
   L.push(`:root {`);
   L.push(...emitPalette(colour.light, "  "));
+  L.push("");
+  L.push(`  /* Motion durations. Tailwind v4 has no --duration-* theme`);
+  L.push(`   * namespace, so these are plain variables, used as`);
+  L.push(`   * duration-[var(--sn-duration-base)] or in bespoke CSS. */`);
+  for (const [k, v] of Object.entries(motion.duration)) {
+    L.push(`  --sn-duration-${k}: ${v};`);
+  }
   L.push(`}`);
   L.push("");
   L.push(`@media (prefers-color-scheme: dark) {`);
@@ -192,6 +208,19 @@ function buildCss(tokens) {
     L.push(`  --container-${k}: ${v};`);
   }
 
+  L.push("");
+  L.push(`  /* Easing */`);
+  for (const [k, v] of Object.entries(motion.easing)) {
+    L.push(`  --ease-${k}: ${v};`);
+  }
+
+  L.push("");
+  L.push(`  /* Image aspect ratios */`);
+  for (const [k, v] of Object.entries(aspect)) {
+    if (k.startsWith("$")) continue;
+    L.push(`  --aspect-${k}: ${v};`);
+  }
+
   L.push(`}`);
   L.push("");
 
@@ -235,6 +264,20 @@ function buildCss(tokens) {
   L.push(`  outline-offset: 2px;`);
   L.push(`}`);
   L.push("");
+  L.push(`/* Honour reduced-motion globally rather than per component, so a`);
+  L.push(` * missed check in one component cannot reintroduce motion.`);
+  L.push(` * See motion.md and accessibility.md. */`);
+  L.push(`@media (prefers-reduced-motion: reduce) {`);
+  L.push(`  *,`);
+  L.push(`  *::before,`);
+  L.push(`  *::after {`);
+  L.push(`    animation-duration: 0.01ms !important;`);
+  L.push(`    animation-iteration-count: 1 !important;`);
+  L.push(`    transition-duration: 0.01ms !important;`);
+  L.push(`    scroll-behavior: auto !important;`);
+  L.push(`  }`);
+  L.push(`}`);
+  L.push("");
 
   return L.join("\n");
 }
@@ -252,7 +295,8 @@ const remToPx = (v) => {
 };
 
 function buildKotlin(tokens) {
-  const { meta, colour, font, space, radius, container, touchTarget } = tokens;
+  const { meta, colour, font, space, radius, container, touchTarget, motion } =
+    tokens;
   const L = [];
 
   L.push(`package ${meta.androidPackage}`);
@@ -319,6 +363,14 @@ function buildKotlin(tokens) {
     L.push(`        val ${id}Size = ${px}.sp`);
     L.push(`        val ${id}LineHeight = ${Math.round(px * s.lineHeight)}.sp`);
     L.push(`        const val ${kebabToConst(name)}_WEIGHT = ${s.weight}`);
+  }
+  L.push(`    }`);
+  L.push("");
+
+  L.push(`    object Motion {`);
+  for (const [k, v] of Object.entries(motion.duration)) {
+    const ms = parseInt(v, 10);
+    L.push(`        const val ${kebabToConst(k)}_MS = ${ms}L`);
   }
   L.push(`    }`);
   L.push("");

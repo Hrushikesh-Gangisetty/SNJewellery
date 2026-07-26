@@ -120,6 +120,14 @@ object Tokens {
         const val SPEC_WEIGHT = 500
     }
 
+    object Motion {
+        const val INSTANT_MS = 0L
+        const val FAST_MS = 120L
+        const val BASE_MS = 200L
+        const val SLOW_MS = 320L
+        const val DELIBERATE_MS = 480L
+    }
+
     object Layout {
         val containerProse = 680.dp
         val containerContent = 1280.dp
