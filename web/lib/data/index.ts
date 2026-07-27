@@ -12,6 +12,14 @@ import type { CatalogueSource } from "./source";
  * Import from `@/lib/data`, never from a source module directly, or the
  * next swap stops being a one-line change.
  *
+ * **One exception, for client components.** Importing anything from this
+ * barrel pulls in the active source, and therefore supabase-js — roughly
+ * 58 kB of client bundle for code the browser never runs. A client
+ * component that needs only a pure helper or a type imports it from its
+ * own module (`./alt`, `./types`) instead. Neither is a source, so the
+ * one-line-swap property is untouched. Nothing client-side may import
+ * `catalogue`; it reads through the server actions in ./actions.ts.
+ *
  * `NEXT_PUBLIC_USE_FIXTURES=1` forces fixtures back on. Useful for
  * working on empty and error states, or developing offline, without
  * touching this file. It reads `process.env` directly rather than going

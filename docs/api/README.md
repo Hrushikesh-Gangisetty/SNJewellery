@@ -30,12 +30,30 @@ Defined in M2.5, implemented against fixtures immediately and against Supabase i
 |---|---|
 | `getFeaturedProducts` | Products flagged featured, for the home page |
 | `getNewestProducts` | Most recently added products |
+| `getAllProducts` | The whole catalogue, paginated |
 | `getProductsByCategory` | Products in one category, paginated |
 | `getProductBySlug` | One product with its ordered images |
 | `getRelatedProducts` | Related products, excluding the current one |
 | `getVisibleCategories` | Categories where `is_visible`, in `display_order` |
+| `getCategoryBySlug` | One visible category, or `null` |
+| `getPurities` | Purities in `display_order`, for labels and filters |
 
 M10 extends this with search and filtering. Every method must respect RLS — a hidden category's or archived product's rows must never appear in any result, and M10.10 verifies that.
+
+## Client-callable surface
+
+Added by **M4.3**, in `web/lib/data/actions.ts`.
+
+The catalogue appends the next page in place rather than navigating, so the browser has to be able to ask for one. It does that through a **server action**, not by querying Supabase from the client — which keeps supabase-js out of the client bundle (≈58 kB) and keeps the read inside the layer.
+
+| Action | Wraps |
+|---|---|
+| `fetchMoreProducts` | `getAllProducts` or `getProductsByCategory`, depending on whether a category slug is given |
+
+Two rules follow from the arguments being attacker-controlled:
+
+- **Every argument is validated or bounded.** An unknown or hidden slug yields an empty page; an unrecognisable or crafted cursor yields an empty page. Page size is fixed at the default rather than accepted from the caller.
+- **Nothing client-side imports `catalogue`.** Importing the `@/lib/data` barrel from a client component pulls the active source, and therefore the whole Supabase SDK, into the browser. Client components import pure helpers and types from their own modules (`lib/data/alt`, `lib/data/types`); everything else goes through an action.
 
 ## The draft-contract sequence
 

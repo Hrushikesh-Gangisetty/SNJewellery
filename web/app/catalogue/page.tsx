@@ -1,0 +1,54 @@
+import type { Metadata } from "next";
+import { CategoryChip } from "@/components/category/category-chip";
+import { ProductCollection } from "@/components/product/product-collection";
+import { Container } from "@/components/ui/container";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { catalogue } from "@/lib/data";
+
+/**
+ * The whole catalogue.
+ *
+ * The category chips are navigation, not a filter panel — pressing one is
+ * a route change to /category/[slug]. The real filter controls (purity,
+ * featured, latest) are M10, and they reuse this same chip.
+ */
+export const metadata: Metadata = {
+  title: "All jewellery",
+  description:
+    "Browse the full collection — gold, silver, and diamond jewellery, with purity and weight on every piece.",
+};
+
+export default async function CataloguePage() {
+  const [categories, firstPage] = await Promise.all([
+    catalogue.getVisibleCategories(),
+    catalogue.getAllProducts(),
+  ]);
+
+  return (
+    <main id="main" className="flex-1">
+      <Container as="section" className="py-10 md:py-14">
+        <SectionHeading
+          as="h1"
+          eyebrow="The collection"
+          title="All jewellery"
+        />
+
+        <nav aria-label="Categories" className="mt-6 flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <CategoryChip key={category.id} category={category} />
+          ))}
+        </nav>
+
+        <div className="mt-10">
+          <ProductCollection
+            initial={firstPage}
+            // The grid is the page here, so its first row is the LCP
+            // candidate. Four covers the widest first row (layout.md §5);
+            // narrower breakpoints preload one row's worth of the next.
+            priorityCount={4}
+          />
+        </div>
+      </Container>
+    </main>
+  );
+}

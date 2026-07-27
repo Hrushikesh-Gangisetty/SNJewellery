@@ -493,7 +493,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Hero banner, featured collections, newly added jewellery, category shortcuts, store information, contact section — per the PRD's Home Page section.
   *Done when:* every section listed in the PRD renders from live data.
 
-- **`M4.3` Catalogue grid and category routes** — `M`
+- **`M4.3` Catalogue grid and category routes** — `M` — ✅ **complete** (all eleven categories pre-rendered and reachable; unknown slug 404s)
   Responsive grid of product cards showing image, name, category, purity, weight when present, and short description — exactly the PRD's card specification. Category-scoped routes for the home page's shortcuts to link to.
   *Done when:* all eleven categories are reachable and each shows its products.
 

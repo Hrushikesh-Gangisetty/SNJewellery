@@ -185,6 +185,20 @@ function encodeCursor(product: Product): string {
   );
 }
 
+/**
+ * Both halves are interpolated into a PostgREST `or` filter below, and
+ * since M4.3 the cursor arrives from the browser via a server action
+ * rather than only from `encodeCursor`. So they are validated, not
+ * trusted: a decoded value that is not a timestamp and a UUID is treated
+ * as an unrecognisable cursor.
+ *
+ * RLS still bounds what any filter can reach, so this is not the security
+ * boundary — it stops crafted input reaching the query builder at all.
+ */
+const TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-][\d:]+)?$/;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function decodeCursor(
   cursor: string,
 ): { createdAt: string; id: string } | null {
@@ -193,6 +207,9 @@ function decodeCursor(
       .toString("utf8")
       .split("|");
     if (!createdAt || !id) return null;
+    if (!TIMESTAMP_PATTERN.test(createdAt) || !UUID_PATTERN.test(id)) {
+      return null;
+    }
     return { createdAt, id };
   } catch {
     return null;

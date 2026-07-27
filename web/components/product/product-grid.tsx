@@ -2,7 +2,7 @@ import { ProductCard } from "./product-card";
 import { ProductCardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/cn";
-import type { Product } from "@/lib/data";
+import type { Product } from "@/lib/data/types";
 
 /**
  * Responsive product grid. Column counts and gaps come from

@@ -3,7 +3,12 @@ import Link from "next/link";
 import { AspectBox } from "@/components/ui/aspect-box";
 import { SoldBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { productImageAlt, type Product } from "@/lib/data";
+// Deliberately NOT the `@/lib/data` barrel. This card renders inside a
+// client boundary (ProductCollection), and the barrel pulls in the active
+// CatalogueSource — which would ship all of supabase-js to the browser for
+// a pure string helper. See the note in lib/data/index.ts.
+import { productImageAlt } from "@/lib/data/alt";
+import type { Product } from "@/lib/data/types";
 
 /**
  * Catalogue product card.
