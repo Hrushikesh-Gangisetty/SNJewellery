@@ -497,15 +497,15 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Responsive grid of product cards showing image, name, category, purity, weight when present, and short description — exactly the PRD's card specification. Category-scoped routes for the home page's shortcuts to link to.
   *Done when:* all eleven categories are reachable and each shows its products.
 
-- **`M4.4` Product detail — information** — `S`
+- **`M4.4` Product detail — information** — `S` — ✅ **complete**
   Name, category, purity, weight, description, and available colours when present.
   *Done when:* every field the PRD's Product Details section lists is rendered from live data.
 
-- **`M4.5` Product detail — image gallery** — `M`
+- **`M4.5` Product detail — image gallery** — `M` — ✅ **complete** (keyboard tablist; frame locked to the first image's aspect)
   Large image gallery with thumbnail navigation, honouring the M1.9 motion rules and M2.9 image conventions.
   *Done when:* the gallery is keyboard-operable, respects reduced-motion, and shows no layout shift.
 
-- **`M4.6` Related products** — `S`
+- **`M4.6` Related products** — `S` — ✅ **complete** (hides when empty)
   Related-products section on the product page.
   *Done when:* related products exclude the current product, archived products, and hidden categories.
 
