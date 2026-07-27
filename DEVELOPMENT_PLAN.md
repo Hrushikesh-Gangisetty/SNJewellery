@@ -521,7 +521,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Centralise phone, WhatsApp number, address, coordinates, business hours, and social handles in one module.
   *Done when:* a grep for the literal phone number returns exactly one occurrence.
 
-- **`M4.10` Contact page** — `S`
+- **`M4.10` Contact page** — `S` — ◐ **built**; address, hours, WhatsApp, call and the rates panel all render from M4.9. The map component ships and hides itself, because Open Question 18 has not supplied a location — so "the map displays the shop location" is unverified, and is the only thing outstanding.
   Address, embedded Google Map, phone, WhatsApp, business hours, social links — all from M4.9.
   *Done when:* the map displays the shop location and is usable at 375 px.
 
@@ -1325,7 +1325,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | 15 | **Next.js 15 or 16.** The PRD and [ADR-0002](docs/adr/0002-nextjs-app-router.md) specify 15, but `create-next-app` now installs 16. M2.1 pinned 15 to honour the PRD. | M2 onward | Cheap to change now, expensive after M4. Next 16's own agent guidance warns its APIs differ from pre-16 knowledge, which favours staying on 15 while the project is agent-built. Against that, 15 is a major version behind and will age out of support sooner. |
 
 | 17 | **Storage and egress projection.** Roughly 500 products × how many photographs each, at what average size? | M5 | Decides the Supabase tier before launch. High-resolution jewellery photography is heavy on both storage and egress, and the free tier's ceilings are reachable. Feeds the compression target in M7.6. |
-| 18 | **Google Maps location and social links.** Pending from the owner. | M4.10, M11.3 | Both sections hide cleanly without them per ADR-0010, so nothing is blocked — but `LocalBusiness` structured data in M11.3 wants a real geo location. |
+| 18 | **Google Maps location and social links.** Pending from the owner. | M4.10, M11.3 | Both sections hide cleanly without them per ADR-0010, so nothing is blocked — but `LocalBusiness` structured data in M11.3 wants a real geo location. **What is needed:** the `src` from Google Maps' Share → Embed a map, into `site.address.mapEmbedUrl`; or coordinates into `geo`, which also feeds M11.3. Either one turns on both the map and Get Directions with no code change. Until then M4.10's map criterion is unverified. |
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
 | 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
 | 21 | **Nobody can set a metal rate until M7.** `metal_rates` ships with both rows unpublished and the website hides the panel, which is correct — but the rate stays invisible until the Android app has a screen for it. | M7 | The panel is dead on the live site until then. If rates are wanted sooner, the interim is a direct SQL update by the owner, which needs a documented runbook. |

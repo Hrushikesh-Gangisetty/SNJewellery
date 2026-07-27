@@ -121,6 +121,16 @@ export const site = {
      */
     geo: null as Pending<{ latitude: number; longitude: number }>,
     mapsUrl: null as Pending<string>,
+    /**
+     * The `src` of Google Maps' own embed, which the owner can copy from
+     * Share → Embed a map without anyone provisioning an API key.
+     *
+     * Preferred over deriving one from `geo`, because the shop's pin on
+     * Google is the shop as customers search for it — its name, its
+     * reviews, its photographs — whereas a coordinate is a dot in a
+     * street. Left null, `mapEmbedSrc` falls back to the coordinates.
+     */
+    mapEmbedUrl: null as Pending<string>,
   },
 
   /** Open every day, 10:00–21:00. */
@@ -193,6 +203,26 @@ export function directionsHref(): string | null {
   if (site.address.geo) {
     const { latitude, longitude } = site.address.geo;
     return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  }
+  return null;
+}
+
+/**
+ * The map iframe's `src`, or `null` when no location has been supplied —
+ * in which case the map section must not render at all.
+ *
+ * The coordinate fallback uses the keyless `output=embed` form rather
+ * than the Maps Embed API. The official API would mean an API key, an
+ * environment variable, a billing account and a restriction list, for a
+ * single static map of one shop that never changes — cost the site does
+ * not need to carry (CLAUDE.md §3.7). If a keyed embed is ever wanted,
+ * it replaces this function, not its callers.
+ */
+export function mapEmbedSrc(): string | null {
+  if (site.address.mapEmbedUrl) return site.address.mapEmbedUrl;
+  if (site.address.geo) {
+    const { latitude, longitude } = site.address.geo;
+    return `https://www.google.com/maps?q=${latitude},${longitude}&output=embed`;
   }
   return null;
 }
