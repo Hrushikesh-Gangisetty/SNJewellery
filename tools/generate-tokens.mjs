@@ -264,6 +264,58 @@ function buildCss(tokens) {
   L.push(`  outline-offset: 2px;`);
   L.push(`}`);
   L.push("");
+  L.push(`/* Entrance for content arriving AFTER interaction - see motion.md §4.`);
+  L.push(` * Opacity plus an 8px rise, never a stagger: a visible cascade across`);
+  L.push(` * a large grid is a delay imposed on someone trying to browse.`);
+  L.push(` *`);
+  L.push(` * Above-the-fold content must never use this. Animating the first`);
+  L.push(` * row delays the customer's first sight of the merchandise and`);
+  L.push(` * harms LCP, which is why this is opt-in per element rather than a`);
+  L.push(` * rule on the grid.`);
+  L.push(` *`);
+  L.push(` * Under reduced motion the global rule below collapses the duration,`);
+  L.push(` * and 'both' leaves the element at its natural end state - reduced,`);
+  L.push(` * not invisible. */`);
+  L.push(`@keyframes sn-enter {`);
+  L.push(`  from {`);
+  L.push(`    opacity: 0;`);
+  L.push(`    transform: translateY(var(--spacing-2));`);
+  L.push(`  }`);
+  L.push(`}`);
+  L.push("");
+  L.push(`.sn-enter {`);
+  L.push(
+    `  animation: sn-enter var(${cssVar("duration-base")}) var(--ease-decelerate) both;`,
+  );
+  L.push(`}`);
+  L.push("");
+  L.push(`/* Skeleton pulse - see motion.md §4, which specifies 'deliberate,`);
+  L.push(` * looped' with standard easing. Tailwind's own animate-pulse runs`);
+  L.push(` * 2s on a curve of its own and would be a token written by hand.`);
+  L.push(` *`);
+  L.push(` * 'alternate' makes deliberate the time in EACH direction, so the`);
+  L.push(` * full cycle is a calm ~1s. A 480ms round trip would flicker, and`);
+  L.push(` * a flickering placeholder competes with the photographs it is`);
+  L.push(` * standing in for.`);
+  L.push(` *`);
+  L.push(` * It never reaches 0: under reduced motion the loop stops, and a`);
+  L.push(` * placeholder that settled invisible would read as an empty page`);
+  L.push(` * rather than a loading one (motion.md §6). */`);
+  L.push(`@keyframes sn-pulse {`);
+  L.push(`  from {`);
+  L.push(`    opacity: 1;`);
+  L.push(`  }`);
+  L.push(`  to {`);
+  L.push(`    opacity: 0.55;`);
+  L.push(`  }`);
+  L.push(`}`);
+  L.push("");
+  L.push(`.sn-pulse {`);
+  L.push(
+    `  animation: sn-pulse var(${cssVar("duration-deliberate")}) var(--ease-standard) infinite alternate;`,
+  );
+  L.push(`}`);
+  L.push("");
   L.push(`/* Honour reduced-motion globally rather than per component, so a`);
   L.push(` * missed check in one component cannot reintroduce motion.`);
   L.push(` * See motion.md and accessibility.md. */`);

@@ -28,10 +28,18 @@ export function ProductGrid({
   products,
   /** Number of leading images to mark priority — above-the-fold only. */
   priorityCount = 0,
+  enterFrom,
   className,
 }: {
   products: readonly Product[];
   priorityCount?: number;
+  /**
+   * Index of the first card that arrived *after* an interaction. Those
+   * cards fade and rise in; everything before is server-rendered and
+   * must not animate (motion.md §4). Omitted, nothing animates — which
+   * is the right default, since most grids on this site are the page.
+   */
+  enterFrom?: number;
   className?: string;
 }) {
   if (products.length === 0) {
@@ -50,6 +58,9 @@ export function ProductGrid({
           key={product.id}
           product={product}
           priority={i < priorityCount}
+          className={
+            enterFrom !== undefined && i >= enterFrom ? "sn-enter" : undefined
+          }
         />
       ))}
     </div>

@@ -541,9 +541,15 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Card, product page, image alt text and metadata. Schema, fixtures and the admin contract keep both. Supersedes the PRD's card and Product Details specifications — see the amendment in [prd.md](prd.md).
   *Done when:* no website surface renders purity or weight, and the contract tests assert it. Open Question 20 records what "hidden" does and does not mean.
 
-- **`M4.13` Motion and visual polish** — `S`
+- **`M4.13` Motion and visual polish** — `S` — ✅ **complete** (`sn-enter` on appended cards only; one deviation found and fixed)
   Apply the M1.9 entrance transitions to grid and gallery; final pass against the design system.
   *Done when:* a page-by-page comparison against `docs/design/` finds no deviation.
+
+  The sweep found **one** deviation: the skeleton used Tailwind's `animate-pulse` (2s, its own curve) where motion.md §4 specifies `deliberate` with `standard` easing. Now `sn-pulse`, emitted by the token generator. No raw millisecond value, hex colour, Tailwind palette colour, or hover-zoom on a photograph exists anywhere in `app/` or `components/`.
+
+  Kept deliberately: the `Load more` spinner's rotation. motion.md §4 does not cover an indeterminate spinner, and §3's "never `linear` for anything spatial" is aimed at transitions — a spinner easing in and out reads as broken. It is paired with the word "Loading", so motion is not carrying the meaning alone (rule 5).
+
+  **Not observed in a browser:** the entrance applies only to cards appended by `Load more`, and the catalogue is 11 products against a page size of 24, so that control never renders. Verified statically instead — the class is absent from every prerendered page (above-the-fold must not animate) and present in the client bundle. Confirm visually once M5.6 loads real content; reduced-motion behaviour is M12.8's check.
 
 ### Dependencies
 

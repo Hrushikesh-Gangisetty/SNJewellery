@@ -240,6 +240,54 @@ body {
   outline-offset: 2px;
 }
 
+/* Entrance for content arriving AFTER interaction - see motion.md §4.
+ * Opacity plus an 8px rise, never a stagger: a visible cascade across
+ * a large grid is a delay imposed on someone trying to browse.
+ *
+ * Above-the-fold content must never use this. Animating the first
+ * row delays the customer's first sight of the merchandise and
+ * harms LCP, which is why this is opt-in per element rather than a
+ * rule on the grid.
+ *
+ * Under reduced motion the global rule below collapses the duration,
+ * and 'both' leaves the element at its natural end state - reduced,
+ * not invisible. */
+@keyframes sn-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--spacing-2));
+  }
+}
+
+.sn-enter {
+  animation: sn-enter var(--sn-duration-base) var(--ease-decelerate) both;
+}
+
+/* Skeleton pulse - see motion.md §4, which specifies 'deliberate,
+ * looped' with standard easing. Tailwind's own animate-pulse runs
+ * 2s on a curve of its own and would be a token written by hand.
+ *
+ * 'alternate' makes deliberate the time in EACH direction, so the
+ * full cycle is a calm ~1s. A 480ms round trip would flicker, and
+ * a flickering placeholder competes with the photographs it is
+ * standing in for.
+ *
+ * It never reaches 0: under reduced motion the loop stops, and a
+ * placeholder that settled invisible would read as an empty page
+ * rather than a loading one (motion.md §6). */
+@keyframes sn-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+
+.sn-pulse {
+  animation: sn-pulse var(--sn-duration-deliberate) var(--ease-standard) infinite alternate;
+}
+
 /* Honour reduced-motion globally rather than per component, so a
  * missed check in one component cannot reintroduce motion.
  * See motion.md and accessibility.md. */

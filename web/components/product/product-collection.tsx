@@ -37,7 +37,20 @@ export function ProductCollection({
   /** Replaces ProductGrid's generic empty state where the page has better copy. */
   emptyState?: React.ReactNode;
 }) {
-  const [items, setItems] = useState<readonly Product[]>(initial.items);
+  /**
+   * The items and the point the newest batch starts are one piece of
+   * state, not two. Deriving `enterFrom` from a separate `items.length`
+   * read would be a stale closure the moment two appends ever overlap.
+   *
+   * `enterFrom` is undefined on the first render: those cards came from
+   * the server and must not animate (motion.md §4).
+   */
+  const [collection, setCollection] = useState<{
+    items: readonly Product[];
+    enterFrom?: number;
+  }>(() => ({ items: initial.items }));
+  const { items, enterFrom } = collection;
+
   const [cursor, setCursor] = useState(initial.nextCursor);
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState(false);
@@ -49,7 +62,10 @@ export function ProductCollection({
     startTransition(async () => {
       try {
         const next = await fetchMoreProducts({ categorySlug, cursor });
-        setItems((current) => [...current, ...next.items]);
+        setCollection((current) => ({
+          items: [...current.items, ...next.items],
+          enterFrom: current.items.length,
+        }));
         setCursor(next.nextCursor);
       } catch {
         // The pieces already loaded stay on screen; the customer can
@@ -74,6 +90,7 @@ export function ProductCollection({
       <ProductGrid
         products={items}
         priorityCount={priorityCount}
+        enterFrom={enterFrom}
         className={cn(
           "ease-standard transition-opacity duration-[var(--sn-duration-base)]",
           pending && "opacity-60",
