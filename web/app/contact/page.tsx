@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { ContactMethods } from "@/components/shop/contact-methods";
 import { MetalRates } from "@/components/shop/metal-rates";
-import { ShopMap } from "@/components/shop/shop-map";
 import { StoreInformation } from "@/components/shop/store-information";
 import { Container } from "@/components/ui/container";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -71,9 +70,9 @@ export default async function ContactPage() {
           </div>
         </div>
 
-        {/* Renders nothing until a location is supplied. The address
-            above is the answer either way; this only makes it easier. */}
-        <ShopMap className="mt-12" />
+        {/* No embedded map. The owner confirmed on 2026-07-27 that there
+            is none, so the address and the directions link are how a
+            customer finds the shop — see M4.10 in DEVELOPMENT_PLAN.md. */}
 
         {/* M4.14's second placement: a customer asking about a piece is
             the one most likely to want today's rate. Renders nothing
