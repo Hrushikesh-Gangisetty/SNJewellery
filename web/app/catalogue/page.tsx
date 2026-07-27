@@ -3,7 +3,14 @@ import { CategoryChip } from "@/components/category/category-chip";
 import { ProductCollection } from "@/components/product/product-collection";
 import { Container } from "@/components/ui/container";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { catalogue } from "@/lib/data";
+import { getAllProducts, getVisibleCategories } from "@/lib/data/cache";
+
+/**
+ * ISR. The cached reads in lib/data/cache.ts carry the tags M9 will
+ * invalidate; this interval is the fallback ADR-0006 requires in case a
+ * webhook is ever dropped. See docs/architecture/rendering.md.
+ */
+export const revalidate = 600;
 
 /**
  * The whole catalogue.
@@ -15,13 +22,13 @@ import { catalogue } from "@/lib/data";
 export const metadata: Metadata = {
   title: "All jewellery",
   description:
-    "Browse the full collection — gold, silver, and diamond jewellery, with purity and weight on every piece.",
+    "Browse the full collection — gold, silver, and diamond jewellery. Visit our showroom in Markapur, or ask us about a piece.",
 };
 
 export default async function CataloguePage() {
   const [categories, firstPage] = await Promise.all([
-    catalogue.getVisibleCategories(),
-    catalogue.getAllProducts(),
+    getVisibleCategories(),
+    getAllProducts(),
   ]);
 
   return (

@@ -6,7 +6,18 @@ import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { catalogue } from "@/lib/data";
+import {
+  getCategoryBySlug,
+  getProductsByCategory,
+  getVisibleCategories,
+} from "@/lib/data/cache";
+
+/**
+ * ISR. The cached reads in lib/data/cache.ts carry the tags M9 will
+ * invalidate; this interval is the fallback ADR-0006 requires in case a
+ * webhook is ever dropped. See docs/architecture/rendering.md.
+ */
+export const revalidate = 600;
 
 type Params = { slug: string };
 
@@ -20,7 +31,7 @@ type Params = { slug: string };
  * routes are static and how they revalidate is settled properly in M4.7.
  */
 export async function generateStaticParams(): Promise<Params[]> {
-  const categories = await catalogue.getVisibleCategories();
+  const categories = await getVisibleCategories();
   return categories.map((category) => ({ slug: category.slug }));
 }
 
@@ -30,7 +41,7 @@ export async function generateMetadata({
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const category = await catalogue.getCategoryBySlug(slug);
+  const category = await getCategoryBySlug(slug);
 
   // Not a 404 here — the page itself raises that. Returning a title for a
   // page that will not render would be worse than returning nothing.
@@ -38,7 +49,7 @@ export async function generateMetadata({
 
   return {
     title: category.name,
-    description: `${category.name} at SN Jewellery & Silver Palace, Markapur. Purity and weight shown on every piece.`,
+    description: `${category.name} at SN Jewellery & Silver Palace, Markapur. Visit our showroom, or ask us about a piece.`,
   };
 }
 
@@ -51,12 +62,12 @@ export default async function CategoryPage({
 
   // A hidden category is indistinguishable from an unknown one, by
   // design — RLS returns null for both. See CatalogueSource rule 2.
-  const category = await catalogue.getCategoryBySlug(slug);
+  const category = await getCategoryBySlug(slug);
   if (!category) notFound();
 
   const [categories, firstPage] = await Promise.all([
-    catalogue.getVisibleCategories(),
-    catalogue.getProductsByCategory(slug),
+    getVisibleCategories(),
+    getProductsByCategory(slug),
   ]);
 
   return (

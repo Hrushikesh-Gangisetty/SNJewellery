@@ -1,6 +1,6 @@
 "use server";
 
-import { catalogue } from "@/lib/data";
+import { getAllProducts, getProductsByCategory } from "./cache";
 import type { Page, Product } from "./types";
 
 /**
@@ -31,6 +31,6 @@ export async function fetchMoreProducts({
   cursor: string;
 }): Promise<Page<Product>> {
   return categorySlug === null
-    ? catalogue.getAllProducts({ cursor })
-    : catalogue.getProductsByCategory(categorySlug, { cursor });
+    ? getAllProducts(cursor)
+    : getProductsByCategory(categorySlug, cursor);
 }

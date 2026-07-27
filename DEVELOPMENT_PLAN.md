@@ -509,7 +509,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Related-products section on the product page.
   *Done when:* related products exclude the current product, archived products, and hidden categories.
 
-- **`M4.7` Rendering and revalidation strategy** — `M`
+- **`M4.7` Rendering and revalidation strategy** — `M` — ✅ **complete** (every route static + ISR at 10 min; tags placed for M9)
   Choose per-route rendering — static with ISR for catalogue and product pages — and place the revalidation tags M9 will trigger. Document the choice.
   *Done when:* `docs/architecture/rendering.md` records the strategy and every cacheable route carries a tag.
 

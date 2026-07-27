@@ -7,7 +7,20 @@ import { StoreInformation } from "@/components/shop/store-information";
 import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { catalogue, type Product } from "@/lib/data";
+import {
+  getFeaturedProducts,
+  getMetalRates,
+  getNewestProducts,
+  getVisibleCategories,
+} from "@/lib/data/cache";
+import type { Product } from "@/lib/data/types";
+
+/**
+ * ISR. The cached reads in lib/data/cache.ts carry the tags M9 will
+ * invalidate; this interval is the fallback ADR-0006 requires in case a
+ * webhook is ever dropped. See docs/architecture/rendering.md.
+ */
+export const revalidate = 600;
 
 /**
  * Home page.
@@ -39,11 +52,11 @@ function firstWithPhotograph(
 
 export default async function Home() {
   const [categories, featured, newest, rates] = await Promise.all([
-    catalogue.getVisibleCategories(),
+    getVisibleCategories(),
     // One more than the row shows, because the hero consumes one.
-    catalogue.getFeaturedProducts(9),
-    catalogue.getNewestProducts(8),
-    catalogue.getMetalRates(),
+    getFeaturedProducts(9),
+    getNewestProducts(8),
+    getMetalRates(),
   ]);
 
   const showcase = firstWithPhotograph(featured, newest);

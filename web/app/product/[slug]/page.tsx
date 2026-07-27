@@ -7,7 +7,18 @@ import { SpecList } from "@/components/product/spec-list";
 import { ConversionActions } from "@/components/shop/conversion";
 import { FeaturedBadge, SoldBadge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/container";
-import { catalogue } from "@/lib/data";
+import {
+  getAllProductSlugs,
+  getProductBySlug,
+  getRelatedProducts,
+} from "@/lib/data/cache";
+
+/**
+ * ISR. The cached reads in lib/data/cache.ts carry the tags M9 will
+ * invalidate; this interval is the fallback ADR-0006 requires in case a
+ * webhook is ever dropped. See docs/architecture/rendering.md.
+ */
+export const revalidate = 600;
 
 type Params = { slug: string };
 
@@ -28,18 +39,25 @@ type Params = { slug: string };
  * a broken record rather than a piece the owner has not finished
  * describing.
  *
- * No `generateStaticParams`. The catalogue grows continuously and M4.7 is
- * where per-route rendering and revalidation tags are decided; pinning a
- * build-time product list here would pre-empt that with the answer that
- * ages worst.
+ * Static with ISR, like the catalogue and the category routes — the
+ * rendering decision M4.7 settled. Every known slug is prerendered;
+ * `dynamicParams` stays at its default, so a product added after the
+ * build renders on first request and is cached from then on. A new piece
+ * is therefore visible without a deploy, which is the whole point of the
+ * revalidation path in ADR-0006.
  */
+export async function generateStaticParams(): Promise<Params[]> {
+  const slugs = await getAllProductSlugs();
+  return slugs.map((slug) => ({ slug }));
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = await catalogue.getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) return {};
 
   return {
@@ -61,10 +79,10 @@ export default async function ProductPage({
 
   // null covers unknown, archived, and hidden-category alike — the data
   // layer makes them indistinguishable on purpose (CatalogueSource rule 4).
-  const product = await catalogue.getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const related = await catalogue.getRelatedProducts(product);
+  const related = await getRelatedProducts(product);
 
   return (
     <main id="main" className="flex-1">

@@ -3,7 +3,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { fontVariables } from "@/lib/fonts";
 import { site } from "@/lib/config/site";
-import { catalogue } from "@/lib/data";
+import { getVisibleCategories } from "@/lib/data/cache";
 import "./globals.css";
 
 /**
@@ -27,7 +27,7 @@ export default async function RootLayout({
   // The header and footer both list categories, so they are fetched once
   // here rather than twice. Reads go through the data boundary — never
   // Supabase directly (CLAUDE.md §3.4).
-  const categories = await catalogue.getVisibleCategories();
+  const categories = await getVisibleCategories();
 
   return (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
