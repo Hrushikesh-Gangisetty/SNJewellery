@@ -31,7 +31,7 @@ implementation)
 
 | Component | Variants | States | Notes |
 |---|---|---|---|
-| `ProductCard` | default, featured | default, hover, focus, **sold**, loading (skeleton) | Image, name, category, purity, weight, short description |
+| `ProductCard` | default, featured | default, hover, focus, **sold**, loading (skeleton) | Image, name, category, short description. No purity or weight since 2026-07-27 |
 | `ProductGrid` | — | default, loading, **empty** | 2/3/4 columns per [layout.md](layout.md) §5 |
 | `CategoryChip` | default, active | default, hover, focus, disabled | Also the filter control |
 | `SoldBadge` | — | default | The word "Sold" — never colour alone |
@@ -43,7 +43,7 @@ implementation)
 |---|---|---|---|
 | `ImageGallery` | single-image, multi-image | default, loading, image-error, **no-images** | Keyboard arrows, thumbnail strip, fixed aspect ratio |
 | `GalleryThumbnail` | — | default, active, hover, focus | |
-| `SpecList` | — | default, missing-optional | Purity, weight (grams), colours. Uses `text-spec` |
+| `SpecList` | — | default, missing-optional, **empty (hides)** | Colours. Uses `text-spec`. Purity and weight were removed on 2026-07-27 — see `MetalRates` |
 | `RelatedProducts` | — | default, loading, empty (hides) | |
 
 ### Conversion — the site's entire purpose
@@ -54,6 +54,21 @@ implementation)
 | `CallButton` | primary, inline | default, hover, focus, active | `tel:` |
 | `DirectionsButton` | primary, inline | default, hover, focus, active, **unavailable** | Hides until Maps location supplied |
 | `ContactBar` | — | default | Header/footer quick contact |
+
+### Rates
+
+| Component | Variants | States | Notes |
+|---|---|---|---|
+| `MetalRates` | — | default, **unpublished (hides)** | Today's gold and silver rate per gram, with the timestamp the owner last set it |
+
+`MetalRates` replaced per-piece purity and weight on 2026-07-27. It renders
+**nothing** until both metals have a real rate: half a panel, or a placeholder, is
+worse than no panel because a customer would act on it.
+
+It is a quiet panel in the page flow, never a strip pinned under the header —
+[brand.md](brand.md) §6 names banner stacking as an anti-pattern. The timestamp is
+formatted in `Asia/Kolkata` explicitly: the shop is in Markapur, so "9:12 AM" must
+mean the shop's morning and not the reader's.
 
 All four are **minimum 44 × 44 px** touch targets ([layout.md](layout.md) §6).
 They are pressed one-handed, often on the move.
@@ -151,7 +166,7 @@ Walking the PRD's page and screen lists against this inventory:
 
 | PRD surface | Covered by |
 |---|---|
-| Home | Header, Footer, ProductGrid, ProductCard, CategoryChip, ContactBar |
+| Home | Header, Footer, ProductGrid, ProductCard, CategoryChip, ContactBar, MetalRates |
 | Catalogue | ProductGrid, ProductCard, Pagination, FilterPanel, CategoryChip |
 | Product Details | ImageGallery, GalleryThumbnail, SpecList, RelatedProducts, WhatsApp/Call/Directions |
 | Search | SearchInput, FilterPanel, FilterChip, ActiveFilters, EmptyState |

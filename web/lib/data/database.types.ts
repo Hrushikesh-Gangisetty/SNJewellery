@@ -69,6 +69,24 @@ export type Database = {
         }
         Relationships: []
       }
+      metal_rates: {
+        Row: {
+          metal: Database["public"]["Enums"]["metal"]
+          rate_per_gram: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          metal: Database["public"]["Enums"]["metal"]
+          rate_per_gram?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          metal?: Database["public"]["Enums"]["metal"]
+          rate_per_gram?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       product_images: {
         Row: {
           aspect: Database["public"]["Enums"]["product_image_aspect"]
@@ -238,6 +256,7 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
+      metal: "gold" | "silver"
       product_image_aspect: "product" | "product-portrait"
       user_role: "admin" | "staff"
     }
@@ -370,6 +389,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      metal: ["gold", "silver"],
       product_image_aspect: ["product", "product-portrait"],
       user_role: ["admin", "staff"],
     },

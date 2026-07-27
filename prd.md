@@ -87,6 +87,16 @@ Displays:
 
 ---
 
+> **Amendment, 2026-07-27 (owner).** Per-piece **Purity** and **Weight** are no
+> longer shown to customers, on the catalogue card or the product page. **Today's
+> gold and silver rate per gram** replaces them, shown once on the home page and
+> on the contact page, and updated daily by the owner from the Android app.
+>
+> Both columns remain in the database and the Android app still records them, so
+> this is reversible as a UI change. The Filters section below still lists purity;
+> that filter is deferred with the display. See
+> [docs/database/schema.md](docs/database/schema.md) for `metal_rates`.
+
 ### Jewellery Catalogue
 
 Grid-based responsive layout.

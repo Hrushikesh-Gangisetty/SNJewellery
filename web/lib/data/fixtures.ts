@@ -1,6 +1,7 @@
 import type {
   Category,
   ImageAspect,
+  MetalRate,
   Product,
   ProductImage,
   Purity,
@@ -34,6 +35,16 @@ export const fixturePurities: readonly Purity[] = [
   { id: "pu-22k", code: "22K", label: "22K Gold", displayOrder: 1 },
   { id: "pu-18k", code: "18K", label: "18K Gold", displayOrder: 2 },
   { id: "pu-slv", code: "Silver", label: "Silver", displayOrder: 3 },
+];
+
+/**
+ * Today's rates. Both published, so the fixture exercises the panel's
+ * rendered state; the unpublished state is what the live database sits in
+ * until the owner sets a rate, and the panel is expected to hide there.
+ */
+export const fixtureMetalRates: readonly MetalRate[] = [
+  { metal: "gold", ratePerGram: 7240, updatedAt: "2026-07-27T03:42:00Z" },
+  { metal: "silver", ratePerGram: 92.5, updatedAt: "2026-07-27T03:42:00Z" },
 ];
 
 const purity = (code: string): Purity => {

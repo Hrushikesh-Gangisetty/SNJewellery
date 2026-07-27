@@ -232,6 +232,32 @@ ok(
   `status ${users.status} · ${JSON.stringify(users.body).slice(0, 160)}`,
 );
 
+// Metal rates are public to read and must be unwritable by anyone but an
+// admin. The two-row invariant matters as much as the values: there is no
+// INSERT and no DELETE policy at all, so even an admin cannot change the
+// table's shape from a client.
+const rates = await get("metal_rates?select=metal,rate_per_gram,updated_at");
+ok(
+  "anon can read metal rates",
+  rates.status === 200 && rates.body?.length === 2,
+  `status ${rates.status} - ${JSON.stringify(rates.body)}`,
+);
+ok(
+  "metal rates are exactly gold and silver",
+  Array.isArray(rates.body) &&
+    [...rates.body.map((r) => r.metal)].sort().join(",") === "gold,silver",
+  JSON.stringify(rates.body),
+);
+ok(
+  "an unpublished rate carries no timestamp",
+  Array.isArray(rates.body) &&
+    rates.body.every(
+      (r) =>
+        (r.rate_per_gram === null) === (r.updated_at === null),
+    ),
+  JSON.stringify(rates.body),
+);
+
 // Rule 5: every write is rejected.
 const attempts = [
   [
@@ -285,6 +311,22 @@ const attempts = [
         url: "/x.svg",
         storage_path: "x",
       }),
+  ],
+  [
+    "anon cannot UPDATE a metal rate",
+    () => attemptWrite("PATCH", "metal_rates?metal=eq.gold", { rate_per_gram: 1 }),
+  ],
+  [
+    "anon cannot INSERT a metal rate",
+    () =>
+      attemptWrite("POST", "metal_rates", {
+        metal: "gold",
+        rate_per_gram: 1,
+      }),
+  ],
+  [
+    "anon cannot DELETE a metal rate",
+    () => attemptWrite("DELETE", "metal_rates?metal=eq.gold"),
   ],
   [
     "anon cannot grant itself a role",

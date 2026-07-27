@@ -2,6 +2,7 @@ import { CategoryChip } from "@/components/category/category-chip";
 import { Hero } from "@/components/home/hero";
 import { ProductGrid } from "@/components/product/product-grid";
 import { ContactMethods } from "@/components/shop/contact-methods";
+import { MetalRates } from "@/components/shop/metal-rates";
 import { StoreInformation } from "@/components/shop/store-information";
 import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
@@ -37,11 +38,12 @@ function firstWithPhotograph(
 }
 
 export default async function Home() {
-  const [categories, featured, newest] = await Promise.all([
+  const [categories, featured, newest, rates] = await Promise.all([
     catalogue.getVisibleCategories(),
     // One more than the row shows, because the hero consumes one.
     catalogue.getFeaturedProducts(9),
     catalogue.getNewestProducts(8),
+    catalogue.getMetalRates(),
   ]);
 
   const showcase = firstWithPhotograph(featured, newest);
@@ -113,6 +115,11 @@ export default async function Home() {
             visit.
           </p>
           <ContactMethods className="mt-6" />
+
+          {/* Sits with the contact block rather than in its own band: a
+              customer who has just read the rate is one tap from asking
+              about it. Renders nothing until both rates are published. */}
+          <MetalRates rates={rates} className="mt-10" />
         </div>
       </Container>
     </main>

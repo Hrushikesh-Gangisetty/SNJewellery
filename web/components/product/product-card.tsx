@@ -13,8 +13,13 @@ import type { Product } from "@/lib/data/types";
 /**
  * Catalogue product card.
  *
- * Shows exactly the fields the PRD specifies: image, name, category,
- * purity, weight, short description.
+ * Shows image, name, category and short description.
+ *
+ * **Purity and weight are deliberately absent.** The PRD's card
+ * specification lists both; the owner's decision of 2026-07-27 supersedes
+ * it, replacing per-piece metal detail with today's gold and silver rates
+ * shown once on the home page. The columns remain in the database, so
+ * restoring the line is a UI change, not a migration.
  *
  * Notes on decisions that are easy to get wrong:
  *
@@ -40,12 +45,6 @@ export function ProductCard({
   className?: string;
 }) {
   const cover = product.images[0] ?? null;
-  const spec = [
-    product.purity?.code,
-    product.weightGrams !== null ? `${product.weightGrams.toFixed(2)} g` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     <Link
@@ -86,8 +85,6 @@ export function ProductCard({
         <p className="text-body-s text-text-secondary">
           {product.category.name}
         </p>
-
-        {spec ? <p className="text-spec text-text-primary">{spec}</p> : null}
 
         {product.summary ? (
           <p className="text-body-s text-text-muted line-clamp-2">

@@ -14,15 +14,19 @@ type Params = { slug: string };
 /**
  * Product detail.
  *
- * Renders every field the PRD's Product Details section lists — gallery,
- * name, category, purity, weight, description, colours, related products
- * — and the three actions that are the point of the whole site.
+ * Gallery, name, category, description, colours, related products, and
+ * the three actions that are the point of the whole site.
  *
- * Optional fields are absent, never blank: SpecList omits a missing
- * weight rather than printing a dash, and the description section does
- * not render at all for a piece that has none. A page of empty labels
- * would read as a broken record rather than a piece the owner has not
- * finished describing.
+ * **Purity and weight are not shown**, per the owner's decision of
+ * 2026-07-27 — today's gold and silver rates on the home page replace
+ * per-piece metal detail. The PRD's Product Details list still names
+ * both; this supersedes it. Both columns remain in the database.
+ *
+ * Optional fields are absent, never blank: SpecList renders nothing at
+ * all for a piece with no colours, and the description section does not
+ * render for a piece that has none. A page of empty labels would read as
+ * a broken record rather than a piece the owner has not finished
+ * describing.
  *
  * No `generateStaticParams`. The catalogue grows continuously and M4.7 is
  * where per-route rendering and revalidation tags are decided; pinning a
@@ -38,16 +42,13 @@ export async function generateMetadata({
   const product = await catalogue.getProductBySlug(slug);
   if (!product) return {};
 
-  const spec = [product.purity?.label, product.category.name]
-    .filter(Boolean)
-    .join(" · ");
-
   return {
     title: product.name,
-    // Falls back to the specification rather than to a generic sentence:
-    // "22K Gold · Necklaces" is a worse description than a written one
-    // and a much better one than boilerplate.
-    description: product.summary ?? product.description ?? spec,
+    // Falls back to the category rather than to a generic sentence: a
+    // written description beats "Necklaces", and "Necklaces" beats
+    // boilerplate that says nothing about this piece at all.
+    description:
+      product.summary ?? product.description ?? product.category.name,
   };
 }
 

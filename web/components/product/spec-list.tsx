@@ -2,19 +2,27 @@ import { cn } from "@/lib/cn";
 import type { Product } from "@/lib/data/types";
 
 /**
- * Product specifications — purity, weight, colours.
+ * Product specifications.
  *
  * A description list, because that is what this is: paired terms and
- * values, which lets a screen reader announce "Purity, 22K Gold" rather
- * than reading two unrelated strings.
+ * values, which lets a screen reader announce "Colours, Yellow, Rose"
+ * rather than reading two unrelated strings.
  *
- * **Missing optional fields are omitted, never shown as a dash.** Not
- * every piece is sold by weight and not every piece comes in a choice of
- * colours; printing "Weight —" tells a customer nothing and implies the
- * shop lost the number. See components.md, `SpecList` missing-optional.
+ * **Purity and weight used to be the bulk of this and deliberately are
+ * not any more.** Per the owner's decision of 2026-07-27, per-piece metal
+ * detail is not shown to customers; today's gold and silver rates are
+ * shown once on the home page instead. Both columns remain in the
+ * database, so putting a row back is an addition here and nowhere else.
  *
- * Values use `text-spec` — the tabular-figure style from typography.md,
- * so weights line up digit for digit down the column.
+ * Category is not listed either — the product page already links to it
+ * directly above the name, and repeating it two lines later reads as a
+ * mistake.
+ *
+ * **Missing optional fields are omitted, never shown as a dash**, and
+ * when nothing remains the whole list renders as nothing rather than an
+ * empty bordered box. See components.md, `SpecList` missing-optional.
+ *
+ * Values use `text-spec` — the tabular-figure style from typography.md.
  */
 export function SpecList({
   product,
@@ -23,22 +31,7 @@ export function SpecList({
   product: Product;
   className?: string;
 }) {
-  const specs: { term: string; value: string }[] = [
-    { term: "Category", value: product.category.name },
-  ];
-
-  // `label` here ("22K Gold"), not the card's short `code` — the product
-  // page has room for the full form and no adjacent category to repeat.
-  if (product.purity) {
-    specs.push({ term: "Purity", value: product.purity.label });
-  }
-
-  if (product.weightGrams !== null) {
-    specs.push({
-      term: "Weight",
-      value: `${product.weightGrams.toFixed(2)} g`,
-    });
-  }
+  const specs: { term: string; value: string }[] = [];
 
   if (product.colours.length > 0) {
     specs.push({
@@ -46,6 +39,8 @@ export function SpecList({
       value: product.colours.join(", "),
     });
   }
+
+  if (specs.length === 0) return null;
 
   return (
     <dl

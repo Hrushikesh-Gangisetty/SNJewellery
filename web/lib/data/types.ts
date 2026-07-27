@@ -24,6 +24,11 @@ export type Timestamp = string;
  * schema change, and a row is cheaper than a migration.
  *
  * At launch: 22K Gold, 18K Gold, Silver.
+ *
+ * **Recorded, not displayed.** Since 2026-07-27 the website shows neither
+ * purity nor weight on any surface; today's gold and silver rates
+ * (`MetalRate`) took their place. The admin app still captures both, so
+ * they stay on the contract.
  */
 export type Purity = {
   readonly id: string;
@@ -32,6 +37,29 @@ export type Purity = {
   /** Full form shown on the product page: "22K Gold". */
   readonly label: string;
   readonly displayOrder: number;
+};
+
+/** The two metals whose daily rate the shop publishes. */
+export type Metal = "gold" | "silver";
+
+/**
+ * Today's rate for one metal, as displayed on the home page.
+ *
+ * Added 2026-07-27, replacing per-piece purity and weight on the
+ * customer-facing site. The owner updates both rates each morning from
+ * the Android app.
+ *
+ * `ratePerGram` is null until the rate has been published for the first
+ * time, and `updatedAt` is null with it. A customer must never be shown a
+ * placeholder rate, so both consumers hide rather than substitute — the
+ * same rule the rest of the site's configuration follows (ADR-0010).
+ */
+export type MetalRate = {
+  readonly metal: Metal;
+  /** Rupees per gram. Null means not published yet. */
+  readonly ratePerGram: number | null;
+  /** When the owner last set it. Null while unpublished. */
+  readonly updatedAt: Timestamp | null;
 };
 
 export type Category = {
@@ -84,8 +112,11 @@ export type Product = {
   readonly purity: Purity | null;
 
   /**
-   * Weight in grams. The owner confirmed this is shown to customers.
-   * Optional because not every piece is sold by weight.
+   * Weight in grams. Optional because not every piece is sold by weight.
+   *
+   * The owner originally confirmed this was shown to customers and
+   * reversed that on 2026-07-27 — see the note on `Purity`. Still
+   * captured by the admin app, never rendered by the website.
    */
   readonly weightGrams: number | null;
 

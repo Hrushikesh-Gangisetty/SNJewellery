@@ -36,7 +36,8 @@ Defined in M2.5, implemented against fixtures immediately and against Supabase i
 | `getRelatedProducts` | Related products, excluding the current one |
 | `getVisibleCategories` | Categories where `is_visible`, in `display_order` |
 | `getCategoryBySlug` | One visible category, or `null` |
-| `getPurities` | Purities in `display_order`, for labels and filters |
+| `getPurities` | Purities in `display_order`. **Not customer-facing since 2026-07-27** — retained because the admin app shares the contract |
+| `getMetalRates` | Today's gold and silver rate per gram, gold first. Always both metals; an unpublished rate is a null value, never a missing row |
 
 M10 extends this with search and filtering. Every method must respect RLS — a hidden category's or archived product's rows must never appear in any result, and M10.10 verifies that.
 

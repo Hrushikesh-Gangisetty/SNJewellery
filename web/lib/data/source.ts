@@ -1,4 +1,11 @@
-import type { Category, Page, PageRequest, Product, Purity } from "./types";
+import type {
+  Category,
+  MetalRate,
+  Page,
+  PageRequest,
+  Product,
+  Purity,
+} from "./types";
 
 /**
  * THE data-access boundary for the website.
@@ -32,7 +39,18 @@ export type CatalogueSource = {
   /** `null` if the slug is unknown or the category is hidden. */
   getCategoryBySlug(slug: string): Promise<Category | null>;
 
-  /** Purities in `displayOrder`, for filter controls and labels. */
+  /**
+   * Purities in `displayOrder`.
+   *
+   * **Not customer-facing since 2026-07-27.** The owner's decision
+   * removed per-piece purity and weight from the website in favour of
+   * today's gold and silver rates. The table, the column and this method
+   * are all retained: the Android app still records purity, and putting
+   * it back on the site is a UI change rather than a migration.
+   *
+   * Nothing on the website calls this today. It is kept because the
+   * schema contract is shared with the admin app, not as dead code.
+   */
   getPurities(): Promise<readonly Purity[]>;
 
   /** Featured products for the home page, newest first. */
@@ -62,6 +80,19 @@ export type CatalogueSource = {
     product: Product,
     limit?: number,
   ): Promise<readonly Product[]>;
+
+  /**
+   * Today's gold and silver rates, gold first.
+   *
+   * Always returns both metals. An unpublished rate is a row with a null
+   * `ratePerGram`, not a missing row, so a caller can never mistake "not
+   * set yet" for "gold is not sold here".
+   *
+   * Not catalogue data, strictly — but this is the website's one data
+   * boundary and a second interface for two rows would be machinery
+   * without a purpose.
+   */
+  getMetalRates(): Promise<readonly MetalRate[]>;
 };
 
 /** Default page size. */

@@ -120,28 +120,44 @@ ok("images are in ascending displayOrder",
    multi.images.every((im, i) => im.displayOrder === i));
 
 // ── Alt text ─────────────────────────────────────────────────────────
-ok("alt text includes name, purity and category",
-   productImageAlt(soldItem) === "Diamond Cut Jhumka Earrings — 22K Earrings",
+// Purity left alt text on 2026-07-27 along with the rest of the
+// customer-facing purity display. A screen-reader user must not be told
+// something a sighted user is not (accessibility.md §1).
+const allAlt = all.items.flatMap(p => p.images.map((_, i) => productImageAlt(p, i)));
+
+ok("alt text is name and category",
+   productImageAlt(soldItem) === "Diamond Cut Jhumka Earrings — Earrings",
    productImageAlt(soldItem));
-// Purity and category names overlap in this catalogue; a naive join reads
-// aloud as "18K Gold Gold Rings" / "Silver Silver Jewellery".
 const ring = await catalogue.getProductBySlug("mens-signet-ring");
-ok("alt text does not repeat 'Gold' for an 18K gold ring",
-   productImageAlt(ring) === "Men's Signet Ring — 18K Gold Rings",
+ok("alt text carries no purity for an 18K gold ring",
+   productImageAlt(ring) === "Men's Signet Ring — Gold Rings",
    productImageAlt(ring));
 const anklet = await catalogue.getProductBySlug("silver-anklet-pair");
-ok("alt text does not repeat 'Silver' for silver jewellery",
+ok("alt text carries no purity for silver jewellery",
    productImageAlt(anklet) === "Silver Anklet Pair — Silver Jewellery",
    productImageAlt(anklet));
+ok("no alt text mentions a purity code",
+   allAlt.every(alt => !/\b\d{2}K\b/.test(alt)),
+   allAlt.find(alt => /\b\d{2}K\b/.test(alt)));
+
+// This assertion used to hold literal 0x08 and 0x01 bytes where \b and \1
+// were intended, so it matched nothing and passed vacuously for as long as
+// it has existed. The positive control below it is what stops that
+// recurring: if the pattern stops detecting a repeat, a test fails.
+const repeatedWord = /\b(\w+)\s+\1\b/i;
+ok("the repeated-word check actually detects a repeat",
+   repeatedWord.test("Silver Silver Jewellery"));
 ok("no alt text contains a consecutive repeated word",
-   all.items.flatMap(p => p.images.map((_, i) => productImageAlt(p, i)))
-     .every(a => !/(\w+)\s+/i.test(a)));
+   allAlt.every(alt => !repeatedWord.test(alt)),
+   allAlt.find(alt => repeatedWord.test(alt)));
+
 ok("alt text numbers additional views",
    productImageAlt(soldItem, 1).endsWith(", view 2"));
-ok("no alt text is empty",
-   all.items.flatMap(p => p.images.map((_, i) => productImageAlt(p, i))).every(a => a.trim().length > 0));
+ok("no alt text is empty", allAlt.every(alt => alt.trim().length > 0));
 
 // ── Purities ─────────────────────────────────────────────────────────
+// Retained in the schema and on the interface, hidden from customers —
+// see the note on getPurities in ../source.ts.
 const pur = await catalogue.getPurities();
 ok("purities are 22K, 18K, Silver in order",
    pur.map(p => p.code).join(",") === "22K,18K,Silver", pur.map(p=>p.code).join(","));

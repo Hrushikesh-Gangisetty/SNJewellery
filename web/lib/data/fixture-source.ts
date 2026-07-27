@@ -1,10 +1,18 @@
 import {
   fixtureCategories,
+  fixtureMetalRates,
   fixtureProducts,
   fixturePurities,
 } from "./fixtures";
 import { DEFAULT_PAGE_SIZE, type CatalogueSource } from "./source";
-import type { Category, Page, PageRequest, Product, Purity } from "./types";
+import type {
+  Category,
+  MetalRate,
+  Page,
+  PageRequest,
+  Product,
+  Purity,
+} from "./types";
 
 /**
  * Fixture implementation of CatalogueSource.
@@ -133,5 +141,9 @@ export const fixtureCatalogueSource: CatalogueSource = {
         )
         .slice(0, limit),
     );
+  },
+
+  getMetalRates(): Promise<readonly MetalRate[]> {
+    return settle(fixtureMetalRates);
   },
 };

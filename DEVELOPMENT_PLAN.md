@@ -533,6 +533,14 @@ Deliver the complete customer-facing website reading live data — home, catalog
   WhatsApp enquiry (`wa.me` deep link, message pre-filled with the product name and page URL), Call Shop (`tel:`), Get Directions (maps link opening the native app on mobile). Mirror WhatsApp and call in the header or footer.
   *Done when:* all three work on a physical Android device, and the WhatsApp message is correctly encoded for a product name containing a space and an ampersand.
 
+- **`M4.14` Today's gold and silver rates** — `S` — ✅ **complete** (`metal_rates` table, RLS, data-access method, home page panel)
+  Owner's decision 2026-07-27, replacing per-piece purity and weight on the customer-facing site. Two rows, updated daily by the owner. Panel hides entirely until both are published.
+  *Done when:* the rates render from live data, and hide cleanly while unpublished. Contact page placement lands with M4.10.
+
+- **`M4.15` Remove purity and weight from the website** — `S` — ✅ **complete**
+  Card, product page, image alt text and metadata. Schema, fixtures and the admin contract keep both. Supersedes the PRD's card and Product Details specifications — see the amendment in [prd.md](prd.md).
+  *Done when:* no website surface renders purity or weight, and the contract tests assert it. Open Question 20 records what "hidden" does and does not mean.
+
 - **`M4.13` Motion and visual polish** — `S`
   Apply the M1.9 entrance transitions to grid and gallery; final pass against the design system.
   *Done when:* a page-by-page comparison against `docs/design/` finds no deviation.
@@ -1319,6 +1327,8 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | 17 | **Storage and egress projection.** Roughly 500 products × how many photographs each, at what average size? | M5 | Decides the Supabase tier before launch. High-resolution jewellery photography is heavy on both storage and egress, and the free tier's ceilings are reachable. Feeds the compression target in M7.6. |
 | 18 | **Google Maps location and social links.** Pending from the owner. | M4.10, M11.3 | Both sections hide cleanly without them per ADR-0010, so nothing is blocked — but `LocalBusiness` structured data in M11.3 wants a real geo location. |
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
+| 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
+| 21 | **Nobody can set a metal rate until M7.** `metal_rates` ships with both rows unpublished and the website hides the panel, which is correct — but the rate stays invisible until the Android app has a screen for it. | M7 | The panel is dead on the live site until then. If rates are wanted sooner, the interim is a direct SQL update by the owner, which needs a documented runbook. |
 
 ---
 

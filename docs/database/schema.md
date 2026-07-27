@@ -40,6 +40,8 @@ addable without a schema change. Adding platinum or 14K is one `INSERT`.
 
 Seeded with the launch set: 22K Gold, 18K Gold, Silver.
 
+**Recorded, not displayed since 2026-07-27.** The owner removed per-piece purity and weight from the customer-facing site in favour of the daily `metal_rates` below. The table, the FK and the column all stay: the Android app still captures purity, and putting it back on the site is a UI change rather than a migration. M10's purity filter is deferred with it.
+
 ### `products`
 
 | Column | Type | Notes |
@@ -50,8 +52,8 @@ Seeded with the launch set: 22K Gold, 18K Gold, Silver.
 | `summary` | `text?` | Short form for cards |
 | `description` | `text?` | Full form for the product page |
 | `category_id` | `uuid` | FK → `categories`, **ON DELETE RESTRICT** |
-| `purity_id` | `uuid?` | FK → `purities`, ON DELETE SET NULL |
-| `weight_grams` | `numeric(10,2)?` | Grams, shown to customers. CHECK > 0 when present |
+| `purity_id` | `uuid?` | FK → `purities`, ON DELETE SET NULL. **Recorded, not displayed** |
+| `weight_grams` | `numeric(10,2)?` | Grams. CHECK > 0 when present. **Recorded, not displayed** — see `purities` |
 | `colours` | `text[]` | Optional available colours |
 | `tags` | `text[]` | Searchable in M10. GIN indexed |
 | `featured` | `boolean` | Home page |
@@ -78,6 +80,33 @@ M8.8 handles the case in the admin UI.
 image rows automatically but leaves the files in the bucket. M8.4 must delete
 both explicitly — orphaned objects accumulate silently and cost money.
 
+### `metal_rates`
+Today's gold and silver rate per gram, updated by the owner each morning from
+the Android app. Added 2026-07-27, replacing per-piece purity and weight on the
+customer-facing site.
+
+**Exactly two rows, permanently.** The metal is the primary key and it is an enum
+of two values, so a third rate, a duplicate, or a missing row are all impossible.
+There is deliberately **no INSERT and no DELETE policy for anyone, admins
+included** — the shape of the table is not something a client can change. Adding
+a third metal is a migration, which is the right cost for changing what the shop
+publishes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `metal` | `metal` | PK. Enum: `gold` \| `silver` |
+| `rate_per_gram` | `numeric(8,2)?` | Rupees per gram. **NULL means not published yet** |
+| `updated_at` | `timestamptz?` | By trigger. NULL while unpublished |
+
+`rate_per_gram` and `updated_at` are null or non-null **together**, enforced by
+both a trigger and a CHECK constraint. A timestamp that outlives the number it
+describes would tell a customer a stale rate was set this morning, so the pairing
+is a property of the table rather than something callers have to remember.
+
+The website hides the rates panel entirely until both metals are published — a
+placeholder rate is exactly what [ADR-0010](../adr/0010-configurable-site-content.md)
+forbids.
+
 ### `users`
 Mirrors `auth.users`. A row is created automatically by the
 `on_auth_user_created` trigger, defaulting to `admin`, because public signup is
@@ -98,6 +127,7 @@ disabled and every account is created deliberately.
 |---|---|
 | `product_image_aspect` | `product`, `product-portrait` |
 | `user_role` | `admin`, `staff` |
+| `metal` | `gold`, `silver` |
 
 The distinction that decides enum vs lookup table:
 

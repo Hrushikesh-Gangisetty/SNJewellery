@@ -1,6 +1,14 @@
 import { getSupabase } from "./supabase-client";
 import { DEFAULT_PAGE_SIZE, type CatalogueSource } from "./source";
-import type { Category, Page, PageRequest, Product, Purity } from "./types";
+import type {
+  Category,
+  Metal,
+  MetalRate,
+  Page,
+  PageRequest,
+  Product,
+  Purity,
+} from "./types";
 
 /**
  * Supabase implementation of CatalogueSource.
@@ -257,6 +265,12 @@ async function pagedProducts(
   };
 }
 
+/**
+ * Display order for the rates panel. Both metals are always returned, so
+ * a missing row surfaces as an unpublished rate rather than vanishing.
+ */
+const METAL_ORDER: readonly Metal[] = ["gold", "silver"];
+
 function buildProductQuery() {
   return getSupabase()
     .from("products")
@@ -358,5 +372,32 @@ export const supabaseCatalogueSource: CatalogueSource = {
         .limit(limit),
     );
     return (rows as unknown as ProductRow[]).map(toProduct);
+  },
+
+  async getMetalRates(): Promise<readonly MetalRate[]> {
+    const rows = unwrap(
+      await getSupabase()
+        .from("metal_rates")
+        .select("metal, rate_per_gram, updated_at"),
+    );
+
+    // Ordered here rather than in SQL: the enum's declaration order is
+    // gold then silver, but relying on that to survive a future ALTER
+    // TYPE would be relying on something nobody would think to preserve.
+    const byMetal = new Map(rows.map((row) => [row.metal, row]));
+
+    return METAL_ORDER.map((metal) => {
+      const row = byMetal.get(metal);
+      return {
+        metal,
+        // numeric arrives as a string from some drivers; coerce so
+        // callers can format it without re-checking the type.
+        ratePerGram:
+          row?.rate_per_gram === null || row?.rate_per_gram === undefined
+            ? null
+            : Number(row.rate_per_gram),
+        updatedAt: row?.updated_at ?? null,
+      };
+    });
   },
 };

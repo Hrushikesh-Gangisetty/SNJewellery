@@ -42,6 +42,8 @@ export { productImageAlt } from "./alt";
 export type {
   Category,
   ImageAspect,
+  Metal,
+  MetalRate,
   Page,
   PageRequest,
   Product,
