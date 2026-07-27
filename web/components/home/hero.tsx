@@ -3,9 +3,11 @@ import Link from "next/link";
 import { AspectBox } from "@/components/ui/aspect-box";
 import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { WhatsAppButton } from "@/components/shop/conversion";
 import { cn } from "@/lib/cn";
-import { site, whatsAppHref } from "@/lib/config/site";
-import { productImageAlt, type Product } from "@/lib/data";
+import { site } from "@/lib/config/site";
+import { productImageAlt } from "@/lib/data/alt";
+import type { Product } from "@/lib/data/types";
 
 /**
  * Home page hero.
@@ -43,10 +45,10 @@ export function Hero({ showcase }: { showcase: Product | null }) {
           {site.description}
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
+          {/* Browsing leads here, not enquiring: a customer who has just
+              arrived has not seen a piece to ask about yet. */}
           <ButtonLink href="/catalogue">Browse the catalogue</ButtonLink>
-          <ButtonLink href={whatsAppHref()} variant="secondary">
-            Ask on WhatsApp
-          </ButtonLink>
+          <WhatsAppButton variant="inline" />
         </div>
       </div>
 

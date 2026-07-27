@@ -1,6 +1,6 @@
-import { ButtonLink } from "@/components/ui/button";
+import { DirectionsButton } from "./conversion";
 import { cn } from "@/lib/cn";
-import { directionsHref, site } from "@/lib/config/site";
+import { site } from "@/lib/config/site";
 
 /**
  * Where the shop is and when it is open.
@@ -15,8 +15,6 @@ import { directionsHref, site } from "@/lib/config/site";
  * at different prominence without the shop's address being written twice.
  */
 export function StoreInformation({ className }: { className?: string }) {
-  const directions = directionsHref();
-
   return (
     <div className={cn("flex flex-col items-start gap-6", className)}>
       <address className="text-body-l text-text-primary not-italic">
@@ -31,11 +29,7 @@ export function StoreInformation({ className }: { className?: string }) {
         <span className="text-text-primary">Open</span> {site.hours.display}
       </p>
 
-      {directions ? (
-        <ButtonLink href={directions} variant="secondary">
-          Get directions
-        </ButtonLink>
-      ) : null}
+      <DirectionsButton />
     </div>
   );
 }

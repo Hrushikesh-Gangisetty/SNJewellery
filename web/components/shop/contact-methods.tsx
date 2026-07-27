@@ -1,6 +1,6 @@
-import { ButtonLink } from "@/components/ui/button";
+import { CallButton, WhatsAppButton } from "./conversion";
 import { cn } from "@/lib/cn";
-import { site, telHref, whatsAppHref } from "@/lib/config/site";
+import { site } from "@/lib/config/site";
 
 /**
  * The ways a customer can reach the shop.
@@ -15,7 +15,7 @@ import { site, telHref, whatsAppHref } from "@/lib/config/site";
  * nothing rather than a dead link.
  *
  * `message` pre-fills the WhatsApp text. The home and contact pages leave
- * it empty; the product page passes the piece's name in M4.12.
+ * it empty; the product page composes its own with `productEnquiry`.
  */
 export function ContactMethods({
   message,
@@ -26,11 +26,9 @@ export function ContactMethods({
 }) {
   return (
     <div className={cn("flex flex-col items-start gap-3", className)}>
-      <ButtonLink href={whatsAppHref(message)}>Message on WhatsApp</ButtonLink>
+      <WhatsAppButton message={message}>Message on WhatsApp</WhatsAppButton>
 
-      <ButtonLink href={telHref()} variant="secondary">
-        Call {site.contact.phoneDisplay}
-      </ButtonLink>
+      <CallButton />
 
       {site.contact.email ? (
         <a

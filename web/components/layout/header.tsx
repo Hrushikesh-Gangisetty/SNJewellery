@@ -5,8 +5,9 @@ import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { Wordmark } from "./wordmark";
 import { MobileDrawer } from "./mobile-drawer";
-import { telHref, whatsAppHref } from "@/lib/config/site";
-import type { Category } from "@/lib/data";
+import { WhatsAppButton } from "@/components/shop/conversion";
+import { telHref } from "@/lib/config/site";
+import type { Category } from "@/lib/data/types";
 
 /**
  * Site header. See docs/design/responsive.md §3.
@@ -43,7 +44,12 @@ export function Header({ categories }: { categories: readonly Category[] }) {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Persistent conversion actions — see ux.md §2. */}
+          {/* Persistent conversion actions — see ux.md §2.
+              Icon-only, so this is the one call action that does not use
+              CallButton: there is no room for the number at this width,
+              and a fourth variant for a single site would cost more than
+              it saves. It still takes its href from telHref, so the
+              number itself is not duplicated. */}
           <a
             href={telHref()}
             aria-label="Call the shop"
@@ -51,14 +57,7 @@ export function Header({ categories }: { categories: readonly Category[] }) {
           >
             <PhoneIcon />
           </a>
-          <a
-            href={whatsAppHref()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-accent text-on-accent text-body-s hidden min-h-11 items-center rounded-md px-4 font-medium sm:inline-flex"
-          >
-            Ask on WhatsApp
-          </a>
+          <WhatsAppButton className="text-body-s hidden sm:inline-flex" />
 
           <button
             ref={triggerRef}

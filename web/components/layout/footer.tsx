@@ -2,13 +2,12 @@ import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { Wordmark } from "./wordmark";
 import {
-  addressOneLine,
-  directionsHref,
-  site,
-  telHref,
-  whatsAppHref,
-} from "@/lib/config/site";
-import type { Category } from "@/lib/data";
+  CallButton,
+  DirectionsButton,
+  WhatsAppButton,
+} from "@/components/shop/conversion";
+import { addressOneLine, site } from "@/lib/config/site";
+import type { Category } from "@/lib/data/types";
 
 /**
  * Site footer: shop details, hours, categories, contact.
@@ -19,8 +18,6 @@ import type { Category } from "@/lib/data";
  * before the owner has supplied social handles or a Maps location.
  */
 export function Footer({ categories }: { categories: readonly Category[] }) {
-  const directions = directionsHref();
-
   return (
     <footer className="bg-surface-raised border-border mt-24 border-t">
       <Container className="grid gap-12 py-16 md:grid-cols-3">
@@ -48,17 +45,8 @@ export function Footer({ categories }: { categories: readonly Category[] }) {
           <p className="text-body-s text-text-secondary mt-4">
             {site.hours.display}
           </p>
-          {/* Hidden entirely until a Maps location is supplied. */}
-          {directions ? (
-            <a
-              href={directions}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-body-s text-accent-text mt-4 inline-flex min-h-11 items-center"
-            >
-              Get directions
-            </a>
-          ) : null}
+          {/* Renders nothing at all until a Maps location is supplied. */}
+          <DirectionsButton variant="link" className="mt-4" />
         </div>
 
         <div>
@@ -91,20 +79,8 @@ export function Footer({ categories }: { categories: readonly Category[] }) {
           {site.name} · {addressOneLine()}
         </p>
         <div className="flex flex-wrap items-center gap-4">
-          <a
-            href={telHref()}
-            className="text-body-s text-text-primary inline-flex min-h-11 items-center"
-          >
-            {site.contact.phoneDisplay}
-          </a>
-          <a
-            href={whatsAppHref()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-body-s text-accent-text inline-flex min-h-11 items-center"
-          >
-            WhatsApp
-          </a>
+          <CallButton variant="link" />
+          <WhatsAppButton variant="link">WhatsApp</WhatsAppButton>
           {/* Empty array today, so this renders nothing rather than a
               heading with no links beneath it. */}
           {site.social.map((s) => (

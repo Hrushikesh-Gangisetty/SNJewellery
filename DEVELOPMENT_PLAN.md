@@ -529,7 +529,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Shop history, experience, mission, certifications — per the PRD's About Us section.
   *Done when:* the page renders; placeholder copy is clearly marked pending Open Question 1.
 
-- **`M4.12` Conversion actions** — `M`
+- **`M4.12` Conversion actions** — `M` — ◐ **built and wired everywhere**; WhatsApp encoding verified for a name containing a space and an ampersand. Two things outstanding, neither in code: physical Android device verification, and Get Directions, which renders nothing until Open Question 18 supplies a Maps location.
   WhatsApp enquiry (`wa.me` deep link, message pre-filled with the product name and page URL), Call Shop (`tel:`), Get Directions (maps link opening the native app on mobile). Mirror WhatsApp and call in the header or footer.
   *Done when:* all three work on a physical Android device, and the WhatsApp message is correctly encoded for a product name containing a space and an ampersand.
 

@@ -2,10 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { site } from "@/lib/config/site";
-import { telHref, whatsAppHref } from "@/lib/config/site";
+import { CallButton, WhatsAppButton } from "@/components/shop/conversion";
 import { cn } from "@/lib/cn";
-import type { Category } from "@/lib/data";
+import type { Category } from "@/lib/data/types";
 
 /**
  * Mobile navigation drawer.
@@ -177,20 +176,8 @@ export function MobileDrawer({
         {/* Conversion actions stay reachable from the menu — they are the
             site's purpose, not a footer afterthought (ux.md §2). */}
         <div className="border-border mt-auto flex flex-col gap-2 border-t p-4">
-          <a
-            href={whatsAppHref()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-accent text-on-accent text-body-m flex min-h-11 items-center justify-center rounded-md px-4 font-medium"
-          >
-            Ask on WhatsApp
-          </a>
-          <a
-            href={telHref()}
-            className="border-border-interactive text-text-primary text-body-m flex min-h-11 items-center justify-center rounded-md border px-4 font-medium"
-          >
-            Call {site.contact.phoneDisplay}
-          </a>
+          <WhatsAppButton />
+          <CallButton />
         </div>
       </div>
     </>
