@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Dark equivalent of the launch window. Same reasoning as
+      values/themes.xml — this only covers the frames before Compose
+      renders. surface (dark), from docs/design/tokens.json.
+    -->
+    <style name="Theme.SnJewelleryAdmin" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <color name="window_background">#0F0F0F</color>
+</resources>

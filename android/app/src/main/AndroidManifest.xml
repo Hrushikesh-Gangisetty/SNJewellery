@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      No permissions yet. CAMERA and the Photo Picker arrive with the
+      upload pipeline in M7, and each is added in the milestone that
+      needs it rather than up front — a permission requested before a
+      feature exists is one the owner is asked to grant for no reason.
+
+      INTERNET is granted implicitly for debug builds by the manifest
+      merger but not for release; it is declared explicitly in M6.5,
+      alongside the Supabase client that first needs it.
+    -->
+
+    <application
+        android:name=".SnJewelleryApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SnJewelleryAdmin">
+
+        <!--
+          allowBackup is false deliberately: this app holds an
+          authenticated admin session (M6.8). Letting it into cloud
+          backup would put a session token somewhere outside the
+          device's protected storage. See CLAUDE.md §9.
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.SnJewelleryAdmin"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

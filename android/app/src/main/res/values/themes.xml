@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The window theme only — it decides what is on screen for the
+      moment between launch and Compose's first frame. The real theme is
+      the Compose one built from design tokens in M6.2; nothing in Kotlin
+      reads this.
+
+      Parented on the platform theme rather than a Material Components
+      one, because this app depends on Compose Material 3 and not on the
+      View-based material library. Pulling that library in for a window
+      background would be a dependency earning nothing (CLAUDE.md §3.7).
+
+      windowBackground matches the light surface token so the launch does
+      not flash a colour the app never uses again. values-night/ carries
+      the dark equivalent.
+    -->
+    <style name="Theme.SnJewelleryAdmin" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!-- surface, from docs/design/tokens.json. See colors.xml. -->
+    <color name="window_background">#FFFFFF</color>
+</resources>

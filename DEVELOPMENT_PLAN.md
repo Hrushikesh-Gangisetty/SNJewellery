@@ -665,9 +665,13 @@ Create the admin application's skeleton — design system applied, architecture,
 
 ### Tasks
 
-- **`M6.1` Scaffold the Android project** — `S`
+- **`M6.1` Scaffold the Android project** — `S` — ✅ **complete** (`assembleDebug` succeeds; minSdk 26, reasoned in `docs/architecture/android-build.md` §2)
   Kotlin project in `android/` with Jetpack Compose; record the minimum SDK decision and its reasoning.
   *Done when:* the project builds a debug variant and the minSdk decision is documented.
+
+  **minSdk 26 (Android 8.0)**, not the 33 ADR-0007's testing note pointed at. The app is for three or four known administrators on direct APK, so excluding a working phone means that person cannot upload at all — and the permission branching ADR-0007 wanted to avoid is avoided instead by the Photo Picker, which needs no storage permission on any version. ADR-0007 left `minSdk` to this task rather than deciding it, so this refines its note rather than contradicting it.
+
+  Also verified: a clean clone with no Supabase credentials in `local.properties` still builds, and the debug APK contains no `service_role` string.
 
 - **`M6.2` Material 3 theme from design tokens** — `M`
   Implement the M1 tokens as a Compose theme with light and dark colour schemes, the M1.4 type scale, and M1.5 shape and elevation. Decide and document dynamic-colour handling — a brand-led luxury identity usually overrides it.

@@ -33,6 +33,7 @@ flowchart LR
 | Document | Contents | Task |
 |---|---|---|
 | `rendering.md` | Per-route rendering strategy, ISR, cache tag placement | M4.7 |
+| `android-build.md` | Toolchain versions, SDK levels and the `minSdk` decision, secrets, signing | M6.1 |
 | `sync.md` | Revalidation mechanism, mutation→tag map, stale-page diagnosis runbook | M9.7 |
 
 Both are near-term deliverables. This README carries the system overview until they exist.
@@ -52,6 +53,6 @@ These hold across the whole system. Breaking one is an architectural change and 
 - [ADR-0001](../adr/0001-monorepo.md) — why one repository
 - [ADR-0002](../adr/0002-nextjs-app-router.md) — Next.js 15 App Router
 - [ADR-0003](../adr/0003-supabase-backend.md) — Supabase as the backend platform
-- [ADR-0006](../adr/0006-cache-revalidation-strategy.md) — revalidation strategy *(Proposed)*
-- [ADR-0007](../adr/0007-android-architecture.md) — Android architecture *(Proposed)*
+- [ADR-0006](../adr/0006-cache-revalidation-strategy.md) — revalidation strategy
+- [ADR-0007](../adr/0007-android-architecture.md) — Android architecture, DI and HTTP client
 - [ADR-0009](../adr/0009-website-first-with-mock-data-adapter.md) — website-first build order

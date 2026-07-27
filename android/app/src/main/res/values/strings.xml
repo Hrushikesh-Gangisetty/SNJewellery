@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The launcher label. Short deliberately: Android truncates a long
+      label under the icon, and "SN Jewellery & Silver Palace" would be
+      unreadable there. brand.md §1 allows the short form where space
+      genuinely constrains it, which is the same reason the website's
+      mobile header uses site.shortName.
+    -->
+    <string name="app_name">SN Admin</string>
+
+    <!-- Replaced by the login screen in M6.7. Says plainly that the app
+         is not finished, rather than showing a convincing empty screen. -->
+    <string name="shell_subtitle">Setup in progress — sign-in arrives in the next build.</string>
+</resources>

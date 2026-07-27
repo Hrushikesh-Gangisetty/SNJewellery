@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Launcher icon colours only.
+
+      These duplicate `accent` and `onAccent` from docs/design/tokens.json.
+      That is not a licence to hard-code elsewhere: Compose reads
+      android/design-tokens/Tokens.kt, which the generator emits, and
+      every colour in Kotlin comes from there (ADR-0008).
+
+      An adaptive icon is an XML resource and cannot read Kotlin, so
+      these two are the one place a token value has to be restated. They
+      are here, next to the icon that uses them, rather than scattered.
+    -->
+    <color name="ic_launcher_background">#C2A55C</color>
+    <color name="ic_launcher_foreground">#1C1917</color>
+</resources>

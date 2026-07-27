@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The monogram, drawn to the adaptive-icon safe zone: the outer third of
+  a 108dp canvas can be masked away by the launcher, so the mark sits
+  inside the middle 72dp (roughly x/y 18-90).
+
+  A vector rather than the supplied PNG logo, because an adaptive icon
+  foreground is masked to arbitrary shapes and a bitmap wordmark crops
+  badly. brand.md §4 forbids recolouring the supplied mark, so this is a
+  plain letterform rather than an altered version of it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- S -->
+    <path
+        android:fillColor="@color/ic_launcher_foreground"
+        android:pathData="M50,40.5c0,-3.9 -3.6,-6.6 -9.3,-6.6c-5.4,0 -9.1,2.5 -9.1,6.1c0,3.1 2.2,4.8 7.4,5.9l4.6,1c7.9,1.7 11.6,5.2 11.6,11.2c0,7.6 -6.4,12.6 -15.6,12.6c-9.6,0 -16.1,-4.7 -16.6,-12.2h7.3c0.5,4.1 4.3,6.6 9.8,6.6c5.7,0 9.6,-2.7 9.6,-6.5c0,-3.2 -2.2,-5 -7.3,-6.1l-5.4,-1.2c-7.6,-1.7 -11.1,-5.1 -11.1,-10.9c0,-7.4 6.2,-12.4 15,-12.4c8.8,0 14.9,5 15.1,12.5z" />
+    <!-- N -->
+    <path
+        android:fillColor="@color/ic_launcher_foreground"
+        android:pathData="M62,28.6h6.6l17.9,27.7h0.3V28.6h7v41.4h-6.6l-18,-27.8h-0.3v27.8h-6.9z" />
+</vector>

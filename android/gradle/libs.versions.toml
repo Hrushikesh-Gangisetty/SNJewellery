@@ -1,0 +1,42 @@
+# Version catalogue — the single place a dependency version is written.
+#
+# Same principle as web/lib/config/site.ts and docs/design/tokens.json:
+# one home per fact. A version written in a module's build file is a
+# version that drifts from the other module's.
+#
+# Versions added here as each milestone needs them — Hilt in M6.4,
+# Supabase and Coil in M6.5 (see ADR-0007). Nothing is listed before it
+# is used; an unused dependency is weight in the APK and a thing to
+# upgrade.
+
+[versions]
+# AGP and Gradle move together. See docs/architecture/android-build.md
+# for why this pair, and what to check before changing either.
+agp = "8.10.1"
+kotlin = "2.0.21"
+composeBom = "2025.04.00"
+
+androidxCore = "1.13.1"
+androidxLifecycle = "2.8.4"
+androidxActivity = "1.9.2"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidxActivity" }
+
+# The BOM pins every Compose artefact, so Compose libraries below carry
+# no version of their own — that is the point of it.
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# Required from Kotlin 2.0: the Compose compiler ships with Kotlin
+# itself rather than as a separately versioned artefact.
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
