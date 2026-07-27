@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { site } from "@/lib/config/site";
 import {
   getCategoryBySlug,
   getProductsByCategory,
@@ -49,7 +50,7 @@ export async function generateMetadata({
 
   return {
     title: category.name,
-    description: `${category.name} at SN Jewellery & Silver Palace, Markapur. Visit our showroom, or ask us about a piece.`,
+    description: `${category.name} at ${site.name}, ${site.address.city}. Visit our showroom, or ask us about a piece.`,
   };
 }
 

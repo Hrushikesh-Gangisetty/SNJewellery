@@ -17,6 +17,17 @@
 /** A value the owner will supply later. Renders as nothing until then. */
 type Pending<T> = T | null;
 
+/**
+ * The shop's number in E.164 — **the only place it is written.**
+ *
+ * A `tel:` link, a `wa.me` path, and the label a customer reads all need
+ * different forms of it, and holding three literals is how a number gets
+ * changed in two of them. Every other form is derived below, so M4.9's
+ * criterion — one occurrence of the number in the repository — holds by
+ * construction rather than by discipline.
+ */
+const PHONE_E164 = "+919440248401";
+
 export type SocialLink = {
   readonly platform: "instagram" | "facebook" | "youtube" | "whatsapp";
   readonly url: string;
@@ -83,12 +94,15 @@ export const site = {
   }>,
 
   contact: {
-    /** E.164, for tel: links. */
-    phone: "+919440248401",
-    /** As displayed to a customer. */
-    phoneDisplay: "+91 94402 48401",
-    /** Digits only, no plus — wa.me requires this form. */
-    whatsapp: "919440248401",
+    /**
+     * E.164, for `tel:` links. The display form and the `wa.me` form are
+     * derived from it — see `phoneDisplay` and `whatsAppHref`.
+     *
+     * The shop uses one number for calls and for WhatsApp. If that ever
+     * stops being true, WhatsApp gets its own constant here; do not
+     * reintroduce a second literal for a form of the same number.
+     */
+    phone: PHONE_E164,
     email: null as Pending<string>,
   },
 
@@ -134,6 +148,27 @@ export const site = {
 // ── Derived helpers ────────────────────────────────────────────────────
 // Centralised so no component builds these URLs itself.
 
+/** Digits only, no plus — the form `wa.me` requires. */
+function phoneDigits(): string {
+  return site.contact.phone.replace(/\D/g, "");
+}
+
+/**
+ * The number as a customer reads it: `+91 94402 48401`.
+ *
+ * Indian mobile grouping — country code, then 5 and 5 — because the last
+ * ten digits are the national number for `+91`. This site serves one
+ * shop in one country, so a general-purpose phone formatter would be a
+ * dependency earning nothing. A number for a different country would
+ * need this rule revisited, not just the constant changed.
+ */
+export function phoneDisplay(): string {
+  const digits = phoneDigits();
+  const national = digits.slice(-10);
+  const country = digits.slice(0, -10);
+  return `+${country} ${national.slice(0, 5)} ${national.slice(5)}`;
+}
+
 /** `tel:` href. */
 export function telHref(): string {
   return `tel:${site.contact.phone}`;
@@ -145,7 +180,7 @@ export function telHref(): string {
  * exactly that case.
  */
 export function whatsAppHref(message?: string): string {
-  const base = `https://wa.me/${site.contact.whatsapp}`;
+  const base = `https://wa.me/${phoneDigits()}`;
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
 

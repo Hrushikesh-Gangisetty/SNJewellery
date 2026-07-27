@@ -1,7 +1,12 @@
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { publicEnv } from "@/lib/config/env";
-import { directionsHref, site, telHref, whatsAppHref } from "@/lib/config/site";
+import {
+  directionsHref,
+  phoneDisplay,
+  telHref,
+  whatsAppHref,
+} from "@/lib/config/site";
 import type { Product } from "@/lib/data/types";
 
 /**
@@ -144,7 +149,7 @@ export function CallButton({
       external={false}
       className={className}
     >
-      {showNumber ? `Call ${site.contact.phoneDisplay}` : "Call the shop"}
+      {showNumber ? `Call ${phoneDisplay()}` : "Call the shop"}
     </ActionLink>
   );
 }

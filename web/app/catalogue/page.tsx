@@ -5,6 +5,7 @@ import { WhatsAppButton } from "@/components/shop/conversion";
 import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { site } from "@/lib/config/site";
 import { getAllProducts, getVisibleCategories } from "@/lib/data/cache";
 
 /**
@@ -23,8 +24,7 @@ export const revalidate = 600;
  */
 export const metadata: Metadata = {
   title: "All jewellery",
-  description:
-    "Browse the full collection — gold, silver, and diamond jewellery. Visit our showroom in Markapur, or ask us about a piece.",
+  description: `Browse the full collection — gold, silver, and diamond jewellery. Visit our showroom in ${site.address.city}, or ask us about a piece.`,
 };
 
 export default async function CataloguePage() {

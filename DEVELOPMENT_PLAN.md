@@ -517,7 +517,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Empty catalogue, empty category, product with no images, product missing optional fields, unknown slug.
   *Done when:* each case renders the M1.10 pattern rather than breaking or erroring.
 
-- **`M4.9` Shop configuration module** — `S`
+- **`M4.9` Shop configuration module** — `S` — ✅ **complete** (`web/lib/config/site.ts`; the number is one literal, every other form derived — grep returns exactly one occurrence)
   Centralise phone, WhatsApp number, address, coordinates, business hours, and social handles in one module.
   *Done when:* a grep for the literal phone number returns exactly one occurrence.
 
