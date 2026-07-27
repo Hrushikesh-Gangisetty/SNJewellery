@@ -19,7 +19,7 @@ Part of the [design system](README.md). Produced by M1.1 and M1.2.
 | **Location** | 4-394/A, Temple Street, Markapur – 523316 |
 | **Tagline** | None. Do not invent one. |
 | **Established** | Not yet supplied |
-| **Logo** | Supplied 2026-07-26 as a raster mockup — see §4 |
+| **Logo** | Transparent PNG supplied 2026-07-27 and now in use — see §4 |
 
 ### The name is doing two jobs
 
@@ -89,6 +89,10 @@ screen — applied to a traditional Indian jewellery catalogue.
 **Supplied 2026-07-26** as a raster mockup: the mark on a deep teal wall, gold
 lettering rendered as brushed metal.
 
+**Superseded 2026-07-27** by a background-free PNG — 768 × 768, RGBA, genuinely
+transparent — which is what the site now ships. SVG was not available. See
+[§4.1](#41--the-assets-in-the-repository) for what was derived from it.
+
 ### What the mark contains
 
 Three parts, and the separation matters:
@@ -114,8 +118,30 @@ Revised from §1:
 | Footer, About, social previews | Full logo lockup |
 | Page metadata, structured data | Full name as text |
 
-This needs the monogram **exported as its own asset**, separate from the lockup —
-cropping it out of the full logo will not scale cleanly.
+This needs the monogram **exported as its own asset**, separate from the lockup.
+That was written when the only asset was a teal-backed mockup. With a clean
+transparent PNG it became possible to crop one — see §4.1 — and that crop is
+what ships. It is a stopgap, not a replacement for a purpose-drawn mark.
+
+### 4.1 · The assets in the repository
+
+Everything below is **derived from the one supplied PNG**. Nothing was redrawn,
+recoloured, or restyled.
+
+| File | What it is | How it was produced |
+|---|---|---|
+| `web/public/site.logo.png` | Full lockup, 725 × 451 | Supplied 768 × 768 PNG cropped to its content box (x 17–741, y 100–550). The canvas padding was asymmetric — 100 px above, 218 px below — which would have made every rendered height wrong. |
+| `web/public/site.monogram.png` | Winged SN, 409 × 409 | Cropped from the same source at x 250–614, y 100–376, then centred on a square canvas with 6 % padding. The cut at y 376 is the narrowest row between the monogram and the "Jewellery" wordmark, where only the N's stem remains. |
+| `web/app/icon.png`, `web/app/apple-icon.png` | 192 px and 180 px | Downscaled from the monogram. |
+| `web/app/favicon.ico` | 48 px | The same, wrapped in an ICO container. |
+
+Rendered heights are set in `components/layout/wordmark.tsx`: 44 px for the
+lockup, 36 px for the monogram. Both clear the 24 px floor below.
+
+**What a purpose-drawn asset would still improve.** The crop is honest but it is
+a crop: the monogram's descender is cut at the baseline rather than terminating
+by design, and at 32 px and below the wings lose definition. An SVG, or a
+monogram exported on its own artboard, fixes both. Neither blocks anything.
 
 ### The serif validates the typeface choice
 
@@ -151,12 +177,12 @@ from a mockup.
 
 ### Still needed
 
-| Asset | Why |
-|---|---|
-| **SVG of the full lockup** | The raster mockup has studio lighting on the metal, so it is not a reliable colour source and will not scale. An SVG also lets us take the gradient stops exactly. |
-| **SVG of the monogram alone** | Mobile header and favicon |
-| **A version that works on white** | The current asset is gold-on-teal. Logos are exempt from WCAG contrast rules, so gold on white is permitted — but it will read lighter than on teal. If that looks washed out, the fix is a dark header band, not darkening the logo. |
-| **A reversed / single-colour version** | Dark-mode surfaces, and print |
+| Asset | Why | Status |
+|---|---|---|
+| **A version that works on white** | Logos are exempt from WCAG contrast rules, so gold on white is permitted. | ✅ **Resolved** — the supplied PNG is transparent and sits on white. If it ever reads washed out, the fix is a dark header band, not darkening the logo. |
+| **SVG of the full lockup** | Raster will not scale past its native size, and an SVG would give the gradient stops exactly. | Still wanted. Not blocking: 725 × 451 is far above any rendered size. |
+| **SVG of the monogram alone** | Mobile header and favicon | Still wanted. §4.1's crop covers it for now. |
+| **A reversed / single-colour version** | Print, and any dark surface where the metallic gradient reads muddy | Still wanted. The gold reads acceptably on near-black, so nothing is blocked. |
 
 ### Usage rules
 
@@ -239,7 +265,7 @@ implementing it quietly.
 
 | Item | Blocks | Workaround until supplied |
 |---|---|---|
-| Logo **SVG** + monogram SVG + reversed version | Nothing hard | Wordmark renders; see §4 |
+| Logo **SVG** + monogram SVG + reversed version | Nothing hard | The supplied PNG and the crops derived from it are in use; see §4.1 |
 | Existing signage / packaging / print photos | Nothing hard | Palette derived from the owner's stated preference (white, gold, black, neutrals) rather than sampled from real assets — see [colour.md](colour.md) |
 | Year established | About page, trust signals | Section hidden |
 | Business history, certifications | About page (M4.11) | Section hidden, per ADR-0010 |

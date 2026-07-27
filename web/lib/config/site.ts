@@ -54,8 +54,33 @@ export const site = {
   /** Year established — shown as a trust signal once supplied. */
   established: null as Pending<number>,
 
-  /** Path under web/public/. Falls back to the wordmark while null. */
-  logo: null as Pending<{ src: string; srcDark: string; alt: string }>,
+  /**
+   * Brand assets under web/public/. Null falls back to the wordmark.
+   *
+   * Two forms, because brand.md §4 assigns them different jobs: the
+   * lockup where there is room, the winged monogram where there is not
+   * (mobile header, favicon) — that is what solves the 28-character-name
+   * problem in the mobile header.
+   *
+   * Intrinsic dimensions are recorded so next/image can reserve the box
+   * and no logo swap can shift the header.
+   *
+   * There is no separate dark asset: the mark is metallic gold on
+   * transparent, which reads on both white and near-black. If a reversed
+   * version is ever supplied, add `srcDark` here rather than filtering
+   * this one — brand.md §4 forbids recolouring.
+   */
+  logo: {
+    /** Desktop header, footer, social previews. */
+    lockup: { src: "/site.logo.png", width: 725, height: 451 },
+    /** Mobile header and favicon. */
+    monogram: { src: "/site.monogram.png", width: 409, height: 409 },
+    alt: "SN Jewellery & Silver Palace",
+  } as Pending<{
+    lockup: { src: string; width: number; height: number };
+    monogram: { src: string; width: number; height: number };
+    alt: string;
+  }>,
 
   contact: {
     /** E.164, for tel: links. */

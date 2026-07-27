@@ -25,9 +25,11 @@ export function Header({ categories }: { categories: readonly Category[] }) {
   return (
     <header className="bg-surface/95 border-border sticky top-0 z-30 border-b backdrop-blur">
       <Container className="flex min-h-16 items-center justify-between gap-4 lg:min-h-20">
-        {/* Compact below lg — the full 28-character name does not fit. */}
-        <Wordmark compact className="lg:hidden" />
-        <Wordmark className="hidden lg:inline-flex" />
+        {/* Monogram below lg — neither the 28-character name nor the full
+            lockup fits, and the lockup's "& Silver Palace" line would be
+            about three pixels tall (brand.md §4). */}
+        <Wordmark compact eager className="lg:hidden" />
+        <Wordmark eager className="hidden lg:inline-flex" />
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           <NavLink href="/catalogue">All jewellery</NavLink>
