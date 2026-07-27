@@ -15,6 +15,7 @@
     <application
         android:name=".SnJewelleryApp"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
@@ -26,12 +27,15 @@
           authenticated admin session (M6.8). Letting it into cloud
           backup would put a session token somewhere outside the
           device's protected storage. See CLAUDE.md §9.
+
+          dataExtractionRules is the Android 12+ form of the same rule;
+          allowBackup still covers everything below it.
         -->
 
+        <!-- No android:label here: it would repeat the application's. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.SnJewelleryAdmin"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

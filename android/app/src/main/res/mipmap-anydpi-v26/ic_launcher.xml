@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Adaptive icon. minSdk is 26, so this is the only launcher icon the app
-  needs — no legacy density-bucket PNGs, which is one of the practical
-  benefits of the minSdk decision in docs/architecture/android-build.md.
+  needs — no legacy density-bucket PNGs. One of the practical benefits of
+  the minSdk decision in docs/architecture/android-build.md §2.
+
+  The -v26 qualifier stays despite lint's ObsoleteSdkInt advice to drop
+  it. It was tried: AAPT then fails to resolve mipmap/ic_launcher from
+  the manifest at all, and the build does not link. The warning is
+  suppressed in lint.xml rather than left standing, so nobody follows it
+  and breaks the build a second time.
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />

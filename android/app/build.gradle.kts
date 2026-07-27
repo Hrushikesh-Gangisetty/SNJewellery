@@ -111,6 +111,21 @@ android {
         }
     }
 
+    /**
+     * The generated token file is compiled from where the generator
+     * writes it, rather than being copied into the source tree.
+     *
+     * That keeps it visibly not-hand-written: `android/design-tokens/` is
+     * an output directory, and nobody editing `ui/theme/` can mistake it
+     * for a file they may change. Regenerate with
+     * `node tools/generate-tokens.mjs` (ADR-0008).
+     */
+    sourceSets {
+        getByName("main") {
+            kotlin.srcDir("../design-tokens")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -123,6 +138,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    lint {
+        // Every suppression is in app/lint.xml with its reason.
+        warningsAsErrors = false
+        abortOnError = true
     }
 
     packaging {

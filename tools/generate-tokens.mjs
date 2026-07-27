@@ -193,7 +193,10 @@ function buildCss(tokens) {
   L.push("");
   L.push(`  /* Elevation */`);
   for (const [k, v] of Object.entries(elevation)) {
-    L.push(`  --shadow-elevation-${k}: ${v};`);
+    if (k.startsWith("$")) continue;
+    // Each step carries both expressions; the web wants the shadow and
+    // Compose wants the dp. See layout.md §3.
+    L.push(`  --shadow-elevation-${k}: ${v.shadow};`);
   }
 
   L.push("");
@@ -347,8 +350,17 @@ const remToPx = (v) => {
 };
 
 function buildKotlin(tokens) {
-  const { meta, colour, font, space, radius, container, touchTarget, motion } =
-    tokens;
+  const {
+    meta,
+    colour,
+    font,
+    space,
+    radius,
+    elevation,
+    container,
+    touchTarget,
+    motion,
+  } = tokens;
   const L = [];
 
   L.push(`package ${meta.androidPackage}`);
@@ -415,6 +427,17 @@ function buildKotlin(tokens) {
     L.push(`        val ${id}Size = ${px}.sp`);
     L.push(`        val ${id}LineHeight = ${Math.round(px * s.lineHeight)}.sp`);
     L.push(`        const val ${kebabToConst(name)}_WEIGHT = ${s.weight}`);
+  }
+  L.push(`    }`);
+  L.push("");
+
+  L.push(`    object Elevation {`);
+  L.push(`        /** layout.md #3: e0 with a hairline border is the default.`);
+  L.push(`         *  Dark mode expresses raised-ness with surfaceRaised, not`);
+  L.push(`         *  shadow, because a shadow is nearly invisible there. */`);
+  for (const [k, v] of Object.entries(elevation)) {
+    if (k.startsWith("$")) continue;
+    L.push(`        val e${k} = ${v.dp}.dp`);
   }
   L.push(`    }`);
   L.push("");

@@ -12,4 +12,9 @@
     <!-- Replaced by the login screen in M6.7. Says plainly that the app
          is not finished, rather than showing a convincing empty screen. -->
     <string name="shell_subtitle">Setup in progress — sign-in arrives in the next build.</string>
+
+    <!-- Rendered in the accent colour at the label step, so the shell
+         shows at a glance that the token-derived theme is live in both
+         light and dark. Goes with the shell screen in M6.7. -->
+    <string name="shell_theme_check">Theme loaded</string>
 </resources>

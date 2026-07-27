@@ -16,7 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.snjewellery.admin.ui.theme.SnTheme
+import com.snjewellery.admin.ui.theme.Tokens
+import com.snjewellery.admin.ui.theme.snTextStyles
 
 /**
  * The single activity. Compose handles navigation from M6.10, so screens
@@ -24,21 +27,15 @@ import androidx.compose.ui.unit.dp
  * host.
  *
  * What it shows today is the shell and nothing more: the login screen
- * lands in M6.7 and becomes the real start destination, and the theme
- * below is still stock Material 3, replaced by the token-derived one in
- * M6.2. Both are named here so nobody mistakes this for a finished
- * screen.
+ * lands in M6.7 and becomes the real start destination. It is named here
+ * so nobody mistakes it for a finished screen.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            // Stock MaterialTheme until M6.2 supplies the token-derived
-            // one. Deliberately not a hand-written colour scheme — a
-            // temporary palette would be a design value written outside
-            // the token pipeline, which ADR-0008 forbids.
-            MaterialTheme {
+            SnTheme {
                 ShellScreen()
             }
         }
@@ -52,26 +49,44 @@ private fun ShellScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                .padding(Tokens.Space.s6),
+            verticalArrangement = Arrangement.spacedBy(
+                Tokens.Space.s2,
+                Alignment.CenterVertically,
+            ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // displayLarge is Cormorant Garamond at display-l, so this
+            // line is also the check that the bundled serif loaded.
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = stringResource(R.string.shell_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.shell_theme_check),
+                style = MaterialTheme.snTextStyles.label,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
 }
 
+/**
+ * Both schemes, side by side. M6.2's acceptance criterion is that light
+ * and dark each render correctly, and a preview that only ever shows one
+ * of them cannot demonstrate that.
+ */
+@PreviewLightDark
 @Preview(showBackground = true)
 @Composable
 private fun ShellScreenPreview() {
-    MaterialTheme {
+    SnTheme {
         ShellScreen()
     }
 }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Lint configuration.
+
+  A suppression needs a reason. An unexplained `ignore` is impossible to
+  retire, and they accumulate until the tool stops being worth running.
+-->
+<lint>
+
+    <!--
+      Lint advises merging res/mipmap-anydpi-v26 into res/mipmap-anydpi
+      because minSdk is already 26. Following it breaks the build: AAPT
+      then cannot resolve mipmap/ic_launcher from the manifest and
+      resource linking fails. Verified, not assumed.
+    -->
+    <issue id="ObsoleteSdkInt" severity="ignore" />
+
+    <!--
+      Dependency versions are pinned deliberately and move together —
+      AGP, Gradle, Kotlin and the Compose BOM are a compatible set, not
+      four independent upgrades. See docs/architecture/android-build.md §1.
+      Upgrading is a considered task, not a lint fix.
+    -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+
+    <!--
+      Warns that targetSdk 35 is not the newest. compileSdk and targetSdk
+      move together and are recorded in docs/architecture/android-build.md §2;
+      raising them is a deliberate change with its own testing, and is
+      not urgent for an internally distributed app.
+    -->
+    <issue id="OldTargetApi" severity="ignore" />
+
+</lint>

@@ -120,6 +120,16 @@ object Tokens {
         const val SPEC_WEIGHT = 500
     }
 
+    object Elevation {
+        /** layout.md #3: e0 with a hairline border is the default.
+         *  Dark mode expresses raised-ness with surfaceRaised, not
+         *  shadow, because a shadow is nearly invisible there. */
+        val e0 = 0.dp
+        val e1 = 1.dp
+        val e2 = 3.dp
+        val e3 = 8.dp
+    }
+
     object Motion {
         const val INSTANT_MS = 0L
         const val FAST_MS = 120L

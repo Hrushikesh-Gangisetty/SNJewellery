@@ -62,12 +62,17 @@ should be presented like a print, not like an app icon.
 
 ## 3 · Elevation
 
-| Token | Shadow | Use |
-|---|---|---|
-| `elevation-0` | none | **Default for nearly everything** |
-| `elevation-1` | `0 1px 2px rgb(0 0 0 / 0.04)` | Barely-there card lift, hover state |
-| `elevation-2` | `0 2px 8px rgb(0 0 0 / 0.06)` | Dropdowns, popovers |
-| `elevation-3` | `0 8px 24px rgb(0 0 0 / 0.10)` | Modals, mobile drawer |
+| Token | Shadow (web) | dp (Compose) | Use |
+|---|---|---:|---|
+| `elevation-0` | none | 0 | **Default for nearly everything** |
+| `elevation-1` | `0 1px 2px rgb(0 0 0 / 0.04)` | 1 | Barely-there card lift, hover state |
+| `elevation-2` | `0 2px 8px rgb(0 0 0 / 0.06)` | 3 | Dropdowns, popovers |
+| `elevation-3` | `0 8px 24px rgb(0 0 0 / 0.10)` | 8 | Modals, mobile drawer |
+
+Each step carries **two expressions of one idea**, because the platforms do not
+describe elevation the same way: CSS takes a shadow, and Android takes a
+distance. The dp values are the Compose equivalents of those shadows, not a
+second scale — a component at `elevation-2` must look the same on both clients.
 
 **Separation comes from space and hairline borders, not shadows.** The
 anti-pattern list in [brand.md](brand.md) names heavy drop shadows explicitly.

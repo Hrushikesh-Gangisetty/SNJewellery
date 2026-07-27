@@ -673,9 +673,15 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Also verified: a clean clone with no Supabase credentials in `local.properties` still builds, and the debug APK contains no `service_role` string.
 
-- **`M6.2` Material 3 theme from design tokens** — `M`
+- **`M6.2` Material 3 theme from design tokens** — `M` — ◐ **built and building**; both schemes, the type scale, shape and elevation all trace to tokens, and dynamic colour is decided. Not yet seen on a screen — see below.
   Implement the M1 tokens as a Compose theme with light and dark colour schemes, the M1.4 type scale, and M1.5 shape and elevation. Decide and document dynamic-colour handling — a brand-led luxury identity usually overrides it.
   *Done when:* both schemes render correctly and every value traces to an M1 token, with no hard-coded colours or dimensions.
+
+  **Dynamic colour is overridden** — recorded against ADR-0008's open sub-question, which left the decision here. The palette is the brand, not a preference, and wallpaper-derived colour would both make the two clients disagree and void the generator's contrast validation. Dark mode is still honoured.
+
+  **Elevation needed a token change.** `tokens.json` held elevation only as CSS box-shadow strings, which Compose cannot use — Android elevation is a distance. Each step now carries both a `shadow` and a `dp`, layout.md §3 documents the pair, and the generated CSS is byte-identical, so the website is unaffected.
+
+  **Outstanding:** "both schemes render correctly" is unverified — it needs a device or an emulator, neither of which this environment has. The build compiles, lint passes, and both font files are confirmed in the APK, but nobody has looked at it. `@PreviewLightDark` previews exist for that check. Fold into the same device pass as M4.12.
 
 - **`M6.3` Architecture and package structure** — `S`
   MVVM + Repository with a clear split: `data` (remote, local, models), `domain`, `ui` (screens, view models). Record it in [ADR-0007](docs/adr/0007-android-architecture.md).

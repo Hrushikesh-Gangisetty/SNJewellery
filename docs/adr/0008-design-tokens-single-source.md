@@ -76,7 +76,7 @@ against values it would have to undo.
 - ~~The mechanism itself~~ — **decided 2026-07-25: single source of truth, generated.**
 - Token naming convention. Must read naturally as both a Tailwind utility and a Compose property. Decided in M1.6.
 - Whether motion durations and easings are tokens too, or documentation only. They should be tokens — M12.8 and both platforms' reduced-motion rules depend on them being consistent.
-- Whether Material 3's dynamic colour is honoured on Android or overridden by the brand palette. M6.2 decides; a luxury identity usually overrides.
+- ~~Whether Material 3's dynamic colour is honoured on Android or overridden by the brand palette.~~ **Decided 2026-07-27 in M6.2: overridden.** The palette is the brand, not a preference — the gold is the shop's gold and the same value the website serves, which is the drift this ADR exists to prevent. Wallpaper-derived colour would make the two clients disagree on every device and differently on each, in an app whose subject is how gold looks, and it would void the contrast validation the generator runs against *these* values. Dark mode is still honoured: that is a legibility preference, not a brand one. Implemented in `android/app/src/main/java/com/snjewellery/admin/ui/theme/Theme.kt`.
 
 ## References
 
