@@ -513,7 +513,7 @@ Deliver the complete customer-facing website reading live data — home, catalog
   Choose per-route rendering — static with ISR for catalogue and product pages — and place the revalidation tags M9 will trigger. Document the choice.
   *Done when:* `docs/architecture/rendering.md` records the strategy and every cacheable route carries a tag.
 
-- **`M4.8` Loading, empty, and 404 states** — `S`
+- **`M4.8` Loading, empty, and 404 states** — `S` — ✅ **complete** (every case renders an M1.10 pattern with a next step; skeletons share the real components' geometry)
   Empty catalogue, empty category, product with no images, product missing optional fields, unknown slug.
   *Done when:* each case renders the M1.10 pattern rather than breaking or erroring.
 

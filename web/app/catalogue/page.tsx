@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { CategoryChip } from "@/components/category/category-chip";
 import { ProductCollection } from "@/components/product/product-collection";
+import { WhatsAppButton } from "@/components/shop/conversion";
 import { Container } from "@/components/ui/container";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { getAllProducts, getVisibleCategories } from "@/lib/data/cache";
 
@@ -49,6 +51,13 @@ export default async function CataloguePage() {
         <div className="mt-10">
           <ProductCollection
             initial={firstPage}
+            emptyState={
+              <EmptyState
+                title="The catalogue is not online yet"
+                description="Pieces are added as they are photographed. Ask us what is in store today — we will send you photographs."
+                action={<WhatsAppButton>Ask what is in store</WhatsAppButton>}
+              />
+            }
             // The grid is the page here, so its first row is the LCP
             // candidate. Four covers the widest first row (layout.md §5);
             // narrower breakpoints preload one row's worth of the next.
