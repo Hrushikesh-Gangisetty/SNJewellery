@@ -186,3 +186,43 @@ export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"   # Git Bash on W
 The debug build applies an `applicationId` suffix of `.debug`, so it installs
 alongside a release build rather than replacing it — an admin keeps the
 working app while a new build is being tested.
+
+---
+
+## 6 · Emulator: check the clock before debugging TLS
+
+A quick-booted emulator resumes the clock from whenever its snapshot was
+taken. An AVD resumed weeks later has a clock weeks behind, and TLS then
+fails against any host whose certificate was issued in the meantime:
+
+```
+javax.net.ssl.SSLHandshakeException: Chain validation failed
+Caused by: java.security.cert.CertificateNotYetValidException:
+  Certificate not valid until Sun Jun 28 2026 (compared to Mon Jun 15 2026)
+```
+
+Supabase sits behind Cloudflare, whose certificates rotate often, so this
+surfaces quickly. DNS resolves and the socket opens, which is what makes it
+look like an application bug. `adb shell ping` is not a useful check —
+emulators drop ICMP even when TCP is fine.
+
+**Diagnose:**
+
+```bash
+adb shell date          # compare against the host
+adb shell dumpsys package <applicationId> | grep -A4 "install permissions"
+```
+
+**Fix:** cold boot, which resyncs from the host and preserves user data.
+`adb shell date` cannot set it — production images refuse root.
+
+```bash
+adb emu kill
+emulator -avd <name> -no-snapshot-load
+```
+
+Encountered 2026-07-28, reported as "the app didn't ask for internet
+permission". It had: `INTERNET` is a *normal* permission, granted at
+install, never prompted — `dumpsys` showed `granted=true`. Worth
+remembering that a connectivity-shaped symptom is often neither
+connectivity nor permissions.

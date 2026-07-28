@@ -6,6 +6,7 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
+import com.snjewellery.admin.data.remote.TransportFailureInterceptor
 import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.config.ConfigStatus
 import com.snjewellery.admin.ui.theme.Tokens
@@ -45,7 +46,13 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    fun provideOkHttpClient(
+        transportFailureInterceptor: TransportFailureInterceptor,
+    ): OkHttpClient = OkHttpClient.Builder()
+        // Sits below the Supabase SDK, which flattens every transport
+        // exception into HttpRequestException and discards the cause. This
+        // is the only place the real reason is still available.
+        .addInterceptor(transportFailureInterceptor)
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)

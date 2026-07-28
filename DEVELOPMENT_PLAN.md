@@ -673,7 +673,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Also verified: a clean clone with no Supabase credentials in `local.properties` still builds, and the debug APK contains no `service_role` string.
 
-- **`M6.2` Material 3 theme from design tokens** — `M` — ◐ **built and building**; both schemes, the type scale, shape and elevation all trace to tokens, and dynamic colour is decided. Not yet seen on a screen — see below.
+- **`M6.2` Material 3 theme from design tokens** — `M` — ✅ **complete** (both schemes verified on an emulator, 2026-07-28)
   Implement the M1 tokens as a Compose theme with light and dark colour schemes, the M1.4 type scale, and M1.5 shape and elevation. Decide and document dynamic-colour handling — a brand-led luxury identity usually overrides it.
   *Done when:* both schemes render correctly and every value traces to an M1 token, with no hard-coded colours or dimensions.
 
@@ -681,7 +681,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   **Elevation needed a token change.** `tokens.json` held elevation only as CSS box-shadow strings, which Compose cannot use — Android elevation is a distance. Each step now carries both a `shadow` and a `dp`, layout.md §3 documents the pair, and the generated CSS is byte-identical, so the website is unaffected.
 
-  **Outstanding:** "both schemes render correctly" is unverified — it needs a device or an emulator, neither of which this environment has. The build compiles, lint passes, and both font files are confirmed in the APK, but nobody has looked at it. `@PreviewLightDark` previews exist for that check. Fold into the same device pass as M4.12.
+  **Verified on an emulator** (Medium_Tablet, API 35): light renders white surface with near-black text, dark renders near-black surface with light text, both with the gold accent, Cormorant Garamond on the display step and Inter for body. No unreadable text in either. Screenshots taken during the M6.7 session.
 
 - **`M6.3` Architecture and package structure** — `S` — ✅ **complete** (`domain`/`data`/`di`/`ui` exist and are documented in `docs/architecture/android-app.md`; ADR-0007 was already Accepted)
   MVVM + Repository with a clear split: `data` (remote, local, models), `domain`, `ui` (screens, view models). Record it in [ADR-0007](docs/adr/0007-android-architecture.md).
@@ -699,7 +699,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   The repository is real, not a demonstration fixture: it reports whether the build was given Supabase credentials, so an admin handed an unconfigured APK is told which `local.properties` entries are missing instead of meeting an unexplained network error at first sign-in. M6.5 injects the same `BackendConfig` into the Supabase client.
 
-- **`M6.5` Networking, Supabase, and image loading** — `M` — ◐ **built**; the stack compiles and the backend answers, but neither half of the *done when* can be observed yet. Two blockers, both outside the code.
+- **`M6.5` Networking, Supabase, and image loading** — `M` — ◐ **authenticated request verified 2026-07-28**; a real sign-in went through the Ktor/OkHttp/Supabase stack on an emulator. The Coil half is still blocked, and not on hardware.
   Configure the chosen HTTP client (Ktor or Retrofit — Open Question 12), the Supabase client, and Coil.
   *Done when:* an authenticated request succeeds and a remote image renders through Coil.
 
@@ -707,7 +707,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   **Verified out of band**, against the dev project with the anon key the app uses: `GET /rest/v1/categories` returns 200 with real rows, `/auth/v1/settings` returns 200, and the `product-images` bucket exists and lists. So the URL, the key and the endpoints are all good.
 
-  **Blocked on:** (1) no device or emulator here, so no in-app request or render can be observed; (2) **the storage bucket is empty** — zero objects — so there is no remote image for Coil to render at all. The second is not a device problem and does not clear until M5.6 loads real content or M7 uploads something. A signed-in request also needs admin credentials, which belong to M6.7.
+  **Half done, verifiably.** "An authenticated request succeeds" — yes: signing in as the admin account through this stack works on an emulator, confirmed 2026-07-28. "A remote image renders through Coil" — **still impossible to test: the `product-images` bucket contains zero objects.** That is not a hardware problem and does not clear until M5.6 loads real content or M7 uploads something.
 
   **Required a version-set change**, recorded in `docs/architecture/android-build.md` §1.1–1.2: every supabase-kt 3.x is built against Kotlin 2.1+, so Kotlin went 2.0.21 → 2.1.20, which in turn forced Hilt 2.52 → 2.56.2 and pinned KSP to its KSP1 suffix line. Both traps produce error messages that point nowhere near the cause, so both are written down.
 
@@ -719,7 +719,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   **`npm run db:check-contract`** (new) compares the generated TypeScript types — authoritative, since they come from the live database — against the hand-written Kotlin. Table sets, column sets, nullability, enum values. Nothing enforced CLAUDE.md §3.3 before this: a column forgotten on one side produced no error anywhere until a row failed to deserialise on a phone. Verified it actually catches drift by introducing a dropped column, a wrong nullability and a missing enum value — all three reported, exit 1 — then reverting. Step 6 of schema.md's change procedure.
 
-- **`M6.7` Login screen** — `M` — ◐ **built**; the two failure modes are distinguished at the source and worded differently, and the HTTP behaviour behind both is verified. The three on-screen states need a device.
+- **`M6.7` Login screen** — `M` — ✅ **complete** (all three paths driven on an emulator, 2026-07-28)
   Email/password form with validation, loading state, and distinct error messages for wrong credentials versus no network.
   *Done when:* both failure modes produce different, accurate messages.
 
@@ -729,7 +729,13 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Nothing is logged on this path — not the email, not the exception body. An auth failure's detail can echo the submitted address, and CLAUDE.md §9 forbids logging credentials.
 
-  **Outstanding:** no device here, so the success, wrong-password and offline screens have not been seen. `MainActivity` now shows the login screen so they *can* be — a deliberately temporary two-state switch that M6.10 replaces, and which does not survive process death on purpose, since pretending otherwise would hide what M6.8 has to build.
+  **Verified on an emulator**, each path driven through the real UI: correct credentials sign in and advance; a wrong password gives "Wrong email or password"; airplane mode gives "No connection. Your details were not the problem". A deliberately expired certificate gives "Sign-in could not be completed (SSLHandshakeException)" — see the note below.
+
+  **A bug report during this milestone exposed a real defect.** Sign-in failed on an emulator reporting "no connection" while DNS and the socket were both fine; the true cause was `CertificateNotYetValidException`, from an emulator clock 43 days behind after a quick-boot from a stale snapshot. The app had mislabelled a TLS failure as connectivity — the exact misdiagnosis this task's error split exists to prevent.
+
+  The cause is that **supabase-kt flattens every transport exception into `HttpRequestException`, which extends `IOException` and takes no `cause`**, so the real type is unrecoverable by the time a repository sees it. `TransportFailureRecorder` and its OkHttp interceptor sit below the SDK, where the exception is still intact, and classify it there. Catching `SSLException` in the repository was tried first and is dead code — confirmed, then removed.
+
+  `MainActivity` shows the login screen so it is reachable at all: a deliberately temporary two-state switch that M6.10 replaces, and which does not survive process death on purpose, since pretending otherwise would hide what M6.8 has to build.
 
 - **`M6.8` Session persistence and token refresh** — `M`
   Persist the session securely so it survives process death, and refresh tokens transparently.
