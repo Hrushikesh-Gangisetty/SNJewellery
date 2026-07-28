@@ -122,4 +122,25 @@ class SupabaseAuthRepository @Inject constructor(
     } catch (e: Exception) {
         SignInResult.Failed(e::class.simpleName)
     }
+
+    /**
+     * Never fails from the caller's point of view. The SDK's default
+     * scope revokes locally *and* on the server; a server call that
+     * cannot be made must still clear the stored session, or a refused
+     * or logged-out account stays signed in on the device because the
+     * network was down at the wrong moment.
+     */
+    override suspend fun signOut() {
+        try {
+            client.auth.signOut()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Not belt-and-braces: `signOut` posts to `logout` and only
+            // clears local state *afterwards*, so a failed request skips
+            // the cleanup entirely and leaves the session on disk.
+            // Checked in the SDK's source, not assumed.
+            client.auth.clearSession()
+        }
+    }
 }

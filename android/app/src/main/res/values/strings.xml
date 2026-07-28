@@ -48,4 +48,30 @@
     <string name="login_error_network">No connection. Your details were not the problem — check your signal or Wi-Fi and try again.</string>
     <string name="login_error_unexpected">Sign-in could not be completed (%1$s). Please try again in a moment.</string>
     <string name="login_error_no_detail">no details</string>
+
+    <!-- ── Role gate (M6.9) ──────────────────────────────────────────
+      Shown to an account that signed in successfully but may not
+      administer the catalogue. The requirement is an explanation rather
+      than a blank screen, so each message says what happened, whose
+      problem it is, and what to do next.
+
+      The refused and unavailable cases are worded apart on purpose. One
+      is a decision about the account; the other is the app admitting it
+      could not find out. Merging them would tell the shop owner they are
+      not an administrator of their own catalogue whenever the signal
+      drops — the same misdiagnosis M6.7's error split exists to prevent.
+    -->
+    <string name="access_refused_title">You cannot manage the catalogue</string>
+    <string name="access_refused_not_admin">You are signed in, but this account is not an administrator. Ask the shop owner to give it access, then tap Try again.</string>
+    <string name="access_refused_no_profile">You are signed in, but this account has not been set up to manage the catalogue. Ask the shop owner to set it up, then tap Try again.</string>
+
+    <string name="access_unavailable_title">Could not check your access</string>
+    <!-- Says outright that the account is not at fault, for the same
+         reason login_error_network does. -->
+    <string name="access_unavailable_offline">No connection, so your access could not be checked. Nothing is wrong with your account — check your signal or Wi-Fi and tap Try again.</string>
+    <string name="access_unavailable_detail">Your access could not be checked (%1$s). Please tap Try again in a moment.</string>
+    <string name="access_unavailable_no_detail">no details</string>
+
+    <string name="access_retry">Try again</string>
+    <string name="access_sign_out">Sign out</string>
 </resources>

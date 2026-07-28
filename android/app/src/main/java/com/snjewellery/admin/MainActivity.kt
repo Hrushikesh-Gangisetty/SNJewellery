@@ -14,7 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.snjewellery.admin.domain.auth.AuthState
+import com.snjewellery.admin.domain.auth.SessionState
+import com.snjewellery.admin.ui.screens.access.AccessScreen
 import com.snjewellery.admin.ui.screens.login.LoginScreen
 import com.snjewellery.admin.ui.screens.root.RootViewModel
 import com.snjewellery.admin.ui.screens.shell.ShellScreen
@@ -30,8 +31,10 @@ import dagger.hilt.android.AndroidEntryPoint
  *
  * **Which screen opens is decided by the persisted session**, not by a
  * flag here. That is what makes a force-stop and relaunch land back where
- * the owner was (M6.8). The real navigation graph, and logout, arrive in
- * M6.10; this switch is still deliberately minimal.
+ * the owner was (M6.8), and from M6.9 it also decides whether being
+ * signed in is enough — only [SessionState.Admin] reaches the app. The
+ * real navigation graph arrives in M6.10; this switch is still
+ * deliberately minimal.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -48,25 +51,35 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun RootContent(viewModel: RootViewModel = hiltViewModel()) {
-    val authState by viewModel.authState.collectAsStateWithLifecycle()
+    val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
 
-    when (authState) {
+    when (val state = sessionState) {
         // Neither screen yet. Showing the login form while the stored
         // session is still being read makes a signed-in owner watch a
-        // form appear and vanish, which reads as being logged out.
-        is AuthState.Restoring -> RestoringIndicator()
+        // form appear and vanish, which reads as being logged out. The
+        // role check that follows gets the same treatment for the same
+        // reason — it is a round trip, not an instant answer.
+        is SessionState.Restoring, is SessionState.VerifyingAccess -> WaitingIndicator()
 
-        is AuthState.SignedIn -> ShellScreen()
+        is SessionState.Admin -> ShellScreen()
 
-        // A failed refresh lands on sign-in for now. M6.9 decides whether
-        // an offline failure should keep the session and retry instead of
-        // discarding it, since the owner did nothing wrong.
-        is AuthState.SignedOut, is AuthState.RefreshFailed -> LoginScreen(onSignedIn = {})
+        // Signing in is not the same as being allowed in. Both blocked
+        // states explain themselves and offer a way out — M6.9.
+        is SessionState.Blocked -> AccessScreen(
+            state = state,
+            onRetry = viewModel::retryAccessCheck,
+            onSignOut = viewModel::signOut,
+        )
+
+        // Navigation on success is the session flow's job, not the login
+        // screen's: the same transition has to happen when a stored
+        // session is restored, and one path is one thing to get right.
+        is SessionState.SignedOut -> LoginScreen(onSignedIn = {})
     }
 }
 
 @Composable
-private fun RestoringIndicator() {
+private fun WaitingIndicator() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,

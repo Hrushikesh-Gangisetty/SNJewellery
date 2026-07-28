@@ -52,4 +52,15 @@ interface AuthRepository {
      * one screen every session starts at.
      */
     suspend fun signIn(email: String, password: String): SignInResult
+
+    /**
+     * Ends the session and clears what M6.8 persisted.
+     *
+     * Here rather than in M6.10 because M6.9's refusal screen would
+     * otherwise be a dead end: the session survives a relaunch, so an
+     * account that is refused would meet the same screen forever with no
+     * way to sign in as someone else. M6.10's logout is this same call
+     * from the navigation shell.
+     */
+    suspend fun signOut()
 }

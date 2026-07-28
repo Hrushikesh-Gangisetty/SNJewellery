@@ -749,9 +749,28 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Also fixed here: the post-login copy still read "sign-in arrives in the next build", which stopped being true when M6.7 shipped.
 
-- **`M6.9` Role gate** — `S`
+- **`M6.9` Role gate** — `S` — ◐ **three of four paths driven on an emulator, 2026-07-28**; the refusal itself is unverified because creating a non-admin account was blocked — see below.
   After authentication, verify `users.role = 'admin'`; reject anyone else with an explanation rather than a blank screen.
   *Done when:* a non-admin account is refused with a clear message and cannot reach the dashboard.
+
+  **The gate is not the security boundary and does not pretend to be.** RLS is — ADR-0004 — and a non-admin session physically cannot write whether or not this check runs. What it buys is the sentence after that in ADR-0004: an explanation instead of a wall of requests that silently do nothing.
+
+  **Failing the check is not the same as failing it.** The state that would have been easiest to write is a boolean, and a boolean forces a network error to become either "you are an admin" (letting someone into screens whose every action fails) or "you are not" (telling the shop owner they do not own their own catalogue because a train went into a tunnel). So `Undetermined` is a third state with its own screen, its own words — *"Nothing is wrong with your account"* — and a retry. It is the same distinction M6.7 drew between a wrong password and no signal, applied one layer up.
+
+  **The refusal has a way out.** M6.8 persists the session, so a refused account meets the same screen on every relaunch. Without sign-out it would be a permanent dead end with words on it rather than a blank one. That put `AuthRepository.signOut()` in this task instead of M6.10, which now reuses it. Its implementation is not the obvious one-liner: the SDK's `signOut` posts to `logout` and clears local state *afterwards*, so a request that fails skips the cleanup and leaves the session on disk. Read in the SDK's source, then handled.
+
+  **`users_read_self` is not enough on its own.** An unfiltered `select` looks correct because a non-admin only ever sees their own row — but `users_admin_read_all` returns *every* row to an admin, and `decodeSingleOrNull` would then take whichever Postgres listed first. The explicit `id` filter is what makes the query mean one thing for both roles.
+
+  Decoded through M6.6's `UserRow` rather than a local shape. That is the first time any of those models has actually deserialised a live row: `db:check-contract` compares declarations, and this exercises one.
+
+  **Verified on an emulator**, using the admin session M6.8 left persisted:
+  - **Granted** — relaunch restores the session, the role query runs, and the app reaches the shell.
+  - **Undetermined, offline** — airplane mode gives "Could not check your access / No connection … Nothing is wrong with your account", *not* a refusal. This doubles as proof the check is a real round trip rather than a no-op that always passes.
+  - **Retry** — restoring the network and pressing Try again reaches the shell with no re-login.
+
+  **Not verified: the refusal itself**, which is this task's actual *Done when*. It needs an account with `role = 'staff'`, and no such account exists — the signup trigger defaults every account to `admin` (deliberately, ADR-0004). Creating a throwaway one needs the service-role key against the dev project, and that action was blocked in the session. Nothing was created, changed or deleted in the database. The code path is a two-branch `when` over the decoded role, and the `Blocked` sub-interface makes the screen's handling of both refusal reasons exhaustive at compile time — but that is an argument, not a check, and this milestone's acceptance criteria ask for the check.
+
+  Also decided here, closing the question `MainActivity` left open in M6.8: a failed token refresh still lands on the login screen. An offline failure could keep the session and retry instead, but the login screen already says "no connection — your details were not the problem" on the next attempt, which is the same information without a second retry surface to build and get wrong.
 
 - **`M6.10` Navigation shell and logout** — `S`
   Authenticated navigation with the dashboard as start destination, plus logout that clears the persisted session.
