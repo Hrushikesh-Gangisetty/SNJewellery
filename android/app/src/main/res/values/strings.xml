@@ -9,9 +9,12 @@
     -->
     <string name="app_name">SN Admin</string>
 
-    <!-- Replaced by the login screen in M6.7. Says plainly that the app
-         is not finished, rather than showing a convincing empty screen. -->
-    <string name="shell_subtitle">Setup in progress — sign-in arrives in the next build.</string>
+    <!-- Shown after signing in, until the dashboard replaces it in M6.11.
+         Says plainly that the app is unfinished rather than presenting a
+         convincing empty screen. Reworded once sign-in existed: the
+         previous copy promised sign-in "in the next build", which stopped
+         being true the moment M6.7 shipped. -->
+    <string name="shell_subtitle">You are signed in. The dashboard is not built yet.</string>
 
     <!-- Whether this build was given backend credentials. An admin
          handed a build without them would otherwise meet a network

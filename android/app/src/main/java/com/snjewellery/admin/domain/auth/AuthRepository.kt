@@ -1,5 +1,7 @@
 package com.snjewellery.admin.domain.auth
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * The outcome of a sign-in attempt.
  *
@@ -37,6 +39,13 @@ sealed interface SignInResult {
  * the Supabase client, which is what keeps the auth SDK out of the UI.
  */
 interface AuthRepository {
+    /**
+     * The current session, as a stream, so the app's entry point can wait
+     * for a persisted session rather than assuming there is none. Emits
+     * [AuthState.Restoring] first on a cold start.
+     */
+    val authState: Flow<AuthState>
+
     /**
      * Signs in, or reports why not. **Does not throw** for any expected
      * failure: an unhandled exception on this path means a crash on the

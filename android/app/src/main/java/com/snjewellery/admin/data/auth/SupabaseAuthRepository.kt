@@ -3,14 +3,19 @@ package com.snjewellery.admin.data.auth
 import com.snjewellery.admin.data.remote.TransportFailure
 import com.snjewellery.admin.data.remote.TransportFailureRecorder
 import com.snjewellery.admin.domain.auth.AuthRepository
+import com.snjewellery.admin.domain.auth.AuthState
 import com.snjewellery.admin.domain.auth.SignInResult
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.status.RefreshFailureCause
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -52,6 +57,23 @@ class SupabaseAuthRepository @Inject constructor(
     private val client: SupabaseClient,
     private val transportFailures: TransportFailureRecorder,
 ) : AuthRepository {
+
+    /**
+     * Mapped from the SDK's own session stream rather than tracked here,
+     * so a token refresh, a restore from disk and a sign-out all reach the
+     * UI through one path. Keeping a second copy of this state is how the
+     * screen and the session drift apart.
+     */
+    override val authState: Flow<AuthState> = client.auth.sessionStatus.map { status ->
+        when (status) {
+            is SessionStatus.Initializing -> AuthState.Restoring
+            is SessionStatus.Authenticated -> AuthState.SignedIn(status.session.user?.id.orEmpty())
+            is SessionStatus.NotAuthenticated -> AuthState.SignedOut
+            is SessionStatus.RefreshFailure -> AuthState.RefreshFailed(
+                offline = status.cause is RefreshFailureCause.NetworkError,
+            )
+        }
+    }
 
     override suspend fun signIn(email: String, password: String): SignInResult = try {
         client.auth.signInWith(Email) {

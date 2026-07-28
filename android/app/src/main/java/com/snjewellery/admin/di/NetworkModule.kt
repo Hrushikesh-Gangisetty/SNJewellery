@@ -6,6 +6,7 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
+import com.snjewellery.admin.data.auth.EncryptedSessionManager
 import com.snjewellery.admin.data.remote.TransportFailureInterceptor
 import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.config.ConfigStatus
@@ -81,6 +82,7 @@ object NetworkModule {
     fun provideSupabaseClient(
         configRepository: ConfigRepository,
         okHttpClient: OkHttpClient,
+        sessionManager: EncryptedSessionManager,
     ): SupabaseClient {
         val config = when (val status = configRepository.status()) {
             is ConfigStatus.Ready -> status.config
@@ -94,7 +96,13 @@ object NetworkModule {
             supabaseUrl = config.url,
             supabaseKey = config.anonKey,
         ) {
-            install(Auth)
+            install(Auth) {
+                // Persistence and refresh are the SDK's defaults; what is
+                // overridden is only WHERE the session is stored. See
+                // EncryptedSessionManager for why the default is not good
+                // enough for an admin refresh token.
+                this.sessionManager = sessionManager
+            }
             install(Postgrest)
             install(Storage)
 

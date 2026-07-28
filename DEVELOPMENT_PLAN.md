@@ -737,9 +737,17 @@ Create the admin application's skeleton — design system applied, architecture,
 
   `MainActivity` shows the login screen so it is reachable at all: a deliberately temporary two-state switch that M6.10 replaces, and which does not survive process death on purpose, since pretending otherwise would hide what M6.8 has to build.
 
-- **`M6.8` Session persistence and token refresh** — `M`
+- **`M6.8` Session persistence and token refresh** — `M` — ◐ **persistence verified on an emulator**; the expiry-driven refresh is unverified for one reason only: it takes an hour of wall-clock time.
   Persist the session securely so it survives process death, and refresh tokens transparently.
   *Done when:* a force-stop and relaunch lands on the dashboard, and an expired token refreshes without a re-login.
+
+  **Verified 2026-07-28:** signed in, `am force-stop`, relaunch — lands on the post-login screen, not the form. The stored value is `IV:ciphertext`; a grep for `eyJ` in the app's `shared_prefs` returns **0**, and `sn_session.xml` is the only file there, which also confirms the SDK's plaintext default was replaced rather than merely shadowed. The refresh grant itself works and rotates the refresh token (checked over HTTP).
+
+  **Encrypted with an Android Keystore key**, AES-256/GCM, rather than the SDK's plain SharedPreferences. What is stored is a long-lived refresh token for an *admin* account, which is the most sensitive thing this app holds. Jetpack Security's `EncryptedSharedPreferences` is deprecated, so the Keystore is used directly. Any read failure returns null and the owner signs in again — hand-rolled storage is exactly where a subtle bug would otherwise brick the app for someone with a shop to run.
+
+  **Not verified:** an access token actually expiring and being refreshed in-app. Expiry is 3600s and the emulator clock cannot be advanced without root, so this needs an hour of real time. Auto-refresh is the SDK default and is not disabled. Worth a deliberate check during M7, when a long upload session will exercise it naturally.
+
+  Also fixed here: the post-login copy still read "sign-in arrives in the next build", which stopped being true when M6.7 shipped.
 
 - **`M6.9` Role gate** — `S`
   After authentication, verify `users.role = 'admin'`; reject anyone else with an explanation rather than a blank screen.
