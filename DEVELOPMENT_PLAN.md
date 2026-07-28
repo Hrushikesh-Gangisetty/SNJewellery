@@ -711,9 +711,13 @@ Create the admin application's skeleton — design system applied, architecture,
 
   **Required a version-set change**, recorded in `docs/architecture/android-build.md` §1.1–1.2: every supabase-kt 3.x is built against Kotlin 2.1+, so Kotlin went 2.0.21 → 2.1.20, which in turn forced Hilt 2.52 → 2.56.2 and pinned KSP to its KSP1 suffix line. Both traps produce error messages that point nowhere near the cause, so both are written down.
 
-- **`M6.6` Domain models mirroring the schema contract** — `S`
+- **`M6.6` Domain models mirroring the schema contract** — `S` — ✅ **complete** (6 tables, 44 columns, 3 enums; agreement is now checked by a script, not by eye)
   Kotlin data classes mirroring M3's frozen contract.
   *Done when:* the models match `docs/database/schema.md` field for field, and the file notes that schema changes must update both clients.
+
+  **`schema.md` was wrong, and mirroring it literally would have propagated the error.** Five columns exist in the database and in the generated TypeScript types but were absent from the document's tables: `purities.created_at/updated_at`, `users.created_at/updated_at`, and `product_images.created_at`. Confirmed against the migration, mirrored from the database, and the document is corrected in the same commit.
+
+  **`npm run db:check-contract`** (new) compares the generated TypeScript types — authoritative, since they come from the live database — against the hand-written Kotlin. Table sets, column sets, nullability, enum values. Nothing enforced CLAUDE.md §3.3 before this: a column forgotten on one side produced no error anywhere until a row failed to deserialise on a phone. Verified it actually catches drift by introducing a dropped column, a wrong nullability and a missing enum value — all three reported, exit 1 — then reverting. Step 6 of schema.md's change procedure.
 
 - **`M6.7` Login screen** — `M`
   Email/password form with validation, loading state, and distinct error messages for wrong credentials versus no network.

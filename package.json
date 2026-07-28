@@ -11,6 +11,7 @@
     "db:reset": "supabase db reset",
     "db:seed": "supabase db reset",
     "db:types": "supabase gen types typescript --linked > web/lib/data/database.types.ts",
+    "db:check-contract": "node tools/check-schema-contract.mjs",
     "db:test-rls": "node supabase/tests/rls.mjs --from-cli"
   },
   "devDependencies": {

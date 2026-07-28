@@ -37,6 +37,7 @@ addable without a schema change. Adding platinum or 14K is one `INSERT`.
 | `code` | `text` | Unique. Short form: `22K`, `18K`, `Silver` |
 | `label` | `text` | Full form: "22K Gold" |
 | `display_order` | `integer` | |
+| `created_at` / `updated_at` | `timestamptz` | `updated_at` by trigger |
 
 Seeded with the launch set: 22K Gold, 18K Gold, Silver.
 
@@ -75,6 +76,7 @@ M8.8 handles the case in the admin UI.
 | `storage_path` | `text` | Path in the bucket, so renditions can be derived ([ADR-0005](../adr/0005-image-storage-and-renditions.md)) |
 | `display_order` | `integer` | Zero-based. **Unique per product.** Position 0 is primary |
 | `aspect` | `product_image_aspect` | Enum: `product` \| `product-portrait` |
+| `created_at` | `timestamptz` | No `updated_at`: an image row is replaced, never edited |
 
 **The cascade covers rows, not storage objects.** Deleting a product removes its
 image rows automatically but leaves the files in the bucket. M8.4 must delete
@@ -118,6 +120,7 @@ disabled and every account is created deliberately.
 | `name` | `text?` | |
 | `email` | `text?` | |
 | `role` | `user_role` | Enum: `admin` \| `staff` |
+| `created_at` / `updated_at` | `timestamptz` | `updated_at` by trigger |
 
 ---
 
@@ -189,9 +192,23 @@ read an archived product's photographs straight from the images table.
 Two suites, both run against real systems rather than asserted:
 
 ```bash
-npm run db:test-rls        # 24 adversarial checks vs the live database
+npm run db:check-contract   # TypeScript and Kotlin describe the same tables
+npm run db:test-rls         # 24 adversarial checks vs the live database
 cd web && npm run test:data # 38 contract checks vs the data boundary
 ```
+
+`db:check-contract` compares the generated TypeScript types — which come
+from the live database, so they are the authority — against the hand-written
+Kotlin models, which are what drifts. It checks table sets, column sets,
+nullability and enum values. It deliberately does not check types, because
+the mapping is intentional and documented in `SchemaContract.kt`
+(`uuid`→`String`, `timestamptz`→`String`, `numeric`→`Double`).
+
+Added in M6.6 because **nothing enforced §3.3 of CLAUDE.md before it**: a
+column added to Postgres and to the website but forgotten in Kotlin
+produced no error on either side until a row failed to deserialise on a
+phone. It found three genuine omissions in this document on its first run —
+`purities` and `users` timestamps, and `product_images.created_at`.
 
 `db:test-rls` uses **only the anon key** and attacks the policies: it tries to
 read archived products, reach hidden products' images directly, un-hide a
@@ -219,9 +236,11 @@ back with `Prefer: return=representation` and asserts the set is empty.
 1. Write a new migration in `supabase/migrations/`. Never edit an applied one.
 2. `npm run db:push`
 3. `npm run db:types` — regenerates `web/lib/data/database.types.ts`
-4. Update the Kotlin data classes (from M6.6)
+4. Update the Kotlin data classes in
+   [`android/.../data/models/SchemaContract.kt`](../../android/app/src/main/java/com/snjewellery/admin/data/models/SchemaContract.kt)
 5. Update this document
-6. `npm run db:test-rls` and `cd web && npm run test:data`
+6. `npm run db:check-contract` — fails if the two clients disagree
+7. `npm run db:test-rls` and `cd web && npm run test:data`
 
 All in one commit. See [CLAUDE.md](../../CLAUDE.md) §3.3.
 

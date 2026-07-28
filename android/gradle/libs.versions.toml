@@ -40,6 +40,10 @@ androidxHiltNavigation = "1.2.0"
 supabase = "3.1.4"
 ktor = "3.1.2"
 coil = "3.1.0"
+# Declared explicitly because the models use @Serializable directly.
+# supabase-kt exposes it transitively, but relying on another library's
+# transitive API is how a version bump breaks a file that never changed.
+kotlinxSerialization = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
@@ -77,6 +81,8 @@ coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref 
 # Coil shares the app's OkHttp client, so there is one connection pool
 # and one place timeouts are set.
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
