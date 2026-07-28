@@ -19,4 +19,30 @@
          that does not exist. Goes with the shell screen in M6.7. -->
     <string name="shell_backend_ready">Backend configured</string>
     <string name="shell_backend_missing">Not configured — missing %1$s in local.properties</string>
+
+    <!-- ── Login (M6.7) ──────────────────────────────────────────── -->
+    <string name="login_subtitle">Sign in to manage the catalogue.</string>
+    <string name="login_email_label">Email</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_password_show">Show</string>
+    <string name="login_password_hide">Hide</string>
+    <string name="login_submit">Sign in</string>
+
+    <string name="login_email_required">Enter your email address.</string>
+    <string name="login_email_malformed">That does not look like an email address.</string>
+    <string name="login_password_required">Enter your password.</string>
+
+    <!--
+      These two must stay clearly different. Wrong credentials and no
+      connection call for different actions, and the network message says
+      outright that the details were not the problem — otherwise someone
+      retypes a correct password over and over on a bad signal.
+
+      Neither says which of email or password was wrong: Supabase does not
+      tell us, and guessing would be worse than saying nothing.
+    -->
+    <string name="login_error_credentials">Wrong email or password. Please check and try again.</string>
+    <string name="login_error_network">No connection. Your details were not the problem — check your signal or Wi-Fi and try again.</string>
+    <string name="login_error_unexpected">Sign-in could not be completed (%1$s). Please try again in a moment.</string>
+    <string name="login_error_no_detail">no details</string>
 </resources>

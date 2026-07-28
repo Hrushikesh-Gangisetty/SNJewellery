@@ -719,9 +719,17 @@ Create the admin application's skeleton — design system applied, architecture,
 
   **`npm run db:check-contract`** (new) compares the generated TypeScript types — authoritative, since they come from the live database — against the hand-written Kotlin. Table sets, column sets, nullability, enum values. Nothing enforced CLAUDE.md §3.3 before this: a column forgotten on one side produced no error anywhere until a row failed to deserialise on a phone. Verified it actually catches drift by introducing a dropped column, a wrong nullability and a missing enum value — all three reported, exit 1 — then reverting. Step 6 of schema.md's change procedure.
 
-- **`M6.7` Login screen** — `M`
+- **`M6.7` Login screen** — `M` — ◐ **built**; the two failure modes are distinguished at the source and worded differently, and the HTTP behaviour behind both is verified. The three on-screen states need a device.
   Email/password form with validation, loading state, and distinct error messages for wrong credentials versus no network.
   *Done when:* both failure modes produce different, accurate messages.
+
+  The two failures are told apart by **where** they fail, not by parsing a message. Wrong credentials means Supabase answered — 400 with `error_code: invalid_credentials`, surfaced as `AuthRestException` carrying `AuthErrorCode.InvalidCredentials`. No network means the request never arrived, so there is no response to read a code from: an `IOException` or Ktor's timeout. Matching on message text would have been easier and would break the first time Supabase rewords it.
+
+  **Verified against the live project** with the owner's account: sign-in returns a bearer token with a refresh token, the account's `users.role` is `admin` (which M6.9's gate will need), and a wrong password returns exactly `{"code":400,"error_code":"invalid_credentials"}`. So the mapping is built against observed behaviour rather than documentation.
+
+  Nothing is logged on this path — not the email, not the exception body. An auth failure's detail can echo the submitted address, and CLAUDE.md §9 forbids logging credentials.
+
+  **Outstanding:** no device here, so the success, wrong-password and offline screens have not been seen. `MainActivity` now shows the login screen so they *can* be — a deliberately temporary two-state switch that M6.10 replaces, and which does not survive process death on purpose, since pretending otherwise would hide what M6.8 has to build.
 
 - **`M6.8` Session persistence and token refresh** — `M`
   Persist the session securely so it survives process death, and refresh tokens transparently.

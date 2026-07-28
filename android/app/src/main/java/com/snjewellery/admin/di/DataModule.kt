@@ -1,6 +1,8 @@
 package com.snjewellery.admin.di
 
+import com.snjewellery.admin.data.auth.SupabaseAuthRepository
 import com.snjewellery.admin.data.config.BuildConfigRepository
+import com.snjewellery.admin.domain.auth.AuthRepository
 import com.snjewellery.admin.domain.config.ConfigRepository
 import dagger.Binds
 import dagger.Module
@@ -30,4 +32,8 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindConfigRepository(impl: BuildConfigRepository): ConfigRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuthRepository(impl: SupabaseAuthRepository): AuthRepository
 }
