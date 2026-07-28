@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 /**
@@ -173,6 +174,15 @@ dependencies {
     // collectAsStateWithLifecycle — a screen must not keep collecting
     // while it is off screen.
     implementation(libs.androidx.lifecycle.runtime.compose)
+
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.storage)
+    implementation(libs.ktor.client.okhttp)
+
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     // Tooling is debug-only: @Preview rendering must not ship in the APK.
     debugImplementation(libs.androidx.compose.ui.tooling)

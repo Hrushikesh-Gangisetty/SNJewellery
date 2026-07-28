@@ -14,18 +14,51 @@ Produced by M6.1.
 |---|---|---|
 | Gradle | 8.11.1 | Wrapper committed — never build with a system Gradle |
 | Android Gradle Plugin | 8.10.1 | |
-| Kotlin | 2.0.21 | |
-| Compose compiler | 2.0.21 | Ships with Kotlin from 2.0; not separately versioned |
+| Kotlin | 2.1.20 | Raised from 2.0.21 in M6.5 — see §1.1 |
+| Compose compiler | 2.1.20 | Ships with Kotlin from 2.0; not separately versioned |
 | Compose BOM | 2025.04.00 | Pins every Compose artefact |
+| KSP | 2.1.20-1.0.32 | **KSP1.** See §1.2 |
+| Hilt | 2.56.2 | See §1.2 |
+| supabase-kt | 3.1.4 | Built against Kotlin 2.1.20 |
+| Ktor | 3.1.2 | The version supabase-kt 3.1.4 expects |
+| Coil | 3.1.0 | |
 | JDK | 21 | Android Studio's bundled JBR is sufficient |
+
+### 1.1 Why Kotlin 2.1.20
+
+Every published supabase-kt 3.x is compiled against Kotlin 2.1 or newer,
+and a 2.0.21 compiler cannot read metadata from a newer one. The choice was
+between raising Kotlin and starting a new project on the superseded
+supabase-kt 2.x line, which was not a real choice.
+
+### 1.2 Two traps in this version set
+
+Both were hit during M6.5 and cost a build cycle each. They are recorded
+because the error messages point nowhere near the cause.
+
+**KSP1, not KSP2.** KSP publishes two suffix lines against each Kotlin
+version: `2.1.20-1.0.32` is KSP1 and `2.1.20-2.0.1` is KSP2. Hilt 2.56.2's
+processor does not support KSP2 — its bytecode transform silently stops
+running, and every `@HiltAndroidApp` and `@AndroidEntryPoint` then fails
+with *"Expected @HiltAndroidApp to have a value. Did you forget to apply
+the Gradle Plugin?"* — which points at plugin configuration that is in
+fact correct. Moving to KSP2 means moving Hilt with it, deliberately.
+
+**Hilt must be new enough to read Kotlin's metadata.** Hilt 2.52 fails
+`hiltJavaCompileDebug` with *"Unable to read Kotlin metadata due to
+unsupported metadata version"* against Kotlin 2.1.20 classes. 2.56.2 reads
+them. Raising Kotlin therefore means checking Hilt in the same change.
 
 Every version lives in [`android/gradle/libs.versions.toml`](../../android/gradle/libs.versions.toml)
 and nowhere else — a version written in a module's build file is one that
 drifts from the other module's.
 
-**These four move together.** AGP requires a minimum Gradle, Kotlin requires
-a matching Compose compiler, and the Compose BOM is tested against a Kotlin
-range. Changing one alone is the most common way this project's build breaks.
+**These move together.** AGP requires a minimum Gradle; Kotlin requires a
+matching Compose compiler and a matching KSP; KSP's suffix line constrains
+Hilt; Hilt must be new enough to read Kotlin's metadata; and supabase-kt
+pins the Ktor version its engine must match. Changing one alone is the most
+common way this project's build breaks — §1.2 records two that did.
+
 Check AGP's release notes for its required Gradle version and Compose's
 compatibility map before touching any of them, and run
 `./gradlew assembleDebug` immediately after.

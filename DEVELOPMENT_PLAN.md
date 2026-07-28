@@ -699,9 +699,17 @@ Create the admin application's skeleton — design system applied, architecture,
 
   The repository is real, not a demonstration fixture: it reports whether the build was given Supabase credentials, so an admin handed an unconfigured APK is told which `local.properties` entries are missing instead of meeting an unexplained network error at first sign-in. M6.5 injects the same `BackendConfig` into the Supabase client.
 
-- **`M6.5` Networking, Supabase, and image loading** — `M`
+- **`M6.5` Networking, Supabase, and image loading** — `M` — ◐ **built**; the stack compiles and the backend answers, but neither half of the *done when* can be observed yet. Two blockers, both outside the code.
   Configure the chosen HTTP client (Ktor or Retrofit — Open Question 12), the Supabase client, and Coil.
   *Done when:* an authenticated request succeeds and a remote image renders through Coil.
+
+  One OkHttp client is shared by Ktor and Coil, so there is a single connection pool, one TLS handshake to the Supabase host, and one place timeouts are set. The Supabase client is built on first injection rather than at startup, so a build without credentials still reaches the shell and reports what is missing (M6.4) instead of crashing before it draws.
+
+  **Verified out of band**, against the dev project with the anon key the app uses: `GET /rest/v1/categories` returns 200 with real rows, `/auth/v1/settings` returns 200, and the `product-images` bucket exists and lists. So the URL, the key and the endpoints are all good.
+
+  **Blocked on:** (1) no device or emulator here, so no in-app request or render can be observed; (2) **the storage bucket is empty** — zero objects — so there is no remote image for Coil to render at all. The second is not a device problem and does not clear until M5.6 loads real content or M7 uploads something. A signed-in request also needs admin credentials, which belong to M6.7.
+
+  **Required a version-set change**, recorded in `docs/architecture/android-build.md` §1.1–1.2: every supabase-kt 3.x is built against Kotlin 2.1+, so Kotlin went 2.0.21 → 2.1.20, which in turn forced Hilt 2.52 → 2.56.2 and pinned KSP to its KSP1 suffix line. Both traps produce error messages that point nowhere near the cause, so both are written down.
 
 - **`M6.6` Domain models mirroring the schema contract** — `S`
   Kotlin data classes mirroring M3's frozen contract.

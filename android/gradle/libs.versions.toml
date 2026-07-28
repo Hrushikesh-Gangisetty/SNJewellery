@@ -13,7 +13,7 @@
 # AGP and Gradle move together. See docs/architecture/android-build.md
 # for why this pair, and what to check before changing either.
 agp = "8.10.1"
-kotlin = "2.0.21"
+kotlin = "2.1.20"
 composeBom = "2025.04.00"
 
 androidxCore = "1.13.1"
@@ -22,9 +22,24 @@ androidxActivity = "1.9.2"
 
 # KSP's version is Kotlin's version plus its own suffix — the two are
 # pinned together and cannot be upgraded independently.
-ksp = "2.0.21-1.0.28"
-hilt = "2.52"
+#
+# The 1.0.x suffix line is KSP1. The 2.0.x line is KSP2, and Hilt 2.52's
+# processor does not support it — its bytecode transform silently stops
+# running and every @HiltAndroidApp fails with "Expected ... to have a
+# value. Did you forget to apply the Gradle Plugin?". Tried, not guessed.
+# Moving to KSP2 means Hilt 2.56.2 or newer, together.
+ksp = "2.1.20-1.0.32"
+# 2.56.2, not 2.52: Hilt 2.52's metadata reader cannot parse Kotlin 2.1
+# classes and fails hiltJavaCompile with "unsupported metadata version".
+hilt = "2.56.2"
 androidxHiltNavigation = "1.2.0"
+
+# Supabase's Kotlin SDK, and the Ktor version it is built against.
+# Bumping supabase means checking this — a mismatched engine fails at
+# runtime, not at compile time. See docs/architecture/android-build.md §1.
+supabase = "3.1.4"
+ktor = "3.1.2"
+coil = "3.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
@@ -48,6 +63,21 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 
+# ADR-0007: Ktor via the Supabase SDK, not Retrofit — the official SDK is
+# built on Ktor, so Retrofit would mean running two HTTP stacks.
+supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
+supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
+supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+supabase-storage = { group = "io.github.jan-tennert.supabase", name = "storage-kt" }
+# OkHttp engine rather than CIO or Android: connection pooling and HTTP/2
+# on a phone on mobile data, which is this app's whole context.
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+# Coil shares the app's OkHttp client, so there is one connection pool
+# and one place timeouts are set.
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
@@ -56,3 +86,5 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+# supabase-kt models rows with kotlinx.serialization.
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

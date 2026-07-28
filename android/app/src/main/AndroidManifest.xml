@@ -2,15 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      No permissions yet. CAMERA and the Photo Picker arrive with the
-      upload pipeline in M7, and each is added in the milestone that
-      needs it rather than up front — a permission requested before a
-      feature exists is one the owner is asked to grant for no reason.
-
-      INTERNET is granted implicitly for debug builds by the manifest
-      merger but not for release; it is declared explicitly in M6.5,
-      alongside the Supabase client that first needs it.
+      CAMERA arrives with the upload pipeline in M7, added in the
+      milestone that needs it — a permission requested before a feature
+      exists is one the owner is asked to grant for no reason. Choosing
+      existing photographs needs none at all: the Photo Picker is
+      permission-free on every supported version.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Read, never required. The app is usable enough to say "you are
+      offline" without it, and M8's offline drafts are the real answer to
+      a lost connection.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".SnJewelleryApp"
