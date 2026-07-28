@@ -13,8 +13,10 @@
          is not finished, rather than showing a convincing empty screen. -->
     <string name="shell_subtitle">Setup in progress — sign-in arrives in the next build.</string>
 
-    <!-- Rendered in the accent colour at the label step, so the shell
-         shows at a glance that the token-derived theme is live in both
-         light and dark. Goes with the shell screen in M6.7. -->
-    <string name="shell_theme_check">Theme loaded</string>
+    <!-- Whether this build was given backend credentials. An admin
+         handed a build without them would otherwise meet a network
+         error at the first sign-in and go looking for a signal problem
+         that does not exist. Goes with the shell screen in M6.7. -->
+    <string name="shell_backend_ready">Backend configured</string>
+    <string name="shell_backend_missing">Not configured — missing %1$s in local.properties</string>
 </resources>

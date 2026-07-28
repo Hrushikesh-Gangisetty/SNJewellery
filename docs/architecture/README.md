@@ -34,6 +34,7 @@ flowchart LR
 |---|---|---|
 | `rendering.md` | Per-route rendering strategy, ISR, cache tag placement | M4.7 |
 | `android-build.md` | Toolchain versions, SDK levels and the `minSdk` decision, secrets, signing | M6.1 |
+| `android-app.md` | Admin app package layout, layering rules, DI, screen structure | M6.3, M6.4 |
 | `sync.md` | Revalidation mechanism, mutation→tag map, stale-page diagnosis runbook | M9.7 |
 
 Both are near-term deliverables. This README carries the system overview until they exist.

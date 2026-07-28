@@ -683,13 +683,21 @@ Create the admin application's skeleton — design system applied, architecture,
 
   **Outstanding:** "both schemes render correctly" is unverified — it needs a device or an emulator, neither of which this environment has. The build compiles, lint passes, and both font files are confirmed in the APK, but nobody has looked at it. `@PreviewLightDark` previews exist for that check. Fold into the same device pass as M4.12.
 
-- **`M6.3` Architecture and package structure** — `S`
+- **`M6.3` Architecture and package structure** — `S` — ✅ **complete** (`domain`/`data`/`di`/`ui` exist and are documented in `docs/architecture/android-app.md`; ADR-0007 was already Accepted)
   MVVM + Repository with a clear split: `data` (remote, local, models), `domain`, `ui` (screens, view models). Record it in [ADR-0007](docs/adr/0007-android-architecture.md).
   *Done when:* the structure exists, is documented, and the ADR moves to Accepted.
 
-- **`M6.4` Dependency injection** — `S`
+  Done together with M6.4 in one commit, deliberately: an empty package cannot be committed, so the structure only exists once something real occupies it, and M6.4's wiring is the first thing that does. Packages beyond these appear with the milestone that needs them — `data/remote` in M6.5, `data/models` in M6.6, `data/local` in M8.
+
+  Each documented rule has a check rather than an assertion. Two were run: `BuildConfig` is named only under `data/`, and nothing under `ui/` imports `data`.
+
+- **`M6.4` Dependency injection** — `S` — ✅ **complete** (Hilt; `ShellViewModel` resolves `ConfigRepository` through the graph)
   Configure the chosen DI framework — the PRD leaves Koin and Hilt open; see Open Question 11.
   *Done when:* a view model resolves its repository through DI, and the choice is recorded in ADR-0007.
+
+  Verified two ways rather than by the build merely passing: the generated `ShellViewModel_Factory` takes `ConfigRepository`, the **domain interface** and not the implementation; and deleting the `@Binds` produces `[Dagger/MissingBinding]` at compile time — the compile-time safety ADR-0007 chose Hilt for, demonstrated rather than claimed.
+
+  The repository is real, not a demonstration fixture: it reports whether the build was given Supabase credentials, so an admin handed an unconfigured APK is told which `local.properties` entries are missing instead of meeting an unexplained network error at first sign-in. M6.5 injects the same `BackendConfig` into the Supabase client.
 
 - **`M6.5` Networking, Supabase, and image loading** — `M`
   Configure the chosen HTTP client (Ktor or Retrofit — Open Question 12), the Supabase client, and Coil.
