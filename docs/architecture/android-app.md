@@ -17,9 +17,11 @@ com.snjewellery.admin/
 ├── MainActivity.kt        @AndroidEntryPoint — the single activity
 │
 ├── domain/                Business types and repository INTERFACES.
+│   ├── auth/              Sign-in, session, role     (M6.7–M6.9)
 │   └── config/            No Android imports. No Compose. No Supabase.
 │
 ├── data/                  Repository IMPLEMENTATIONS and their sources.
+│   ├── auth/              Supabase Auth, encrypted session (M6.7–M6.9)
 │   ├── config/            BuildConfig-backed configuration
 │   ├── remote/            Supabase and network            (M6.5)
 │   ├── local/             Room and DataStore, offline drafts (M8)
@@ -29,9 +31,13 @@ com.snjewellery.admin/
 │
 └── ui/
     ├── theme/             Tokens → Material 3 theme (M6.2)
+    ├── navigation/        The authenticated graph   (M6.10)
     ├── components/        Shared composables            (M6.7 onward)
     └── screens/           One package per screen:
-        └── shell/           the composable and its view model together
+        ├── root/            which world the app is in
+        ├── login/           sign-in                     (M6.7)
+        ├── access/          refused / could not check   (M6.9)
+        └── dashboard/       start destination     (M6.10, M6.11)
 ```
 
 Packages appear as the milestone that needs them arrives. An empty
@@ -110,6 +116,26 @@ Where a distinction leads somewhere different — configured versus not —
 it is a `sealed interface` in `domain`, so a `when` over it is
 exhaustive and a new case is a compile error at every call site.
 
+### 2.6a Session state and navigation are separate concerns
+
+**Session state decides which world you are in; the graph decides where
+you are within it.** `RootViewModel` maps the persisted session and the
+M6.9 role check onto `SessionState`, and `MainActivity` chooses between
+the login screen, the blocked screen, and the authenticated `NavHost`.
+Login is **not** a navigation destination.
+
+Making it one is the obvious shortcut and it is wrong twice over: two
+things would own the same answer, and the back stack would cheerfully
+return a signed-out user to a screen they may no longer see. Keeping the
+split is also what makes logout free — it clears the session and the
+graph is replaced wholesale, with no navigation state left to get out of
+step.
+
+Navigation Compose with **type-safe routes** (`@Serializable` objects in
+`ui/navigation/Destinations.kt`), so a misspelled destination is a
+compile error rather than a runtime crash — the same argument ADR-0007
+made for Hilt. One destination exists today; M7 and M8 add theirs.
+
 ### 2.7 No screen declares a visual value
 
 Colour, size, radius, duration: all from `MaterialTheme` or `Tokens`,
@@ -124,6 +150,8 @@ and M6.2.
 2. Implement the repository in `data/`, talking to exactly one source.
 3. Bind it in `di/DataModule.kt`.
 4. Add `ui/screens/<name>/` with the view model and both composables.
+5. If it is a new destination, declare it in `ui/navigation/Destinations.kt`
+   and wire it into `AdminNavHost`.
 
 If step 2 needs something constructed rather than injected — a Supabase
 client, a Room database — give it its own `@Provides` module rather than

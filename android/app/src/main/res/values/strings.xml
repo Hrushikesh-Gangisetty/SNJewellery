@@ -9,19 +9,21 @@
     -->
     <string name="app_name">SN Admin</string>
 
-    <!-- Shown after signing in, until the dashboard replaces it in M6.11.
+    <!-- ── Dashboard (M6.10; the metrics arrive in M6.11) ────────────
          Says plainly that the app is unfinished rather than presenting a
-         convincing empty screen. Reworded once sign-in existed: the
-         previous copy promised sign-in "in the next build", which stopped
-         being true the moment M6.7 shipped. -->
-    <string name="shell_subtitle">You are signed in. The dashboard is not built yet.</string>
+         convincing empty screen. A plausible "0 products" would be a lie
+         the owner could act on. -->
+    <string name="dashboard_pending">The dashboard is not built yet.</string>
 
     <!-- Whether this build was given backend credentials. An admin
          handed a build without them would otherwise meet a network
-         error at the first sign-in and go looking for a signal problem
-         that does not exist. Goes with the shell screen in M6.7. -->
-    <string name="shell_backend_ready">Backend configured</string>
-    <string name="shell_backend_missing">Not configured — missing %1$s in local.properties</string>
+         error and go looking for a signal problem that does not exist. -->
+    <string name="dashboard_backend_ready">Backend configured</string>
+    <string name="dashboard_backend_missing">Not configured — missing %1$s in local.properties</string>
+
+    <!-- On the dashboard's top bar. Worded the same as the refusal
+         screen's escape hatch, because they do the same thing. -->
+    <string name="dashboard_sign_out">Sign out</string>
 
     <!-- ── Login (M6.7) ──────────────────────────────────────────── -->
     <string name="login_subtitle">Sign in to manage the catalogue.</string>

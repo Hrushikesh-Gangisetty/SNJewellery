@@ -15,10 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.snjewellery.admin.domain.auth.SessionState
+import com.snjewellery.admin.ui.navigation.AdminNavHost
 import com.snjewellery.admin.ui.screens.access.AccessScreen
 import com.snjewellery.admin.ui.screens.login.LoginScreen
 import com.snjewellery.admin.ui.screens.root.RootViewModel
-import com.snjewellery.admin.ui.screens.shell.ShellScreen
 import com.snjewellery.admin.ui.theme.SnTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,9 +32,14 @@ import dagger.hilt.android.AndroidEntryPoint
  * **Which screen opens is decided by the persisted session**, not by a
  * flag here. That is what makes a force-stop and relaunch land back where
  * the owner was (M6.8), and from M6.9 it also decides whether being
- * signed in is enough — only [SessionState.Admin] reaches the app. The
- * real navigation graph arrives in M6.10; this switch is still
- * deliberately minimal.
+ * signed in is enough — only [SessionState.Admin] reaches the app, where
+ * M6.10's navigation graph takes over.
+ *
+ * The split is deliberate: **session state decides which world you are
+ * in; the graph decides where you are within it.** Making sign-in a
+ * destination instead would give two owners one answer, and the back
+ * stack would happily return a signed-out user to a screen they may no
+ * longer see.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -61,7 +66,9 @@ private fun RootContent(viewModel: RootViewModel = hiltViewModel()) {
         // reason — it is a round trip, not an instant answer.
         is SessionState.Restoring, is SessionState.VerifyingAccess -> WaitingIndicator()
 
-        is SessionState.Admin -> ShellScreen()
+        // The authenticated graph. Everything inside it is past the gate,
+        // so no screen there re-asks who this is.
+        is SessionState.Admin -> AdminNavHost(onSignOut = viewModel::signOut)
 
         // Signing in is not the same as being allowed in. Both blocked
         // states explain themselves and offer a way out — M6.9.

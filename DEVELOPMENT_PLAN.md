@@ -772,9 +772,19 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Also decided here, closing the question `MainActivity` left open in M6.8: a failed token refresh still lands on the login screen. An offline failure could keep the session and retry instead, but the login screen already says "no connection — your details were not the problem" on the next attempt, which is the same information without a second retry surface to build and get wrong.
 
-- **`M6.10` Navigation shell and logout** — `S`
+- **`M6.10` Navigation shell and logout** — `S` — ✅ **complete** (driven on an emulator, 2026-07-29)
   Authenticated navigation with the dashboard as start destination, plus logout that clears the persisted session.
   *Done when:* relaunching after logout shows the login screen.
+
+  **Session state and navigation are kept apart, and login is not a destination.** `SessionState` decides which world the app is in; the graph decides where you are within it. Putting sign-in in the graph is the obvious shortcut and is wrong twice: two things would own one answer, and the back stack would happily return a signed-out user to a screen they may no longer see. The split is also what makes logout free — clearing the session replaces the whole graph, so there is no navigation state left to fall out of step. Recorded in `docs/architecture/android-app.md` §2.6a rather than as an ADR: it is a structural rule, but ADR-0007 already owns the architecture decision and §7 rule 3 forbids rewriting an accepted one.
+
+  **Navigation Compose with type-safe routes** — a destination is a `@Serializable` object, so a misspelled one is a compile error rather than a crash on a screen opened once a week. Same argument ADR-0007 made for Hilt. One destination exists today and none is declared for a screen that does not; M7 and M8 add theirs.
+
+  `ui/screens/shell/` is gone, renamed to `ui/screens/dashboard/`. It keeps the honest "the dashboard is not built yet" line and the backend-configured indicator — M6.11 replaces the body with the four metrics. A plausible "0 products" in the meantime would be a lie the owner could act on.
+
+  **Verified on an emulator:** the restored session reaches the dashboard through the M6.9 gate; **Sign out** returns to the login form and removes the session entry from `sn_session.xml` entirely — the store is left with no keys at all, not merely an overwritten value; force-stop and relaunch then shows the login screen, which is this task's *Done when*. `assembleRelease` succeeds and lint reports 0 errors.
+
+  Noticed, not done: **there is no confirmation on Sign out.** It is a single tap in the top bar, and an accidental one costs the owner a password re-entry on a phone. M1.7's inventory does list a confirmation dialog. Left alone because it is outside this task's *Done when* — worth a decision before the app is handed over.
 
 - **`M6.11` Dashboard** — `M`
   Total products, new uploads, featured products, and recently added items — live from Supabase, with loading and error states per M1.10.
