@@ -18,11 +18,13 @@ com.snjewellery.admin/
 │
 ├── domain/                Business types and repository INTERFACES.
 │   ├── auth/              Sign-in, session, role     (M6.7–M6.9)
+│   ├── dashboard/         The four PRD metrics           (M6.11)
 │   └── config/            No Android imports. No Compose. No Supabase.
 │
 ├── data/                  Repository IMPLEMENTATIONS and their sources.
 │   ├── auth/              Supabase Auth, encrypted session (M6.7–M6.9)
 │   ├── config/            BuildConfig-backed configuration
+│   ├── dashboard/         Catalogue counts               (M6.11)
 │   ├── remote/            Supabase and network            (M6.5)
 │   ├── local/             Room and DataStore, offline drafts (M8)
 │   └── models/            Mirrors of the schema contract   (M6.6)
@@ -135,6 +137,22 @@ Navigation Compose with **type-safe routes** (`@Serializable` objects in
 `ui/navigation/Destinations.kt`), so a misspelled destination is a
 compile error rather than a runtime crash — the same argument ADR-0007
 made for Hilt. One destination exists today; M7 and M8 add theirs.
+
+### 2.6b The public policy does not apply to this app
+
+The website reads with the anonymous key, whose policy hides archived
+products and hidden categories for it. **The admin app authenticates,
+and `products_admin_all` returns every row** — so any filtering an admin
+screen wants is that screen's own job.
+
+The dashboard therefore writes `archived = false` on every query. Get it
+wrong and the owner is told they have more pieces than a customer can
+see, with nothing anywhere to indicate why. Expect to repeat this filter
+in M8's catalogue list; it is not a default and cannot be.
+
+*Check:* against the seeded dev project, the anonymous key counts 11
+non-archived products and an admin counts 12 — the difference is the one
+product in a hidden category, which the owner must be able to manage.
 
 ### 2.7 No screen declares a visual value
 

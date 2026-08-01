@@ -9,16 +9,42 @@
     -->
     <string name="app_name">SN Admin</string>
 
-    <!-- ── Dashboard (M6.10; the metrics arrive in M6.11) ────────────
-         Says plainly that the app is unfinished rather than presenting a
-         convincing empty screen. A plausible "0 products" would be a lie
-         the owner could act on. -->
-    <string name="dashboard_pending">The dashboard is not built yet.</string>
+    <!-- ── Dashboard (M6.11) ─────────────────────────────────────────
+      The four figures the PRD's Dashboard section names. Its wording is
+      kept exactly — "Total Products", "New Uploads", "Featured
+      Products", "Recently Added" — per CLAUDE.md §5: the PRD's domain
+      terms are the app's terms, and a synonym here would be a second
+      name for the same thing.
+
+      The PRD defines no window for "New Uploads", so the screen states
+      the one chosen rather than leaving the owner to guess whether the
+      number covers a day, a week or all time.
+    -->
+    <string name="dashboard_total_products">Total Products</string>
+    <string name="dashboard_new_uploads">New Uploads</string>
+    <string name="dashboard_new_uploads_window">last 7 days</string>
+    <string name="dashboard_featured">Featured Products</string>
+    <string name="dashboard_recently_added">Recently Added</string>
+
+    <!-- ux.md rule 3: "nothing here" is not "something broke". No
+         products yet is a normal state for a shop that has just
+         installed the app, so it is a statement, not an error. -->
+    <string name="dashboard_empty">No products yet.</string>
+
+    <!-- Offline and server-fault worded apart, as on the login and role
+         screens: only the first is something the owner can act on. -->
+    <string name="dashboard_error_offline">No connection, so the figures could not be loaded. Check your signal or Wi-Fi and try again.</string>
+    <string name="dashboard_error_server">The figures could not be loaded (%1$s). Please try again in a moment.</string>
+    <string name="dashboard_error_no_detail">no details</string>
+    <string name="dashboard_retry">Try again</string>
 
     <!-- Whether this build was given backend credentials. An admin
          handed a build without them would otherwise meet a network
          error and go looking for a signal problem that does not exist. -->
-    <string name="dashboard_backend_ready">Backend configured</string>
+    <!-- Only the failure is stated now. A green "Backend configured"
+         earned its place when the screen had nothing else on it; beside
+         real figures it is noise, and the figures loading is the same
+         proof. -->
     <string name="dashboard_backend_missing">Not configured — missing %1$s in local.properties</string>
 
     <!-- On the dashboard's top bar. Worded the same as the refusal

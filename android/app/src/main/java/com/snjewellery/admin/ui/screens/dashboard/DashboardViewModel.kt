@@ -1,42 +1,68 @@
 package com.snjewellery.admin.ui.screens.dashboard
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.config.ConfigStatus
+import com.snjewellery.admin.domain.dashboard.DashboardMetrics
+import com.snjewellery.admin.domain.dashboard.DashboardRepository
+import com.snjewellery.admin.domain.dashboard.MetricsResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** What the dashboard renders. The four metrics arrive in M6.11. */
+/**
+ * What the dashboard is showing.
+ *
+ * A sealed type rather than a `DashboardUiState` with nullable metrics
+ * and an `isLoading` flag: those permit states that cannot happen —
+ * loading *and* failed, loaded *and* erroring — and every screen reading
+ * them has to decide which wins. Here the `when` is exhaustive and there
+ * is nothing to decide.
+ */
+sealed interface DashboardState {
+    data object Loading : DashboardState
+
+    data class Loaded(val metrics: DashboardMetrics) : DashboardState
+
+    /** ux.md: an inline error where the content belongs, plus Retry. */
+    data class Failed(val failure: RequestFailure) : DashboardState
+}
+
+/** The dashboard's full UI state: its metrics, plus the build's health. */
 data class DashboardUiState(
-    val configured: Boolean,
+    val state: DashboardState = DashboardState.Loading,
+    val configured: Boolean = true,
     /** Entries absent from local.properties. Empty when configured. */
     val missingConfig: List<String> = emptyList(),
 )
 
 /**
- * The dashboard's view model. Was `ShellViewModel` until M6.10 made the
- * post-login screen a real destination.
+ * The dashboard's view model.
  *
- * It answers one question today: **has this build been given
- * credentials?** A build handed to an admin without them would otherwise
- * fail at the first request and send someone hunting for a signal problem
- * that does not exist.
+ * Loads on creation and on demand. Nothing is cached across a reload:
+ * the counts are the point of the screen, and showing a stale number
+ * beside a spinner is how an owner concludes an upload did not save.
  *
- * M6.11 adds the four live metrics beside that. Nothing here fabricates
- * one in the meantime — the screen says the dashboard is unbuilt rather
- * than showing a plausible zero.
+ * It also still reports whether this build was given credentials (M6.4).
+ * That is not a metric, so it sits beside the state rather than inside
+ * it — a build with no credentials cannot load metrics *and* needs to
+ * say why in terms that name the missing `local.properties` line.
  */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    private val dashboardRepository: DashboardRepository,
     configRepository: ConfigRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         when (val status = configRepository.status()) {
-            is ConfigStatus.Ready -> DashboardUiState(configured = true)
+            is ConfigStatus.Ready -> DashboardUiState()
             is ConfigStatus.Incomplete -> DashboardUiState(
                 configured = false,
                 missingConfig = status.missing,
@@ -45,4 +71,20 @@ class DashboardViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
+
+    init {
+        load()
+    }
+
+    fun load() {
+        _uiState.update { it.copy(state = DashboardState.Loading) }
+
+        viewModelScope.launch {
+            val next = when (val result = dashboardRepository.metrics()) {
+                is MetricsResult.Loaded -> DashboardState.Loaded(result.metrics)
+                is MetricsResult.Failed -> DashboardState.Failed(result.failure)
+            }
+            _uiState.update { it.copy(state = next) }
+        }
+    }
 }

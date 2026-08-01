@@ -2,18 +2,14 @@ package com.snjewellery.admin.data.auth
 
 import com.snjewellery.admin.data.models.UserRole
 import com.snjewellery.admin.data.models.UserRow
-import com.snjewellery.admin.data.remote.TransportFailure
-import com.snjewellery.admin.data.remote.TransportFailureRecorder
+import com.snjewellery.admin.data.remote.RequestFailureClassifier
 import com.snjewellery.admin.domain.auth.AdminAccess
 import com.snjewellery.admin.domain.auth.AdminAccessRepository
 import com.snjewellery.admin.domain.auth.RefusalReason
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.postgrest
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,7 +41,7 @@ import javax.inject.Singleton
 @Singleton
 class SupabaseAdminAccessRepository @Inject constructor(
     private val client: SupabaseClient,
-    private val transportFailures: TransportFailureRecorder,
+    private val failures: RequestFailureClassifier,
 ) : AdminAccessRepository {
 
     override suspend fun check(): AdminAccess = try {
@@ -74,27 +70,18 @@ class SupabaseAdminAccessRepository @Inject constructor(
                 null -> AdminAccess.Refused(RefusalReason.NoProfile)
             }
         }
-    } catch (e: HttpRequestTimeoutException) {
-        AdminAccess.Undetermined(offline = true, detail = null)
-    } catch (e: IOException) {
-        // As in SupabaseAuthRepository: the SDK flattens every transport
-        // failure into an IOException carrying no cause, so the real
-        // reason comes from the interceptor that saw it first.
-        when (val failure = transportFailures.take()) {
-            is TransportFailure.Tls ->
-                AdminAccess.Undetermined(offline = false, detail = failure.detail)
-            is TransportFailure.Other ->
-                AdminAccess.Undetermined(offline = false, detail = failure.detail)
-            is TransportFailure.Unreachable, null ->
-                AdminAccess.Undetermined(offline = true, detail = null)
-        }
     } catch (e: CancellationException) {
+        // Never swallowed: the caller was cancelled — the screen went
+        // away, or a newer check superseded this one — and cancellation
+        // must keep propagating.
         throw e
     } catch (e: Exception) {
-        // Includes PostgrestRestException — an expired JWT, a policy
-        // change, a project paused. Its `code` is a Postgres or PostgREST
-        // code and is safe to show; its message can quote the request.
-        AdminAccess.Undetermined(offline = false, detail = e.postgrestCodeOrType())
+        // Every expected failure, classified in one place because the
+        // dashboard needs exactly the same ladder. An expired JWT, a
+        // paused project, a wrong device clock and a tunnel all arrive
+        // here and are told apart there, not here.
+        val failure = failures.classify(e)
+        AdminAccess.Undetermined(offline = failure.offline, detail = failure.detail)
     }
 
     /**
@@ -108,9 +95,6 @@ class SupabaseAdminAccessRepository @Inject constructor(
             ?: client.auth.currentSessionOrNull()?.let {
                 client.auth.retrieveUserForCurrentSession(updateSession = true).id
             }
-
-    private fun Exception.postgrestCodeOrType(): String? =
-        (this as? PostgrestRestException)?.code ?: this::class.simpleName
 
     private companion object {
         const val TABLE_USERS = "users"

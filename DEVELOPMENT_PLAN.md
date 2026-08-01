@@ -786,9 +786,28 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Noticed, not done: **there is no confirmation on Sign out.** It is a single tap in the top bar, and an accidental one costs the owner a password re-entry on a phone. M1.7's inventory does list a confirmation dialog. Left alone because it is outside this task's *Done when* — worth a decision before the app is handed over.
 
-- **`M6.11` Dashboard** — `M`
+- **`M6.11` Dashboard** — `M` — ◐ **built, and every query verified against the live database**; the on-screen render is unverified because the emulator has no session — see below.
   Total products, new uploads, featured products, and recently added items — live from Supabase, with loading and error states per M1.10.
   *Done when:* all four metrics match the database's actual counts.
+
+  **The PRD names four figures and defines none of them.** Two needed a decision, and both are stated in `DashboardMetrics` rather than buried in a query:
+
+  - **Archived pieces are excluded from every count.** Archiving means "no longer in the catalogue", so counting them would tell the owner they have more pieces than a customer can see. *Sold* is deliberately **not** excluded — a sold piece is still in the catalogue and still shown on the website with a badge, so it still counts.
+  - **"New Uploads" means the last seven days.** The PRD gives no window. The screen states the choice under the number instead of leaving the owner to guess whether it covers a day, a week or all time.
+
+  **The public policy does not apply to this app, and that is easy to get wrong.** The website's anonymous key has archived products and hidden categories filtered out *for* it; `products_admin_all` returns every row to an authenticated admin. So `archived = false` is this repository's job on every query, and the same filter will be needed again in M8. Recorded as `docs/architecture/android-app.md` §2.6b with its check.
+
+  **Counted, not fetched.** The three counts use `head = true` with an exact count, so PostgREST answers with a `Content-Range` header and no rows. Fetching ids and calling `.size` works fine at eleven products and quietly becomes a growing download on mobile data for a number that fits in a header. The four requests run concurrently in one scope, so the screen waits for the slowest rather than the sum, over the single shared OkHttp connection from M6.5.
+
+  **Extracted, not duplicated:** `RequestFailureClassifier`. M6.9 established the transport-failure ladder — timeout, the SDK's cause-less `IOException` consulted against the interceptor, TLS told apart from offline — inside the role-gate repository, and the dashboard needed it verbatim. A second copy is how two screens start disagreeing about what "offline" means. `SupabaseAdminAccessRepository` now uses it too, and lost four catch branches.
+
+  **Verified against the live dev project**, issuing exactly the query shapes the app issues, with the anonymous key: `archived=eq.false` → **11**; the same plus `created_at=gte.<now-7d>` → **1**; plus `featured=eq.true` → **4**; and the ordered, limited recent query returns the five newest with correct names and descending dates. So the filters, the count header and the ordering are all confirmed rather than assumed.
+
+  **What the admin dashboard should therefore show is 12 / 1 / 5** — one more than the anonymous key in total and in featured, because the seed's non-archived product in a hidden category is invisible to the public key and must be visible to its owner. If it were to show 11 / 1 / 4, the dashboard would be reading the public view, which is precisely the mistake §2.6b exists to prevent.
+
+  **Not verified: the rendered screen.** M6.10's logout check ended the emulator's session and the account password is the owner's, so the dashboard cannot be reached to photograph it. `assembleDebug` succeeds and the build is installed on the emulator at the login screen, ready for that check.
+
+  Left for M7, deliberately: the empty state says "No products yet." with **no action**. ux.md rule 1 wants a next step and the right one is "Add your first product" — which has nowhere to navigate until M7 exists. A button that does nothing would be worse than the missing one.
 
 ### Dependencies
 
