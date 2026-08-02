@@ -9,13 +9,16 @@ import com.snjewellery.admin.domain.auth.AuthState
 import com.snjewellery.admin.domain.auth.SessionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,11 +56,17 @@ class RootViewModel @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val sessionState: StateFlow<SessionState> =
-        combine(authRepository.authState, accessAttempt) { auth, _ -> auth }
+        combine(
+            // A token refresh re-emits the same signed-in person, and
+            // re-running the role query for them is a network round trip
+            // that can only produce the answer already held.
+            authRepository.authState.distinctUntilChanged(),
+            accessAttempt,
+        ) { auth, attempt -> auth to attempt }
             // `flatMapLatest`, not `map`: signing out mid-check must
             // cancel the in-flight query rather than let its result
             // arrive afterwards and route a signed-out app somewhere.
-            .flatMapLatest { auth ->
+            .flatMapLatest { (auth, _) ->
                 when (auth) {
                     is AuthState.Restoring -> flowOf(SessionState.Restoring)
 
@@ -78,9 +87,22 @@ class RootViewModel @Inject constructor(
                     }
                 }
             }
+            .keepAdmitted()
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS),
+                // Started once and never stopped. `WhileSubscribed` ended
+                // collection whenever the activity had been stopped for
+                // longer than its timeout, and restarting rebuilt the
+                // chain above from nothing — including [keepAdmitted]'s
+                // memory of having already admitted this person, which is
+                // exactly what must not be forgotten while the owner is in
+                // the camera app.
+                //
+                // A session is a fact about the process, not a
+                // subscription belonging to a screen, so nothing is kept
+                // alive here that should not be: one StateFlow, collected
+                // for as long as the view model lives.
+                started = SharingStarted.Lazily,
                 initialValue = SessionState.Restoring,
             )
 
@@ -101,9 +123,38 @@ class RootViewModel @Inject constructor(
         is AdminAccess.Refused -> SessionState.Refused(reason)
         is AdminAccess.Undetermined -> SessionState.AccessUnavailable(offline, detail)
     }
-
-    private companion object {
-        /** Survives a configuration change without restarting collection. */
-        const val SUBSCRIPTION_TIMEOUT_MS = 5_000L
-    }
 }
+
+/**
+ * Holds [SessionState.Admin] through a re-check.
+ *
+ * ── The bug this exists for ──────────────────────────────────────────
+ * The Supabase SDK reloads its session every time the app returns to the
+ * foreground, so its status goes Initializing → Authenticated again, and
+ * this flow followed it: **Admin → Restoring → VerifyingAccess → Admin**.
+ *
+ * `MainActivity` picks a whole screen from that value, so the two middle
+ * emissions replaced `AdminNavHost` with the waiting indicator and back
+ * again — and a `NavHost` that leaves composition takes its back stack,
+ * and every view model scoped to it, with it. The owner filled in the Add
+ * Product form, opened the camera, and came back to the dashboard with
+ * everything they had typed gone. The photograph was on disk; nothing was
+ * left that knew about it. Found by driving M7.3, not in review.
+ *
+ * ── Why suppressing them is right, not a patch ───────────────────────
+ * `Restoring` and `VerifyingAccess` mean *the answer is not known yet*.
+ * That is true at launch, and it is what stops the login form flashing
+ * past a signed-in owner. It is not true on the way back from the camera:
+ * the answer **is** known, and re-deriving it does not un-know it.
+ *
+ * Only `Admin` is held. A blocked account still shows the waiting state
+ * while it retries, because there the answer really is being asked again
+ * and the person is waiting for it. And nothing here can keep someone
+ * admitted who should not be: a sign-out, a refusal and a failed refresh
+ * are all settled answers and all pass straight through.
+ */
+private fun Flow<SessionState>.keepAdmitted(): Flow<SessionState> =
+    scan(SessionState.Restoring as SessionState) { previous, next ->
+        val stillDeciding = next is SessionState.Restoring || next is SessionState.VerifyingAccess
+        if (stillDeciding && previous is SessionState.Admin) previous else next
+    }.distinctUntilChanged()
