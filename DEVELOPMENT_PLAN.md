@@ -864,9 +864,21 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   Found while driving it, and left for M7.2: **the weight field silently discards text it cannot parse.** `toDoubleOrNull()` returns null, so a mistyped weight saves as "not weighed" rather than complaining. The Decimal keyboard makes it unlikely by hand and a paste makes it possible.
 
-- **`M7.2` Validation and state preservation** — `S`
+- **`M7.2` Validation and state preservation** — `S` — ✅ **complete** (driven on an emulator, 2026-08-02)
   Inline validation with clear errors; entered state survives configuration change and backgrounding.
   *Done when:* rotating the device mid-form loses neither field values nor selected images.
+
+  **Every rule mirrors a constraint the database already enforces** — `products_name_not_blank`, `category_id not null`, `products_weight_positive`. That is deliberate: the database stays the authority, and these exist to say so before a round trip, in words the owner can act on. A rule invented here that the schema does not hold would reject a piece the catalogue would have accepted.
+
+  **The M7.1 defect is fixed:** an unparseable weight is now refused with *"Weight should be a number, like 12.5. Leave it empty if the piece has not been weighed"*, instead of `toDoubleOrNull()` quietly returning null and saving the piece as "not weighed".
+
+  **Save is never disabled.** Greying it out hides *why* nothing happens when it is pressed; pressing it puts the reason under the field that needs it. Same rule the login screen follows.
+
+  **State survives on a `SavedStateHandle`, not just a `ViewModel`.** A view model survives rotation but not process death, and process death is the case that matters: the owner is photographing a ring, switches to the camera, and Android reclaims the app. M7.5's selected images join by the same route.
+
+  **A real defect, caught on a screenshot rather than in review.** `onFocusChanged` fires once at initial composition with `isFocused = false`, so blur validation ran the moment the screen opened — the owner tapped Add Product and was immediately told to give the piece a name they had had no chance to type. Precisely the failure the blur rule exists to prevent, and it survived process death too, so a restored form came back covered in errors. Fixed with a `validateOnBlur` modifier that only fires for a field that was actually entered.
+
+  **Verified on an emulator:** leaving the name empty and moving on shows its error, and only then; `abc` in Weight shows the weight error; **rotating landscape → portrait mid-form kept the name, the category and the weight, error state included**; `am kill` with the process confirmed gone, then relaunch, came back to the same form with the same values; a fresh form shows no errors at all; and Save on an empty form surfaces *"Give the piece a name."* and *"Choose a category."* rather than doing nothing. Selected images are not part of this check — M7.3–M7.5 have not built them yet.
 
 - **`M7.3` Camera capture** — `M`
   Capture from camera with Android 13+ media permission handling and a graceful denied-permission path.

@@ -9,7 +9,9 @@ import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.product.CreateProductResult
+import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.domain.product.ProductDraft
+import com.snjewellery.admin.domain.product.ProductFormRules
 import com.snjewellery.admin.domain.product.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,20 @@ data class ProductForm(
     val featured: Boolean = false,
 )
 
+/**
+ * Problems shown under their fields.
+ *
+ * Separate from [ProductForm] so what the owner typed and what is wrong
+ * with it cannot drift — clearing a problem never risks clearing a value.
+ */
+data class FormProblems(
+    val name: FieldProblem? = null,
+    val category: FieldProblem? = null,
+    val weight: FieldProblem? = null,
+) {
+    val any: Boolean get() = name != null || category != null || weight != null
+}
+
 /** The outcome of a save, once. */
 sealed interface SaveState {
     data object Idle : SaveState
@@ -49,6 +65,7 @@ sealed interface SaveState {
 
 data class AddProductUiState(
     val form: ProductForm = ProductForm(),
+    val problems: FormProblems = FormProblems(),
     val options: OptionsState = OptionsState.Loading,
     val saveState: SaveState = SaveState.Idle,
 )
@@ -113,13 +130,31 @@ class AddProductViewModel @Inject constructor(
         }
     }
 
-    fun onNameChange(value: String) = updateForm { it.copy(name = value) }
-    fun onCategoryChange(id: String) = updateForm { it.copy(categoryId = id) }
-    fun onPurityChange(id: String?) = updateForm { it.copy(purityId = id) }
-    fun onWeightChange(value: String) = updateForm { it.copy(weight = value) }
-    fun onDescriptionChange(value: String) = updateForm { it.copy(description = value) }
-    fun onTagsChange(value: String) = updateForm { it.copy(tags = value) }
-    fun onFeaturedChange(value: Boolean) = updateForm { it.copy(featured = value) }
+    fun onNameChange(value: String) = updateForm({ it.copy(name = value) }) { it.copy(name = null) }
+    fun onCategoryChange(id: String) =
+        updateForm({ it.copy(categoryId = id) }) { it.copy(category = null) }
+
+    fun onPurityChange(id: String?) = updateForm({ it.copy(purityId = id) })
+    fun onWeightChange(value: String) =
+        updateForm({ it.copy(weight = value) }) { it.copy(weight = null) }
+
+    fun onDescriptionChange(value: String) = updateForm({ it.copy(description = value) })
+    fun onTagsChange(value: String) = updateForm({ it.copy(tags = value) })
+    fun onFeaturedChange(value: Boolean) = updateForm({ it.copy(featured = value) })
+
+    /**
+     * Validation appears when a field is **left**, not while it is being
+     * typed into. Flagging a blank name at the first keystroke tells
+     * someone they are wrong before they have finished being right — the
+     * same rule the login screen follows.
+     */
+    fun onNameBlur() = _uiState.update {
+        it.copy(problems = it.problems.copy(name = ProductFormRules.validateName(it.form.name)))
+    }
+
+    fun onWeightBlur() = _uiState.update {
+        it.copy(problems = it.problems.copy(weight = ProductFormRules.validateWeight(it.form.weight)))
+    }
 
     fun save() {
         val current = _uiState.value
@@ -128,9 +163,26 @@ class AddProductViewModel @Inject constructor(
         // it two taps are two products.
         if (current.saveState is SaveState.Saving) return
 
+        // Everything is checked here, not only on blur: a field never
+        // touched has never blurred, and Save must still say what is
+        // missing rather than doing nothing.
+        val problems = FormProblems(
+            name = ProductFormRules.validateName(current.form.name),
+            category = ProductFormRules.validateCategory(current.form.categoryId),
+            weight = ProductFormRules.validateWeight(current.form.weight),
+        )
+
+        if (problems.any) {
+            _uiState.update { it.copy(problems = problems) }
+            return
+        }
+
+        // Safe: validateCategory just proved it non-null. Re-read rather
+        // than asserted, because CLAUDE.md forbids `!!` and a null here
+        // would be a crash on the owner's only Save button.
         val categoryId = current.form.categoryId ?: return
 
-        _uiState.update { it.copy(saveState = SaveState.Saving) }
+        _uiState.update { it.copy(problems = problems, saveState = SaveState.Saving) }
 
         viewModelScope.launch {
             val result = productRepository.create(current.form.toDraft(categoryId))
@@ -149,13 +201,26 @@ class AddProductViewModel @Inject constructor(
     /** Lets the screen dismiss an error without re-entering everything. */
     fun onErrorDismissed() = _uiState.update { it.copy(saveState = SaveState.Idle) }
 
-    private fun updateForm(transform: (ProductForm) -> ProductForm) {
+    /**
+     * [clearProblem] clears only the problem belonging to the field that
+     * changed. A message about a field the owner has not touched is
+     * still true, and wiping all of them on every keystroke would hide
+     * what Save just told them.
+     */
+    private fun updateForm(
+        transform: (ProductForm) -> ProductForm,
+        clearProblem: (FormProblems) -> FormProblems = { it },
+    ) {
         _uiState.update { state ->
             val form = transform(state.form)
             persist(form)
-            // An error describes the previous attempt and stops being
-            // true the moment the form changes.
-            state.copy(form = form, saveState = SaveState.Idle)
+            state.copy(
+                form = form,
+                problems = clearProblem(state.problems),
+                // A save error describes the previous attempt and stops
+                // being true the moment the form changes.
+                saveState = SaveState.Idle,
+            )
         }
     }
 

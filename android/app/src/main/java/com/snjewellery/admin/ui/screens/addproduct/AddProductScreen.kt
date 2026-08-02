@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -46,6 +47,7 @@ import com.snjewellery.admin.R
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
+import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.ui.theme.SnTheme
 import com.snjewellery.admin.ui.theme.Tokens
 import com.snjewellery.admin.ui.theme.snTextStyles
@@ -82,6 +84,8 @@ fun AddProductScreen(
         onDescriptionChange = viewModel::onDescriptionChange,
         onTagsChange = viewModel::onTagsChange,
         onFeaturedChange = viewModel::onFeaturedChange,
+        onNameBlur = viewModel::onNameBlur,
+        onWeightBlur = viewModel::onWeightBlur,
         onSave = viewModel::save,
         onRetryOptions = viewModel::loadOptions,
         onSaved = onSaved,
@@ -102,6 +106,8 @@ internal fun AddProductScreen(
     onDescriptionChange: (String) -> Unit = {},
     onTagsChange: (String) -> Unit = {},
     onFeaturedChange: (Boolean) -> Unit = {},
+    onNameBlur: () -> Unit = {},
+    onWeightBlur: () -> Unit = {},
     onSave: () -> Unit = {},
     onRetryOptions: () -> Unit = {},
     onSaved: (String) -> Unit = {},
@@ -151,8 +157,14 @@ internal fun AddProductScreen(
             OutlinedTextField(
                 value = uiState.form.name,
                 onValueChange = onNameChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .validateOnBlur(onNameBlur),
                 label = { Text(stringResource(R.string.add_product_name)) },
+                isError = uiState.problems.name != null,
+                supportingText = uiState.problems.name?.let { problem ->
+                    { Text(stringResource(problem.messageRes())) }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             )
@@ -173,6 +185,7 @@ internal fun AddProductScreen(
                     CategoryPicker(
                         categories = options.categories,
                         selectedId = uiState.form.categoryId,
+                        problem = uiState.problems.category,
                         onSelect = onCategoryChange,
                     )
                     PurityPicker(
@@ -186,8 +199,14 @@ internal fun AddProductScreen(
             OutlinedTextField(
                 value = uiState.form.weight,
                 onValueChange = onWeightChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .validateOnBlur(onWeightBlur),
                 label = { Text(stringResource(R.string.add_product_weight)) },
+                isError = uiState.problems.weight != null,
+                supportingText = uiState.problems.weight?.let { problem ->
+                    { Text(stringResource(problem.messageRes())) }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
@@ -233,13 +252,12 @@ internal fun AddProductScreen(
                     keyboard?.hide()
                     onSave()
                 },
-                // Category is the only field the database cannot default
-                // or accept as null, so it is the only one that gates the
-                // button. Everything else is checked on submit in M7.2,
-                // where the reason can be shown against the field.
-                enabled = saveState !is SaveState.Saving &&
-                    uiState.form.name.isNotBlank() &&
-                    uiState.form.categoryId != null,
+                // Enabled whenever a save is not already in flight, even
+                // with fields missing. Disabling it would hide *why*
+                // nothing happens when it is pressed; pressing it puts
+                // the reason under the field that needs it. Same rule as
+                // the login screen.
+                enabled = saveState !is SaveState.Saving,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Tokens.Layout.touchTarget),
@@ -318,12 +336,14 @@ private fun OptionsError(failure: RequestFailure, onRetry: () -> Unit) {
 private fun CategoryPicker(
     categories: List<Category>,
     selectedId: String?,
+    problem: FieldProblem?,
     onSelect: (String) -> Unit,
 ) {
     val selected = categories.firstOrNull { it.id == selectedId }
     Picker(
         label = stringResource(R.string.add_product_category),
         selectedLabel = selected?.let { it.displayName() } ?: "",
+        problem = problem,
     ) { dismiss ->
         categories.forEach { category ->
             DropdownMenuItem(
@@ -385,6 +405,7 @@ private fun PurityPicker(
 private fun Picker(
     label: String,
     selectedLabel: String,
+    problem: FieldProblem? = null,
     items: @Composable (dismiss: () -> Unit) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -398,6 +419,8 @@ private fun Picker(
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
+            isError = problem != null,
+            supportingText = problem?.let { { Text(stringResource(it.messageRes())) } },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -407,6 +430,37 @@ private fun Picker(
             items { expanded = false }
         }
     }
+}
+
+/**
+ * Runs [onBlur] when the field is left — and **only** if it was ever
+ * entered.
+ *
+ * `onFocusChanged` fires once at initial composition with
+ * `isFocused = false`, so the naive version validates every field the
+ * moment the screen opens: the owner taps Add Product and is immediately
+ * told to give the piece a name they have had no chance to type. That is
+ * the exact failure the blur rule exists to avoid, and it survives
+ * process death too, so a restored form came back covered in errors.
+ * Caught on a screenshot, not in review.
+ */
+@Composable
+private fun Modifier.validateOnBlur(onBlur: () -> Unit): Modifier {
+    var everFocused by remember { mutableStateOf(false) }
+    return onFocusChanged { state ->
+        if (state.isFocused) {
+            everFocused = true
+        } else if (everFocused) {
+            onBlur()
+        }
+    }
+}
+
+private fun FieldProblem.messageRes(): Int = when (this) {
+    FieldProblem.NameBlank -> R.string.add_product_error_name_blank
+    FieldProblem.CategoryMissing -> R.string.add_product_error_category_missing
+    FieldProblem.WeightNotANumber -> R.string.add_product_error_weight_nan
+    FieldProblem.WeightNotPositive -> R.string.add_product_error_weight_positive
 }
 
 private const val DESCRIPTION_LINES = 3

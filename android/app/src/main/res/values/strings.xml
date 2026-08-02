@@ -93,6 +93,20 @@
          thing that can: a different name. -->
     <string name="add_product_error_name_taken">There are already too many pieces with this name. Please give this one a slightly different name.</string>
 
+    <!-- ── Field validation (M7.2) ───────────────────────────────────
+      Each mirrors a constraint the database enforces anyway, said in
+      words the owner can act on and before a round trip — never instead
+      of the database. No message blames the person (ux.md rule 5).
+
+      The weight messages exist because M7.1 SILENTLY DISCARDED anything
+      unparseable: a mistyped weight saved as "not weighed" without a
+      word. Found by driving the form, not by reading the code.
+    -->
+    <string name="add_product_error_name_blank">Give the piece a name.</string>
+    <string name="add_product_error_category_missing">Choose a category.</string>
+    <string name="add_product_error_weight_nan">Weight should be a number, like 12.5. Leave it empty if the piece has not been weighed.</string>
+    <string name="add_product_error_weight_positive">Weight should be more than zero. Leave it empty if the piece has not been weighed.</string>
+
     <!-- ── Login (M6.7) ──────────────────────────────────────────── -->
     <string name="login_subtitle">Sign in to manage the catalogue.</string>
     <string name="login_email_label">Email</string>
