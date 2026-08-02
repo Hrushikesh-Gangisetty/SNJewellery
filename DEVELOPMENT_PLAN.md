@@ -749,7 +749,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Also fixed here: the post-login copy still read "sign-in arrives in the next build", which stopped being true when M6.7 shipped.
 
-- **`M6.9` Role gate** — `S` — ◐ **three of four paths driven on an emulator, 2026-07-28**; the refusal itself is unverified because creating a non-admin account was blocked — see below.
+- **`M6.9` Role gate** — `S` — ✅ **complete** — verified by the project owner, 2026-08-02. Three paths were driven on an emulator during the session below; the owner confirmed the milestone in full afterwards.
   After authentication, verify `users.role = 'admin'`; reject anyone else with an explanation rather than a blank screen.
   *Done when:* a non-admin account is refused with a clear message and cannot reach the dashboard.
 
@@ -786,7 +786,7 @@ Create the admin application's skeleton — design system applied, architecture,
 
   Noticed, not done: **there is no confirmation on Sign out.** It is a single tap in the top bar, and an accidental one costs the owner a password re-entry on a phone. M1.7's inventory does list a confirmation dialog. Left alone because it is outside this task's *Done when* — worth a decision before the app is handed over.
 
-- **`M6.11` Dashboard** — `M` — ◐ **built, and every query verified against the live database**; the on-screen render is unverified because the emulator has no session — see below.
+- **`M6.11` Dashboard** — `M` — ✅ **complete** — the predicted **12 / 1 / 5** was confirmed on the emulator on 2026-08-02, and the owner verified the milestone. (The New Uploads figure reads against the *device* clock, which on that emulator was several days behind the server's; the count was correct for it.)
   Total products, new uploads, featured products, and recently added items — live from Supabase, with loading and error states per M1.10.
   *Done when:* all four metrics match the database's actual counts.
 
@@ -850,9 +850,19 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
 ### Tasks
 
-- **`M7.1` Add Product form** — `M`
+- **`M7.1` Add Product form** — `M` — ✅ **complete** (driven on an emulator against the live database, 2026-08-02)
   Every field the PRD lists: name, category (picker from live categories), purity, weight, description, tags, featured toggle.
   *Done when:* every PRD field is present and writes to the correct column.
+
+  **A gap in the PRD, flagged rather than patched: there is no Summary field.** The PRD's Add Product section lists eight things and Summary is not among them — but `products.summary` is exactly what the website's product card renders as its short description. So a piece uploaded from the app shows no short description on the catalogue grid where every seeded product does. Three ways out: add a ninth field to a form used between customers, derive one silently from the description, or accept blank cards. **This needs the owner's decision**; the form ships the PRD's eight fields until it comes. Same class of omission as the four M3.4 fields.
+
+  Category and Purity are dropdowns over the **live lookup tables**, in the owner's own `display_order` rather than alphabetically — that ordering is a decision they make in M8.7 and sorting here would quietly discard it. **Hidden categories are offered and labelled `(hidden)`, not withheld**: filing a piece into one before a launch is what a hidden category is for.
+
+  **Verified end to end on the emulator**, then read back over the REST API. Every column landed correctly: `slug` `m7-verification-piece`, `weight_grams` `12.50`, `purity_id` `null` from "Not recorded", `featured` `true`, `sold`/`archived` `false`, `colours` `[]`, and tags typed as the deliberately ragged `"verification,m7, test"` stored as `["verification","m7","test"]`. The dashboard went **12 / 3 / 5 → 13 / 4 / 6** on return, which also confirms M6.11's reload-on-resume.
+
+  **Two verification products remain in the dev database** — both named `M7-Verification-Piece`, one of them featured, so one appears in the dev site's featured section. They need deleting from the Supabase dashboard, or with M8.4 when it exists.
+
+  Found while driving it, and left for M7.2: **the weight field silently discards text it cannot parse.** `toDoubleOrNull()` returns null, so a mistyped weight saves as "not weighed" rather than complaining. The Decimal keyboard makes it unlikely by hand and a paste makes it possible.
 
 - **`M7.2` Validation and state preservation** — `S`
   Inline validation with clear errors; entered state survives configuration change and backgrounding.
@@ -890,9 +900,17 @@ Deliver the feature the shop owner actually bought this platform for: photograph
   Connection lost mid-upload, app backgrounded mid-upload, double-tap submission.
   *Done when:* each case is handled, and double-tapping Save creates exactly one product.
 
-- **`M7.11` Slug generation** — `S`
+- **`M7.11` Slug generation** — `S` — ✅ **complete** (done early: M7.1's insert cannot write a row without one)
   Generate the product `slug` with guaranteed uniqueness, including for two products with identical names.
   *Done when:* two products named identically both save with distinct slugs.
+
+  **The slug is claimed, not checked.** The obvious shape — query for the slug, then insert if free — races: two saves of the same name can both find nothing and both proceed, and the loser gets a constraint error the owner cannot act on. So the insert is attempted and a unique violation is the signal to try the next candidate. The database arbitrates, which is the only thing that can.
+
+  Matched on **SQLSTATE 23505** alone, with no constraint name: `products` has exactly two unique constraints and the other is the primary key, which the database generates — so the code alone identifies it, and no migration in this repository states the name Postgres derived.
+
+  **Accents fold, other scripts do not.** `Café` becomes `cafe`; Telugu and Devanagari are left alone, because there is no correct mechanical romanisation and inventing one produces URLs that are wrong in a language the shop's customers read. A name with no ASCII at all therefore yields no slug, and rather than refuse a correctly-named piece the insert falls back to an opaque token — ugly rather than wrong, and invisible to the owner.
+
+  **Verified:** two products both named `M7-Verification-Piece` saved as `m7-verification-piece` and `m7-verification-piece-2`.
 
 - **`M7.12` Success confirmation** — `S`
   Clear confirmation with a path to view or edit the created product.

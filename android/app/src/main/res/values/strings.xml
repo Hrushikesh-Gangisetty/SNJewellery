@@ -50,6 +50,48 @@
     <!-- On the dashboard's top bar. Worded the same as the refusal
          screen's escape hatch, because they do the same thing. -->
     <string name="dashboard_sign_out">Sign out</string>
+    <string name="dashboard_add_product">Add product</string>
+
+    <!-- ── Add Product (M7.1) ────────────────────────────────────────
+      The PRD's Add Product section names eight fields and this uses its
+      words for all of them, per CLAUDE.md §5.
+
+      Note what is NOT here: Summary. The PRD does not list it, but the
+      website's product card renders that column as its short
+      description — so a piece uploaded from the app shows no short
+      description where the seeded ones do. Flagged in
+      DEVELOPMENT_PLAN.md rather than fixed by inventing a ninth field
+      on a form used between customers.
+    -->
+    <string name="add_product_title">Add Product</string>
+    <string name="add_product_back">Back</string>
+    <string name="add_product_name">Product Name</string>
+    <string name="add_product_category">Category</string>
+    <!-- A hidden category is offered, not withheld: filing a piece into
+         one before a launch is what hidden categories are for. -->
+    <string name="add_product_category_hidden">%1$s (hidden)</string>
+    <string name="add_product_purity">Purity</string>
+    <string name="add_product_purity_none">Not recorded</string>
+    <string name="add_product_weight">Weight (grams)</string>
+    <string name="add_product_description">Description</string>
+    <string name="add_product_tags">Tags</string>
+    <string name="add_product_tags_hint">Separate with commas</string>
+    <string name="add_product_featured">Featured</string>
+    <string name="add_product_save">Save</string>
+
+    <string name="add_product_options_loading">Loading categories…</string>
+    <string name="add_product_options_offline">No connection, so categories could not be loaded.</string>
+    <string name="add_product_options_error">Categories could not be loaded (%1$s).</string>
+    <string name="add_product_options_retry">Try again</string>
+
+    <!-- Offline says outright that nothing was saved: the owner has just
+         typed a piece in and needs to know it is still theirs to retry. -->
+    <string name="add_product_error_offline">No connection, so the piece was not saved. Nothing you entered has been lost — check your signal and tap Save again.</string>
+    <string name="add_product_error_server">The piece could not be saved (%1$s). Nothing you entered has been lost — please try again.</string>
+    <string name="add_product_error_no_detail">no details</string>
+    <!-- The one failure retrying cannot fix, so it asks for the one
+         thing that can: a different name. -->
+    <string name="add_product_error_name_taken">There are already too many pieces with this name. Please give this one a slightly different name.</string>
 
     <!-- ── Login (M6.7) ──────────────────────────────────────────── -->
     <string name="login_subtitle">Sign in to manage the catalogue.</string>

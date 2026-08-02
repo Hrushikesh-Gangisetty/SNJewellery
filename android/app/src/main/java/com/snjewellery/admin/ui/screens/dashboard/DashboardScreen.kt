@@ -31,6 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.snjewellery.admin.R
 import com.snjewellery.admin.domain.RequestFailure
@@ -62,13 +64,21 @@ import java.util.Locale
 @Composable
 fun DashboardScreen(
     onSignOut: () -> Unit,
+    onAddProduct: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // On resume, not in the view model's `init`: coming back from Add
+    // Product must show a total that includes what was just saved, and
+    // this view model outlives that navigation.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+
     DashboardScreen(
         uiState = uiState,
         onSignOut = onSignOut,
+        onAddProduct = onAddProduct,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -80,6 +90,7 @@ internal fun DashboardScreen(
     uiState: DashboardUiState,
     modifier: Modifier = Modifier,
     onSignOut: () -> Unit = {},
+    onAddProduct: () -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
     Scaffold(
@@ -93,6 +104,12 @@ internal fun DashboardScreen(
                     )
                 },
                 actions = {
+                    TextButton(onClick = onAddProduct) {
+                        Text(
+                            text = stringResource(R.string.dashboard_add_product),
+                            style = MaterialTheme.snTextStyles.label,
+                        )
+                    }
                     TextButton(onClick = onSignOut) {
                         Text(
                             text = stringResource(R.string.dashboard_sign_out),

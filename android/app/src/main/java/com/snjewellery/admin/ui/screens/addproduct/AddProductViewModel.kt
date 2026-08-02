@@ -1,0 +1,208 @@
+package com.snjewellery.admin.ui.screens.addproduct
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.snjewellery.admin.domain.RequestFailure
+import com.snjewellery.admin.domain.catalogue.CatalogueRepository
+import com.snjewellery.admin.domain.catalogue.CatalogueResult
+import com.snjewellery.admin.domain.catalogue.Category
+import com.snjewellery.admin.domain.catalogue.Purity
+import com.snjewellery.admin.domain.product.CreateProductResult
+import com.snjewellery.admin.domain.product.ProductDraft
+import com.snjewellery.admin.domain.product.ProductRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/** Where the category and purity lists are in their loading. */
+sealed interface OptionsState {
+    data object Loading : OptionsState
+    data class Loaded(val categories: List<Category>, val purities: List<Purity>) : OptionsState
+    data class Failed(val failure: RequestFailure) : OptionsState
+}
+
+/** What the owner typed. Field names match the PRD's and the schema's. */
+data class ProductForm(
+    val name: String = "",
+    val categoryId: String? = null,
+    val purityId: String? = null,
+    val weight: String = "",
+    val description: String = "",
+    /** Raw text; split on commas when saved. */
+    val tags: String = "",
+    val featured: Boolean = false,
+)
+
+/** The outcome of a save, once. */
+sealed interface SaveState {
+    data object Idle : SaveState
+    data object Saving : SaveState
+    data class Saved(val slug: String) : SaveState
+    data class Failed(val failure: RequestFailure) : SaveState
+    data object NameUnavailable : SaveState
+}
+
+data class AddProductUiState(
+    val form: ProductForm = ProductForm(),
+    val options: OptionsState = OptionsState.Loading,
+    val saveState: SaveState = SaveState.Idle,
+)
+
+/**
+ * The Add Product form.
+ *
+ * ── Why the state is in a SavedStateHandle ───────────────────────────
+ * A `ViewModel` alone survives rotation but **not** process death, and
+ * process death is the case that matters here: the owner is
+ * photographing a ring, switches to the camera, and Android reclaims the
+ * app. Losing everything they typed at that moment is the single most
+ * annoying thing this screen could do, and it happens on exactly the
+ * phones this shop will use. M7.2's requirement is written as "survives
+ * configuration change and backgrounding" for that reason.
+ *
+ * The handle holds the form's fields — the selected images will join
+ * them in M7.5 by the same route.
+ */
+@HiltViewModel
+class AddProductViewModel @Inject constructor(
+    private val catalogueRepository: CatalogueRepository,
+    private val productRepository: ProductRepository,
+    private val savedState: SavedStateHandle,
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(AddProductUiState(form = restoreForm()))
+    val uiState: StateFlow<AddProductUiState> = _uiState.asStateFlow()
+
+    init {
+        loadOptions()
+    }
+
+    fun loadOptions() {
+        _uiState.update { it.copy(options = OptionsState.Loading) }
+
+        viewModelScope.launch {
+            // Sequential rather than concurrent: two small lookups, and
+            // if the first fails the second will too. The dashboard
+            // parallelises four because it shows all four at once; here
+            // the first failure is the answer.
+            val categories = catalogueRepository.categories()
+            if (categories is CatalogueResult.Failed) {
+                _uiState.update { it.copy(options = OptionsState.Failed(categories.failure)) }
+                return@launch
+            }
+
+            val purities = catalogueRepository.purities()
+            if (purities is CatalogueResult.Failed) {
+                _uiState.update { it.copy(options = OptionsState.Failed(purities.failure)) }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    options = OptionsState.Loaded(
+                        categories = (categories as CatalogueResult.Loaded).items,
+                        purities = (purities as CatalogueResult.Loaded).items,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun onNameChange(value: String) = updateForm { it.copy(name = value) }
+    fun onCategoryChange(id: String) = updateForm { it.copy(categoryId = id) }
+    fun onPurityChange(id: String?) = updateForm { it.copy(purityId = id) }
+    fun onWeightChange(value: String) = updateForm { it.copy(weight = value) }
+    fun onDescriptionChange(value: String) = updateForm { it.copy(description = value) }
+    fun onTagsChange(value: String) = updateForm { it.copy(tags = value) }
+    fun onFeaturedChange(value: Boolean) = updateForm { it.copy(featured = value) }
+
+    fun save() {
+        val current = _uiState.value
+        // Double-tap guard. M7.10 owns the rest of that task; this much
+        // belongs with the only Save button that exists, because without
+        // it two taps are two products.
+        if (current.saveState is SaveState.Saving) return
+
+        val categoryId = current.form.categoryId ?: return
+
+        _uiState.update { it.copy(saveState = SaveState.Saving) }
+
+        viewModelScope.launch {
+            val result = productRepository.create(current.form.toDraft(categoryId))
+            _uiState.update {
+                it.copy(
+                    saveState = when (result) {
+                        is CreateProductResult.Created -> SaveState.Saved(result.slug)
+                        is CreateProductResult.Failed -> SaveState.Failed(result.failure)
+                        is CreateProductResult.SlugExhausted -> SaveState.NameUnavailable
+                    },
+                )
+            }
+        }
+    }
+
+    /** Lets the screen dismiss an error without re-entering everything. */
+    fun onErrorDismissed() = _uiState.update { it.copy(saveState = SaveState.Idle) }
+
+    private fun updateForm(transform: (ProductForm) -> ProductForm) {
+        _uiState.update { state ->
+            val form = transform(state.form)
+            persist(form)
+            // An error describes the previous attempt and stops being
+            // true the moment the form changes.
+            state.copy(form = form, saveState = SaveState.Idle)
+        }
+    }
+
+    private fun persist(form: ProductForm) {
+        savedState[KEY_NAME] = form.name
+        savedState[KEY_CATEGORY] = form.categoryId
+        savedState[KEY_PURITY] = form.purityId
+        savedState[KEY_WEIGHT] = form.weight
+        savedState[KEY_DESCRIPTION] = form.description
+        savedState[KEY_TAGS] = form.tags
+        savedState[KEY_FEATURED] = form.featured
+    }
+
+    private fun restoreForm() = ProductForm(
+        name = savedState[KEY_NAME] ?: "",
+        categoryId = savedState[KEY_CATEGORY],
+        purityId = savedState[KEY_PURITY],
+        weight = savedState[KEY_WEIGHT] ?: "",
+        description = savedState[KEY_DESCRIPTION] ?: "",
+        tags = savedState[KEY_TAGS] ?: "",
+        featured = savedState[KEY_FEATURED] ?: false,
+    )
+
+    private companion object {
+        const val KEY_NAME = "name"
+        const val KEY_CATEGORY = "category_id"
+        const val KEY_PURITY = "purity_id"
+        const val KEY_WEIGHT = "weight"
+        const val KEY_DESCRIPTION = "description"
+        const val KEY_TAGS = "tags"
+        const val KEY_FEATURED = "featured"
+    }
+}
+
+/**
+ * Form text to a draft.
+ *
+ * Tags are comma-separated because that is how someone types a list on a
+ * phone keyboard without a chip editor to fight. Blank entries are
+ * dropped and each is trimmed, so `"bridal, temple,"` is two tags.
+ */
+internal fun ProductForm.toDraft(categoryId: String) = ProductDraft(
+    name = name.trim(),
+    categoryId = categoryId,
+    purityId = purityId,
+    weightGrams = weight.trim().toDoubleOrNull(),
+    description = description,
+    tags = tags.split(',').map(String::trim).filter(String::isNotEmpty),
+    featured = featured,
+)

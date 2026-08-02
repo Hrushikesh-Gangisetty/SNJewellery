@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.snjewellery.admin.ui.screens.addproduct.AddProductScreen
 import com.snjewellery.admin.ui.screens.dashboard.DashboardScreen
 
 /**
@@ -34,7 +35,22 @@ fun AdminNavHost(
         modifier = modifier,
     ) {
         composable<Dashboard> {
-            DashboardScreen(onSignOut = onSignOut)
+            DashboardScreen(
+                onSignOut = onSignOut,
+                onAddProduct = { navController.navigate(AddProduct) },
+            )
+        }
+
+        composable<AddProduct> {
+            AddProductScreen(
+                // The dashboard reloads on resume, so popping back shows
+                // a total that includes what was just saved. M7.12
+                // replaces this with a confirmation that links to the
+                // new product; returning to updated counts is the
+                // honest minimum until then.
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

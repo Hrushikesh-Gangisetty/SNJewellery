@@ -16,8 +16,12 @@ import kotlinx.serialization.Serializable
  * were a destination, two things would own the answer and a signed-out
  * user could be left on a screen the back stack still held.
  *
- * One destination today, honestly. M7 adds Add Product and M8 the
- * catalogue list; nothing is declared here before the screen exists.
+ * Nothing is declared here before the screen exists. M8 adds the
+ * catalogue list and Edit Product.
  */
 @Serializable
 data object Dashboard
+
+/** The Add Product form (M7.1). */
+@Serializable
+data object AddProduct

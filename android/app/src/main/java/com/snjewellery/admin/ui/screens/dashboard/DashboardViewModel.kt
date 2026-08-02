@@ -72,10 +72,13 @@ class DashboardViewModel @Inject constructor(
 
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    init {
-        load()
-    }
-
+    /**
+     * Deliberately **not** called from `init`. The screen loads on
+     * resume instead, so returning here after saving a product shows a
+     * total that includes it. Loading once at construction would leave
+     * the view model alive across that navigation and the count stale —
+     * which the owner reads as the save having failed.
+     */
     fun load() {
         _uiState.update { it.copy(state = DashboardState.Loading) }
 
