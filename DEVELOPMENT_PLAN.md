@@ -898,9 +898,21 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   Not driven: the no-camera-app and no-storage paths. Both are handled and worded, neither is reachable on this emulator.
 
-- **`M7.4` Gallery selection** — `S`
+- **`M7.4` Gallery selection** — `S` — ✅ **complete** (driven on an emulator, 2026-08-02)
   Multi-select from the gallery with correct permission handling.
   *Done when:* selecting several images at once works, and denial is handled as in M7.3.
+
+  **The correct permission handling is none.** `PickVisualMedia` needs no storage permission on any version and is backported below the platform picker, so there is one code path from `minSdk` 26 upward and nothing to deny. That is not a shortcut around the task's wording — it is the decision [android-build.md §2](docs/architecture/android-build.md) made when it set the floor at 26, where the granular media permissions were **avoided** rather than branched on. Verified: the picker opens with no dialog of any kind.
+
+  **A selected photograph is copied, not referenced.** The picker's read grant is temporary and does not outlive the process, so a restored URI would render as a broken thumbnail and fail M7.7's upload — which would have quietly undone the guarantee M7.2 and M7.3 established. `CaptureTargets` therefore became `StagedImages`, with `copyIn` beside `newCaptureTarget`, and both routes now end in a file this app owns under `cache/staged/`. Everything downstream — the thumbnails, M7.5's ordering, M7.6's compression, M7.7's upload — deals with one kind of thing and never has to ask where a photograph came from.
+
+  The copy is also the only place in this form that shows progress and disables a control: several full-size photographs are megabytes, and a button that appears to do nothing for two seconds gets pressed again. Each lands as it is copied, so a selection that partly fails still gives the owner what worked, and the message says **how many** failed rather than leaving them counting thumbnails.
+
+  **Both camera messages were reworded**, because M7.3 shipped with no alternative to offer and now there is one: a refused or blocked camera points at choosing an existing photo.
+
+  **Verified on an emulator:** the picker opened with no permission dialog; selecting three at once added three, in the order the picker returned them; they landed as `chosen-<uuid>.png` — `.png`, not `.jpg`, so the extension is taken from what the source says it is rather than assumed; and `am kill` with the process gone, then relaunch, still rendered all three, which is the whole reason for copying.
+
+  Not driven: the no-picker path and a partly failing copy. Both are handled and worded, neither is reachable on this emulator.
 
 - **`M7.5` Image ordering and removal** — `S`
   Reorder and remove images before upload; first image designated primary.

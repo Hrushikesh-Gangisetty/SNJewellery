@@ -10,9 +10,11 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
@@ -28,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -42,21 +45,22 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
  * The photographs section of the Add Product form.
  *
  * Presentation only — every framework interaction is hoisted into
- * [rememberCameraCapture], which the stateful screen builds. That split
+ * [rememberPhotoSources], which the stateful screen builds. That split
  * is what keeps `@Preview` working: an activity result launcher cannot be
  * created without an `ActivityResultRegistryOwner`, and a preview has
  * none, so a launcher anywhere on this path would take the previews down
  * with it.
  *
- * M7.3 shows what has been captured. Reordering, removal, and the primary
- * badge are M7.5; the gallery is M7.4.
+ * Reordering, removal, and the primary badge are M7.5.
  */
 @Composable
 internal fun ProductImages(
     images: List<String>,
-    cameraProblem: CameraProblem?,
+    photoProblem: PhotoProblem?,
+    addingPhotos: Boolean,
     modifier: Modifier = Modifier,
     onTakePhoto: () -> Unit = {},
+    onChoosePhotos: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
 ) {
     Column(
@@ -101,17 +105,48 @@ internal fun ProductImages(
             }
         }
 
-        OutlinedButton(
-            onClick = onTakePhoto,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = Tokens.Layout.touchTarget),
-        ) {
-            Text(stringResource(R.string.add_product_take_photo))
+        // Side by side and equally weighted. Neither is the fallback: a
+        // piece photographed at the counter comes from the camera, and one
+        // already shot properly comes from the gallery, and the shop does
+        // both.
+        Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
+            OutlinedButton(
+                onClick = onTakePhoto,
+                enabled = !addingPhotos,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = Tokens.Layout.touchTarget),
+            ) {
+                Text(stringResource(R.string.add_product_take_photo))
+            }
+            OutlinedButton(
+                onClick = onChoosePhotos,
+                // The one place in this form a control is disabled, and
+                // only while its own work is in flight — pressing it again
+                // mid-copy would add the same selection twice. The Save
+                // button's rule still holds: nothing is greyed out for
+                // being incomplete.
+                enabled = !addingPhotos,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = Tokens.Layout.touchTarget),
+            ) {
+                Text(stringResource(R.string.add_product_choose_photos))
+            }
         }
 
-        if (cameraProblem != null) {
-            CameraProblemMessage(problem = cameraProblem, onOpenSettings = onOpenSettings)
+        if (addingPhotos) {
+            // Full-size photographs are megabytes each, and a button that
+            // appears to do nothing for two seconds gets pressed again.
+            Text(
+                text = stringResource(R.string.add_product_images_adding),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (photoProblem != null) {
+            PhotoProblemMessage(problem = photoProblem, onOpenSettings = onOpenSettings)
         }
     }
 }
@@ -123,24 +158,28 @@ internal fun ProductImages(
  * offered after it is a dead button — the failure M7.3 exists to prevent.
  */
 @Composable
-private fun CameraProblemMessage(problem: CameraProblem, onOpenSettings: () -> Unit) {
+private fun PhotoProblemMessage(problem: PhotoProblem, onOpenSettings: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
         Text(
-            text = stringResource(
-                when (problem) {
-                    CameraProblem.PermissionRefused -> R.string.add_product_camera_refused
-                    CameraProblem.PermissionBlocked -> R.string.add_product_camera_blocked
-                    CameraProblem.NoCameraApp -> R.string.add_product_camera_none
-                    CameraProblem.NoStorage -> R.string.add_product_camera_no_storage
-                },
-            ),
+            text = when (problem) {
+                PhotoProblem.CameraRefused -> stringResource(R.string.add_product_camera_refused)
+                PhotoProblem.CameraBlocked -> stringResource(R.string.add_product_camera_blocked)
+                PhotoProblem.NoCameraApp -> stringResource(R.string.add_product_camera_none)
+                PhotoProblem.NoGalleryApp -> stringResource(R.string.add_product_gallery_none)
+                PhotoProblem.NoStorage -> stringResource(R.string.add_product_photo_no_storage)
+                is PhotoProblem.SomeNotAdded -> pluralStringResource(
+                    R.plurals.add_product_photos_not_added,
+                    problem.count,
+                    problem.count,
+                )
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )
 
         // Only where it leads somewhere. Settings cannot restore a camera
         // the phone does not have, or make room on a full one.
-        if (problem == CameraProblem.PermissionBlocked) {
+        if (problem == PhotoProblem.CameraBlocked) {
             TextButton(
                 onClick = onOpenSettings,
                 modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
@@ -151,33 +190,46 @@ private fun CameraProblemMessage(problem: CameraProblem, onOpenSettings: () -> U
     }
 }
 
-/** Everything the capture flow needs from the framework, in one place. */
-internal data class CameraCapture(
+/** Everything the two ways in need from the framework, in one place. */
+internal data class PhotoSources(
     val takePhoto: () -> Unit,
+    val choosePhotos: () -> Unit,
     val openSettings: () -> Unit,
 )
 
 /**
- * Wires the permission request and the capture intent to the view model.
+ * Wires the camera and the photo picker to the view model.
  *
- * ── Why the permission is checked before it is requested ──────────────
+ * ── The gallery asks for no permission at all ────────────────────────
+ * `PickVisualMedia` needs no storage permission on any version, and is
+ * backported below the platform picker, so there is one code path from
+ * `minSdk` 26 upward and nothing to deny. That is the decision
+ * docs/architecture/android-build.md §2 made when it set the floor at 26
+ * — the granular media permissions were avoided rather than branched on.
+ *
+ * The URIs it returns are read-only and **temporary**, which is why the
+ * view model copies rather than keeps them. See [StagedImages].
+ *
+ * ── Why the camera permission is checked before it is requested ──────
  * `RequestPermission` returns immediately with the existing answer when
  * one is already held, so requesting unconditionally would work — but it
  * costs a round trip through the activity on every single photograph, and
  * the owner is taking several in a row. Checking first is the fast path.
  *
- * ── Why the refusal is read from the activity ─────────────────────────
+ * ── Why the refusal is read from the activity ────────────────────────
  * `granted = false` alone cannot tell "not this time" from "stop asking",
  * and those need different words. `shouldShowRequestPermissionRationale`
  * read *after* the refusal is the only thing that distinguishes them.
  */
 @Composable
-internal fun rememberCameraCapture(
-    onNewTarget: () -> String?,
+internal fun rememberPhotoSources(
+    onNewCaptureTarget: () -> String?,
     onCaptured: (Boolean) -> Unit,
-    onRefused: (canAskAgain: Boolean) -> Unit,
-    onUnavailable: () -> Unit,
-): CameraCapture {
+    onChosen: (List<String>) -> Unit,
+    onCameraRefused: (canAskAgain: Boolean) -> Unit,
+    onCameraUnavailable: () -> Unit,
+    onGalleryUnavailable: () -> Unit,
+): PhotoSources {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
 
@@ -186,14 +238,22 @@ internal fun rememberCameraCapture(
         onCaptured,
     )
 
+    // The no-argument contract takes the system's own maximum rather than
+    // a number invented here. A shop owner photographing one piece will
+    // never approach it, and capping it lower would be a limit with no
+    // reason behind it.
+    val pickPhotos = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(),
+    ) { uris -> onChosen(uris.map(Uri::toString)) }
+
     fun capture() {
-        val target = onNewTarget() ?: return
+        val target = onNewCaptureTarget() ?: return
         try {
             takePicture.launch(Uri.parse(target))
         } catch (_: ActivityNotFoundException) {
             // A phone with no camera app at all. Rare, and the manifest
             // allows it to install, so it must not be a crash.
-            onUnavailable()
+            onCameraUnavailable()
         }
     }
 
@@ -205,7 +265,7 @@ internal fun rememberCameraCapture(
         } else {
             // No activity means no way to ask again either, so the
             // blocked wording is the honest one.
-            onRefused(
+            onCameraRefused(
                 activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
                     activity,
                     Manifest.permission.CAMERA,
@@ -214,7 +274,7 @@ internal fun rememberCameraCapture(
         }
     }
 
-    return CameraCapture(
+    return PhotoSources(
         takePhoto = {
             val granted = ContextCompat.checkSelfPermission(
                 context,
@@ -222,6 +282,18 @@ internal fun rememberCameraCapture(
             ) == PackageManager.PERMISSION_GRANTED
 
             if (granted) capture() else requestCamera.launch(Manifest.permission.CAMERA)
+        },
+        choosePhotos = {
+            try {
+                // Images only. This catalogue has no use for a video, and
+                // offering one would let the owner pick something that
+                // fails later rather than now.
+                pickPhotos.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            } catch (_: ActivityNotFoundException) {
+                onGalleryUnavailable()
+            }
         },
         openSettings = {
             context.startActivity(
@@ -258,7 +330,7 @@ private val THUMBNAIL_SIZE = Tokens.Space.s24
 @Composable
 private fun ProductImagesEmptyPreview() {
     SnTheme {
-        ProductImages(images = emptyList(), cameraProblem = null)
+        ProductImages(images = emptyList(), photoProblem = null, addingPhotos = false)
     }
 }
 
@@ -266,6 +338,18 @@ private fun ProductImagesEmptyPreview() {
 @Composable
 private fun ProductImagesBlockedPreview() {
     SnTheme {
-        ProductImages(images = emptyList(), cameraProblem = CameraProblem.PermissionBlocked)
+        ProductImages(
+            images = emptyList(),
+            photoProblem = PhotoProblem.CameraBlocked,
+            addingPhotos = false,
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProductImagesAddingPreview() {
+    SnTheme {
+        ProductImages(images = emptyList(), photoProblem = null, addingPhotos = true)
     }
 }

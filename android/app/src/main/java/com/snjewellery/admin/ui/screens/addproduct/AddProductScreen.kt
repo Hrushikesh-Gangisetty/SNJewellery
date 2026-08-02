@@ -79,11 +79,13 @@ fun AddProductScreen(
     // Built here rather than inside the form: activity result launchers
     // need an ActivityResultRegistryOwner, which a @Preview has none of.
     // See ProductImages.kt.
-    val camera = rememberCameraCapture(
-        onNewTarget = viewModel::newCaptureTarget,
+    val photos = rememberPhotoSources(
+        onNewCaptureTarget = viewModel::newCaptureTarget,
         onCaptured = viewModel::onCaptureFinished,
-        onRefused = viewModel::onCameraPermissionRefused,
-        onUnavailable = viewModel::onCameraUnavailable,
+        onChosen = viewModel::onGallerySelection,
+        onCameraRefused = viewModel::onCameraPermissionRefused,
+        onCameraUnavailable = viewModel::onCameraUnavailable,
+        onGalleryUnavailable = viewModel::onGalleryUnavailable,
     )
 
     AddProductScreen(
@@ -99,8 +101,9 @@ fun AddProductScreen(
         onWeightBlur = viewModel::onWeightBlur,
         onSave = viewModel::save,
         onRetryOptions = viewModel::loadOptions,
-        onTakePhoto = camera.takePhoto,
-        onOpenCameraSettings = camera.openSettings,
+        onTakePhoto = photos.takePhoto,
+        onChoosePhotos = photos.choosePhotos,
+        onOpenCameraSettings = photos.openSettings,
         onSaved = onSaved,
         onBack = onBack,
         modifier = modifier,
@@ -124,6 +127,7 @@ internal fun AddProductScreen(
     onSave: () -> Unit = {},
     onRetryOptions: () -> Unit = {},
     onTakePhoto: () -> Unit = {},
+    onChoosePhotos: () -> Unit = {},
     onOpenCameraSettings: () -> Unit = {},
     onSaved: (String) -> Unit = {},
     onBack: () -> Unit = {},
@@ -266,8 +270,10 @@ internal fun AddProductScreen(
             // order for this form.
             ProductImages(
                 images = uiState.form.images,
-                cameraProblem = uiState.cameraProblem,
+                photoProblem = uiState.photoProblem,
+                addingPhotos = uiState.addingPhotos,
                 onTakePhoto = onTakePhoto,
+                onChoosePhotos = onChoosePhotos,
                 onOpenSettings = onOpenCameraSettings,
             )
 

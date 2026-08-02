@@ -3,18 +3,14 @@
   What the FileProvider in AndroidManifest.xml is allowed to share.
 
   One directory, and deliberately the narrowest one: a camera app gets a
-  URI for a single file under `cache/captures/` and nothing else. Naming
+  URI for a single file under `cache/staged/` and nothing else. Naming
   the cache root instead would expose the session-derived material Coil
   and OkHttp keep alongside it.
 
-  The cache is the right home for a photograph waiting to be uploaded.
-  The file matters for the minutes between capture and the M7.7 upload,
-  and the system may reclaim it afterwards without anything being lost.
-  `files/` would make deleting every one of them our problem, and the one
-  we failed to delete would sit on the phone forever.
+  Why the cache rather than `files/` is in CacheStagedImages.
 -->
 <paths>
     <cache-path
-        name="captures"
-        path="captures/" />
+        name="staged"
+        path="staged/" />
 </paths>

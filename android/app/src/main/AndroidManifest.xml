@@ -89,7 +89,7 @@
         -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.captures"
+            android:authorities="${applicationId}.staged"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

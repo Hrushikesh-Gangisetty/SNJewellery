@@ -120,6 +120,10 @@
          something anyone would guess. -->
     <string name="add_product_images_empty">No photographs yet. The first one you add becomes the main image.</string>
     <string name="add_product_take_photo">Take photo</string>
+    <!-- M7.4. "Choose photos", not "Gallery": the owner is choosing
+         pictures of a piece, not browsing an app by its name. -->
+    <string name="add_product_choose_photos">Choose photos</string>
+    <string name="add_product_images_adding">Adding photographs…</string>
     <!-- Announced by the screen reader. The photograph itself has no
          description anyone could write, so the position is what is read
          out — and the position is the thing M7.5 lets the owner change. -->
@@ -132,14 +136,24 @@
       telling someone to tap again when the system has stopped asking is
       a button that does nothing.
 
-      None of them blames the person (ux.md rule 5), and none promises a
-      gallery: choosing an existing photograph arrives in M7.4.
+      None of them blames the person (ux.md rule 5). Both camera messages
+      now name the alternative, because since M7.4 there is one: choosing
+      an existing photograph needs no permission at all.
     -->
-    <string name="add_product_camera_refused">Photographs need the camera. Tap Take photo to be asked again.</string>
-    <string name="add_product_camera_blocked">Camera access is turned off for this app, so photographs cannot be taken here. Turn it on in Settings.</string>
+    <string name="add_product_camera_refused">Photographs need the camera. Tap Take photo to be asked again, or choose one you have already taken.</string>
+    <string name="add_product_camera_blocked">Camera access is turned off for this app, so photographs cannot be taken here. Turn it on in Settings, or choose photos you have already taken.</string>
     <string name="add_product_camera_settings">Open Settings</string>
-    <string name="add_product_camera_none">This phone has no camera app that can take a photograph.</string>
-    <string name="add_product_camera_no_storage">There is no room left on the phone for a photograph. Free up some space and try again.</string>
+    <string name="add_product_camera_none">This phone has no camera app that can take a photograph. You can still choose photos you have already taken.</string>
+    <string name="add_product_gallery_none">This phone has no way to choose an existing photo.</string>
+    <string name="add_product_photo_no_storage">There is no room left on the phone for a photograph. Free up some space and try again.</string>
+
+    <!-- Says how many, because the ones that worked are already on
+         screen and a bare "something failed" leaves the owner counting
+         thumbnails to work out what they still have to do. -->
+    <plurals name="add_product_photos_not_added">
+        <item quantity="one">One photo could not be added. Try choosing it again.</item>
+        <item quantity="other">%1$d photos could not be added. Try choosing them again.</item>
+    </plurals>
 
     <!-- ── Login (M6.7) ──────────────────────────────────────────── -->
     <string name="login_subtitle">Sign in to manage the catalogue.</string>

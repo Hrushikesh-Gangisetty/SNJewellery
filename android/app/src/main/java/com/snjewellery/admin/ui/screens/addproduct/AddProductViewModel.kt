@@ -8,7 +8,7 @@ import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
-import com.snjewellery.admin.domain.media.CaptureTargets
+import com.snjewellery.admin.domain.media.StagedImages
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.domain.product.ProductDraft
@@ -48,25 +48,37 @@ data class ProductForm(
 )
 
 /**
- * Why a photograph could not be taken, when one could not.
+ * Why a photograph could not be added, when one could not.
  *
- * Cancelling is **not** here. `TakePicture` reports a cancelled capture
- * and a failed one identically, and cancelling is much the commoner of
- * the two — an error after someone deliberately backed out of the camera
- * would be the app arguing with them.
+ * Cancelling is **not** here, from either route. `TakePicture` reports a
+ * cancelled capture and a failed one identically, and the picker returns
+ * an empty selection when it is dismissed — in both cases backing out is
+ * much the commoner reading, and an error after someone deliberately
+ * changed their mind would be the app arguing with them.
  */
-sealed interface CameraProblem {
-    /** Refused this time. Asking again is still allowed. */
-    data object PermissionRefused : CameraProblem
+sealed interface PhotoProblem {
+    /** The camera was refused this time. Asking again is still allowed. */
+    data object CameraRefused : PhotoProblem
 
-    /** Refused for good; only the system settings can undo it. */
-    data object PermissionBlocked : CameraProblem
+    /** The camera was refused for good; only the system settings can undo it. */
+    data object CameraBlocked : PhotoProblem
 
     /** Nothing on the phone answers the capture intent. */
-    data object NoCameraApp : CameraProblem
+    data object NoCameraApp : PhotoProblem
+
+    /** Nothing on the phone answers the photo picker. */
+    data object NoGalleryApp : PhotoProblem
 
     /** No room to put the photograph. */
-    data object NoStorage : CameraProblem
+    data object NoStorage : PhotoProblem
+
+    /**
+     * Some of a selection could not be copied in, and [count] says how
+     * many — because the ones that succeeded are on screen, and a bare
+     * "something failed" leaves the owner counting thumbnails to work
+     * out what they still have to do.
+     */
+    data class SomeNotAdded(val count: Int) : PhotoProblem
 }
 
 /**
@@ -97,7 +109,9 @@ data class AddProductUiState(
     val problems: FormProblems = FormProblems(),
     val options: OptionsState = OptionsState.Loading,
     val saveState: SaveState = SaveState.Idle,
-    val cameraProblem: CameraProblem? = null,
+    val photoProblem: PhotoProblem? = null,
+    /** A gallery selection is being copied in. Can be several megabytes. */
+    val addingPhotos: Boolean = false,
 )
 
 /**
@@ -120,7 +134,7 @@ data class AddProductUiState(
 class AddProductViewModel @Inject constructor(
     private val catalogueRepository: CatalogueRepository,
     private val productRepository: ProductRepository,
-    private val captureTargets: CaptureTargets,
+    private val stagedImages: StagedImages,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -201,20 +215,20 @@ class AddProductViewModel @Inject constructor(
      * where the photograph went.
      */
     fun newCaptureTarget(): String? {
-        val target = captureTargets.newTarget()
+        val target = stagedImages.newCaptureTarget()
         if (target == null) {
-            _uiState.update { it.copy(cameraProblem = CameraProblem.NoStorage) }
+            _uiState.update { it.copy(photoProblem = PhotoProblem.NoStorage) }
             return null
         }
 
         savedState[KEY_PENDING_CAPTURE] = target
-        _uiState.update { it.copy(cameraProblem = null) }
+        _uiState.update { it.copy(photoProblem = null) }
         return target
     }
 
     /**
      * [captured] is the camera app's own report. False covers both a
-     * cancelled capture and a failed one — see [CameraProblem] for why
+     * cancelled capture and a failed one — see [PhotoProblem] for why
      * neither says anything.
      */
     fun onCaptureFinished(captured: Boolean) {
@@ -223,6 +237,41 @@ class AddProductViewModel @Inject constructor(
 
         if (!captured || pending == null) return
         updateForm({ it.copy(images = it.images + pending) })
+    }
+
+    /**
+     * Copies a gallery selection into the app's own storage, in the order
+     * the picker returned it.
+     *
+     * The copy is the point — see [StagedImages]. It is also why this is
+     * the one way in that shows progress: several full-size photographs
+     * are megabytes, and a button that appears to do nothing for two
+     * seconds gets pressed again.
+     *
+     * Each is added as it lands rather than all at once at the end, so a
+     * selection that partly fails still gives the owner what worked.
+     */
+    fun onGallerySelection(sourceUris: List<String>) {
+        // Dismissing the picker returns nothing. That is not a failure
+        // and must not be reported as one.
+        if (sourceUris.isEmpty()) return
+
+        _uiState.update { it.copy(photoProblem = null, addingPhotos = true) }
+
+        viewModelScope.launch {
+            var failed = 0
+            sourceUris.forEach { source ->
+                val staged = stagedImages.copyIn(source)
+                if (staged == null) failed++ else updateForm({ it.copy(images = it.images + staged) })
+            }
+
+            _uiState.update {
+                it.copy(
+                    addingPhotos = false,
+                    photoProblem = if (failed > 0) PhotoProblem.SomeNotAdded(failed) else null,
+                )
+            }
+        }
     }
 
     /**
@@ -235,16 +284,19 @@ class AddProductViewModel @Inject constructor(
      */
     fun onCameraPermissionRefused(canAskAgain: Boolean) = _uiState.update {
         it.copy(
-            cameraProblem = if (canAskAgain) {
-                CameraProblem.PermissionRefused
+            photoProblem = if (canAskAgain) {
+                PhotoProblem.CameraRefused
             } else {
-                CameraProblem.PermissionBlocked
+                PhotoProblem.CameraBlocked
             },
         )
     }
 
     fun onCameraUnavailable() =
-        _uiState.update { it.copy(cameraProblem = CameraProblem.NoCameraApp) }
+        _uiState.update { it.copy(photoProblem = PhotoProblem.NoCameraApp) }
+
+    fun onGalleryUnavailable() =
+        _uiState.update { it.copy(photoProblem = PhotoProblem.NoGalleryApp) }
 
     fun save() {
         val current = _uiState.value
