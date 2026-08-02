@@ -18,14 +18,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -51,7 +57,11 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
  * none, so a launcher anywhere on this path would take the previews down
  * with it.
  *
- * Reordering, removal, and the primary badge are M7.5.
+ * The list **is** the order, and the first entry is the primary image.
+ * There is no separate `display_order` held anywhere for the two to
+ * disagree about, which is what makes M7.5's requirement — that what is
+ * on screen is what gets persisted — true by construction rather than by
+ * keeping something in step.
  */
 @Composable
 internal fun ProductImages(
@@ -62,6 +72,9 @@ internal fun ProductImages(
     onTakePhoto: () -> Unit = {},
     onChoosePhotos: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onMoveEarlier: (Int) -> Unit = {},
+    onMoveLater: (Int) -> Unit = {},
+    onRemove: (Int) -> Unit = {},
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -83,24 +96,22 @@ internal fun ProductImages(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
-                itemsIndexed(images, key = { _, uri -> uri }) { index, uri ->
-                    AsyncImage(
-                        model = uri,
-                        // The photograph itself carries no description
-                        // anyone could write, so the position is what is
-                        // announced — which is also the thing M7.5 lets
-                        // the owner change.
-                        contentDescription = stringResource(
-                            R.string.add_product_image_position,
-                            index + 1,
-                            images.size,
-                        ),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(THUMBNAIL_SIZE)
-                            .clip(MaterialTheme.shapes.small),
-                    )
+            // A plain Column, not a LazyColumn: this sits inside a
+            // vertically scrolling form, where a nested lazy list has no
+            // height to measure against. A piece has a handful of
+            // photographs, so there is nothing to virtualise anyway.
+            Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
+                images.forEachIndexed { index, uri ->
+                    key(uri) {
+                        ProductImageRow(
+                            uri = uri,
+                            index = index,
+                            total = images.size,
+                            onMoveEarlier = { onMoveEarlier(index) },
+                            onMoveLater = { onMoveLater(index) },
+                            onRemove = { onRemove(index) },
+                        )
+                    }
                 }
             }
         }
@@ -147,6 +158,96 @@ internal fun ProductImages(
 
         if (photoProblem != null) {
             PhotoProblemMessage(problem = photoProblem, onOpenSettings = onOpenSettings)
+        }
+    }
+}
+
+/**
+ * One photograph, with everything that can be done to it.
+ *
+ * ── Why arrows rather than dragging ──────────────────────────────────
+ * Compose has no reorderable list, so dragging would mean a third-party
+ * library or a hand-written gesture — weight and a maintenance burden for
+ * a list of three or four items (CLAUDE.md §3.7). Arrows also need no
+ * discovering, work one-handed on a phone held over a counter, and are
+ * the only version of this a screen reader can operate at all.
+ *
+ * The arrows at the ends are disabled. That is not the Save button's rule
+ * being broken — Save is never disabled because the reason would be
+ * invisible, whereas the reason the first photograph cannot move up is
+ * that it is the first photograph, which is on the screen.
+ */
+@Composable
+private fun ProductImageRow(
+    uri: String,
+    index: Int,
+    total: Int,
+    onMoveEarlier: () -> Unit,
+    onMoveLater: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val position = index + 1
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = uri,
+            // The photograph itself carries no description anyone could
+            // write, so what is announced is where it sits — which is
+            // exactly what the buttons beside it change.
+            contentDescription = stringResource(
+                R.string.add_product_image_position,
+                position,
+                total,
+            ),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(THUMBNAIL_SIZE)
+                .clip(MaterialTheme.shapes.small),
+        )
+
+        Text(
+            text = if (index == 0) {
+                stringResource(R.string.add_product_image_main)
+            } else {
+                stringResource(R.string.add_product_image_number, position)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (index == 0) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.weight(1f),
+        )
+
+        IconButton(onClick = onMoveEarlier, enabled = index > 0) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowUp,
+                contentDescription = stringResource(
+                    R.string.add_product_image_move_earlier,
+                    position,
+                ),
+            )
+        }
+        IconButton(onClick = onMoveLater, enabled = index < total - 1) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(
+                    R.string.add_product_image_move_later,
+                    position,
+                ),
+            )
+        }
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(R.string.add_product_image_remove, position),
+                tint = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
@@ -351,5 +452,22 @@ private fun ProductImagesBlockedPreview() {
 private fun ProductImagesAddingPreview() {
     SnTheme {
         ProductImages(images = emptyList(), photoProblem = null, addingPhotos = true)
+    }
+}
+
+/**
+ * The URIs resolve to nothing in a preview, so the thumbnails render
+ * empty — what this is for is the row: the main-image label, and which
+ * arrows are disabled at which end.
+ */
+@PreviewLightDark
+@Composable
+private fun ProductImagesOrderedPreview() {
+    SnTheme {
+        ProductImages(
+            images = listOf("content://preview/1", "content://preview/2", "content://preview/3"),
+            photoProblem = null,
+            addingPhotos = false,
+        )
     }
 }

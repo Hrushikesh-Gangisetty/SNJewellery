@@ -292,6 +292,33 @@ class AddProductViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Moves a photograph one place towards the front, where the front is
+     * the primary image.
+     *
+     * The list **is** the order. There is no separate `display_order` to
+     * keep in step, so what M7.8 writes is what the owner is looking at,
+     * and the two cannot disagree.
+     */
+    fun onMoveImageEarlier(index: Int) = moveImage(index, index - 1)
+
+    fun onMoveImageLater(index: Int) = moveImage(index, index + 1)
+
+    /**
+     * Removes a photograph, and throws away the file behind it.
+     *
+     * No confirmation. A staged photograph has not been uploaded and
+     * costs a re-take rather than a loss, and a dialog on every removal
+     * would be paid for on every deliberate one — which is the common
+     * case, because rejecting a bad shot is what this button is for.
+     */
+    fun onRemoveImage(index: Int) {
+        val removed = _uiState.value.form.images.getOrNull(index) ?: return
+
+        updateForm({ it.copy(images = it.images - removed) })
+        viewModelScope.launch { stagedImages.discard(removed) }
+    }
+
     fun onCameraUnavailable() =
         _uiState.update { it.copy(photoProblem = PhotoProblem.NoCameraApp) }
 
@@ -349,6 +376,17 @@ class AddProductViewModel @Inject constructor(
      * still true, and wiping all of them on every keystroke would hide
      * what Save just told them.
      */
+    private fun moveImage(from: Int, to: Int) {
+        val images = _uiState.value.form.images
+        // The ends are guarded here rather than by the caller, so a stale
+        // index from a recomposition can never reorder the wrong pair.
+        if (from !in images.indices || to !in images.indices) return
+
+        updateForm({ form ->
+            form.copy(images = form.images.toMutableList().apply { add(to, removeAt(from)) })
+        })
+    }
+
     private fun updateForm(
         transform: (ProductForm) -> ProductForm,
         clearProblem: (FormProblems) -> FormProblems = { it },

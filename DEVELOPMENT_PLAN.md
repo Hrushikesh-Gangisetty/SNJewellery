@@ -914,9 +914,19 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   Not driven: the no-picker path and a partly failing copy. Both are handled and worded, neither is reachable on this emulator.
 
-- **`M7.5` Image ordering and removal** — `S`
+- **`M7.5` Image ordering and removal** — `S` — ✅ **complete** (driven on an emulator, 2026-08-02)
   Reorder and remove images before upload; first image designated primary.
   *Done when:* the on-screen order is the order that will be persisted.
+
+  **The *Done when* is true by construction rather than by keeping something in step.** The list *is* the order and the first entry *is* the primary image; there is no separate `display_order` held anywhere for the two to disagree about. M7.8 writes the index, so the only way the website could show a different order is if M7.8 wrote the list backwards.
+
+  **Arrows, not dragging.** Compose has no reorderable list, so drag-to-reorder would mean a third-party library or a hand-written gesture — weight and a maintenance burden for a list of three or four items ([CLAUDE.md §3.7](CLAUDE.md)). Arrows also need no discovering, work one-handed on a phone held over a counter, and are the only version of this a screen reader can operate at all. That decision is what turned the horizontal strip into a **vertical list**: three 48dp controls will not fit under a 96dp tile, and the primary badge needed somewhere to live.
+
+  **The end arrows are disabled**, which is not the Save button's rule being broken. Save is never disabled because the reason would be invisible; the reason the first photograph cannot move up is that it is the first photograph, and that is on the screen.
+
+  **Removal takes the file with it, and asks nothing first.** A staged photograph has not been uploaded and costs a re-take rather than a loss, and a confirmation would be paid for on every deliberate removal — which is the common case, because rejecting a bad shot is what the button is for. Worth revisiting with an undo if it turns out to bite. `discard` refuses any URI outside the app's own staging authority: deleting whatever a stray URI pointed at would be a far worse bug than the one it guards against.
+
+  **Verified on an emulator:** three photographs added, then Photograph 2 moved up — it became **Main image** and the previous main became Photograph 2, thumbnails following; removing Photograph 2 renumbered the rest **and** deleted `chosen-b9812ee7-….png` from `cache/staged/`, confirmed by listing the directory before and after; the end arrows are greyed at each end; and `am kill` with the process gone, then relaunch, restored the **reordered** list in exactly that order.
 
 - **`M7.6` Compression and resizing** — `M`
   Compress and resize before upload to a documented maximum dimension and file size.

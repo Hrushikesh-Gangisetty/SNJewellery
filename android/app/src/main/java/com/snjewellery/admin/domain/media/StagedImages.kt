@@ -46,4 +46,14 @@ interface StagedImages {
      * caller adding several has to decide about each of them.
      */
     suspend fun copyIn(sourceUri: String): String?
+
+    /**
+     * Throws away a staged photograph the owner has removed.
+     *
+     * Nothing depends on it having worked — the photograph is already off
+     * the form either way, and the cache is reclaimable. It exists so a
+     * long session of adding and rejecting shots does not leave every
+     * rejected one on the phone.
+     */
+    suspend fun discard(uri: String)
 }

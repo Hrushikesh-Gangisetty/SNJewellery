@@ -62,6 +62,26 @@ class CacheStagedImages @Inject constructor(
         uriFor(target)
     }
 
+    override suspend fun discard(uri: String): Unit = withContext(Dispatchers.IO) {
+        val target = uri.toUri()
+
+        // Only ever this app's own staging area. A URI from somewhere
+        // else reaching here would be a bug, and deleting whatever it
+        // pointed at would be a considerably worse one.
+        if (target.authority != AUTHORITY) return@withContext
+
+        try {
+            context.contentResolver.delete(target, null, null)
+        } catch (e: IllegalArgumentException) {
+            // A URI under our authority that resolves to no configured
+            // path. Nothing to delete, and nothing worth failing over —
+            // the photograph is already off the form.
+        } catch (e: SecurityException) {
+            // As above: the cache is reclaimable, so a file left behind
+            // is untidy rather than broken.
+        }
+    }
+
     private fun newFile(prefix: String, extension: String): File? {
         val directory = File(context.cacheDir, STAGING_DIRECTORY)
         // mkdirs() is false both when the directory could not be made and

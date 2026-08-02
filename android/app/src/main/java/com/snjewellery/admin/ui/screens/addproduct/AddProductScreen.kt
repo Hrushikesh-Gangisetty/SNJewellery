@@ -104,6 +104,9 @@ fun AddProductScreen(
         onTakePhoto = photos.takePhoto,
         onChoosePhotos = photos.choosePhotos,
         onOpenCameraSettings = photos.openSettings,
+        onMoveImageEarlier = viewModel::onMoveImageEarlier,
+        onMoveImageLater = viewModel::onMoveImageLater,
+        onRemoveImage = viewModel::onRemoveImage,
         onSaved = onSaved,
         onBack = onBack,
         modifier = modifier,
@@ -129,6 +132,9 @@ internal fun AddProductScreen(
     onTakePhoto: () -> Unit = {},
     onChoosePhotos: () -> Unit = {},
     onOpenCameraSettings: () -> Unit = {},
+    onMoveImageEarlier: (Int) -> Unit = {},
+    onMoveImageLater: (Int) -> Unit = {},
+    onRemoveImage: (Int) -> Unit = {},
     onSaved: (String) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
@@ -275,6 +281,9 @@ internal fun AddProductScreen(
                 onTakePhoto = onTakePhoto,
                 onChoosePhotos = onChoosePhotos,
                 onOpenSettings = onOpenCameraSettings,
+                onMoveEarlier = onMoveImageEarlier,
+                onMoveLater = onMoveImageLater,
+                onRemove = onRemoveImage,
             )
 
             Button(

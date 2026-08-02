@@ -129,6 +129,21 @@
          out — and the position is the thing M7.5 lets the owner change. -->
     <string name="add_product_image_position">Photograph %1$d of %2$d</string>
 
+    <!-- ── Ordering and removal (M7.5) ────────────────────────────────
+      The first photograph is labelled rather than numbered, because
+      being first is the only thing about it the owner needs to act on:
+      it is what the website shows on the product card and at the top of
+      the gallery.
+    -->
+    <string name="add_product_image_main">Main image</string>
+    <string name="add_product_image_number">Photograph %1$d</string>
+    <!-- Read out by the screen reader, so each says which photograph it
+         acts on — three identical "Move up" buttons in a list would be
+         unusable without it. -->
+    <string name="add_product_image_move_earlier">Move photograph %1$d earlier</string>
+    <string name="add_product_image_move_later">Move photograph %1$d later</string>
+    <string name="add_product_image_remove">Remove photograph %1$d</string>
+
     <!--
       The camera failures, worded apart because each calls for a
       different action. Refusing this time and refusing for good look
