@@ -107,6 +107,40 @@
     <string name="add_product_error_weight_nan">Weight should be a number, like 12.5. Leave it empty if the piece has not been weighed.</string>
     <string name="add_product_error_weight_positive">Weight should be more than zero. Leave it empty if the piece has not been weighed.</string>
 
+    <!-- ── Photographs (M7.3) ────────────────────────────────────────
+      The PRD calls this section "Upload Images". "Photographs" is used
+      on screen because that is what the owner is looking at — pictures
+      of a piece, not files being uploaded, which is a thing the app does
+      later and by itself. The domain-term rule in CLAUDE.md §5 governs
+      code and schema; this is a label.
+    -->
+    <string name="add_product_images">Photographs</string>
+    <!-- Says what the order will mean before there is an order to see,
+         because the first photograph becoming the main image is not
+         something anyone would guess. -->
+    <string name="add_product_images_empty">No photographs yet. The first one you add becomes the main image.</string>
+    <string name="add_product_take_photo">Take photo</string>
+    <!-- Announced by the screen reader. The photograph itself has no
+         description anyone could write, so the position is what is read
+         out — and the position is the thing M7.5 lets the owner change. -->
+    <string name="add_product_image_position">Photograph %1$d of %2$d</string>
+
+    <!--
+      The camera failures, worded apart because each calls for a
+      different action. Refusing this time and refusing for good look
+      identical to the app unless it asks the system which it was, and
+      telling someone to tap again when the system has stopped asking is
+      a button that does nothing.
+
+      None of them blames the person (ux.md rule 5), and none promises a
+      gallery: choosing an existing photograph arrives in M7.4.
+    -->
+    <string name="add_product_camera_refused">Photographs need the camera. Tap Take photo to be asked again.</string>
+    <string name="add_product_camera_blocked">Camera access is turned off for this app, so photographs cannot be taken here. Turn it on in Settings.</string>
+    <string name="add_product_camera_settings">Open Settings</string>
+    <string name="add_product_camera_none">This phone has no camera app that can take a photograph.</string>
+    <string name="add_product_camera_no_storage">There is no room left on the phone for a photograph. Free up some space and try again.</string>
+
     <!-- ── Login (M6.7) ──────────────────────────────────────────── -->
     <string name="login_subtitle">Sign in to manage the catalogue.</string>
     <string name="login_email_label">Email</string>

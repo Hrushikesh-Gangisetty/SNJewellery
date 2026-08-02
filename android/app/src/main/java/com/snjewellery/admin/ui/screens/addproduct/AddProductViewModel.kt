@@ -8,6 +8,7 @@ import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
+import com.snjewellery.admin.domain.media.CaptureTargets
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.domain.product.ProductDraft
@@ -38,7 +39,35 @@ data class ProductForm(
     /** Raw text; split on commas when saved. */
     val tags: String = "",
     val featured: Boolean = false,
+    /**
+     * Content URIs of the photographs chosen so far, in the order they
+     * will be uploaded. The first is the primary image — M7.5 makes that
+     * order editable and says so on screen; M7.7 uploads them.
+     */
+    val images: List<String> = emptyList(),
 )
+
+/**
+ * Why a photograph could not be taken, when one could not.
+ *
+ * Cancelling is **not** here. `TakePicture` reports a cancelled capture
+ * and a failed one identically, and cancelling is much the commoner of
+ * the two — an error after someone deliberately backed out of the camera
+ * would be the app arguing with them.
+ */
+sealed interface CameraProblem {
+    /** Refused this time. Asking again is still allowed. */
+    data object PermissionRefused : CameraProblem
+
+    /** Refused for good; only the system settings can undo it. */
+    data object PermissionBlocked : CameraProblem
+
+    /** Nothing on the phone answers the capture intent. */
+    data object NoCameraApp : CameraProblem
+
+    /** No room to put the photograph. */
+    data object NoStorage : CameraProblem
+}
 
 /**
  * Problems shown under their fields.
@@ -68,6 +97,7 @@ data class AddProductUiState(
     val problems: FormProblems = FormProblems(),
     val options: OptionsState = OptionsState.Loading,
     val saveState: SaveState = SaveState.Idle,
+    val cameraProblem: CameraProblem? = null,
 )
 
 /**
@@ -82,13 +112,15 @@ data class AddProductUiState(
  * phones this shop will use. M7.2's requirement is written as "survives
  * configuration change and backgrounding" for that reason.
  *
- * The handle holds the form's fields — the selected images will join
- * them in M7.5 by the same route.
+ * The handle holds the form's fields and, since M7.3, the photographs —
+ * plus the capture in flight, because opening the camera is exactly what
+ * makes the app a candidate for being reclaimed.
  */
 @HiltViewModel
 class AddProductViewModel @Inject constructor(
     private val catalogueRepository: CatalogueRepository,
     private val productRepository: ProductRepository,
+    private val captureTargets: CaptureTargets,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -155,6 +187,64 @@ class AddProductViewModel @Inject constructor(
     fun onWeightBlur() = _uiState.update {
         it.copy(problems = it.problems.copy(weight = ProductFormRules.validateWeight(it.form.weight)))
     }
+
+    /**
+     * Claims somewhere for the camera app to write, and returns the URI
+     * to launch it with — or `null`, having said why, when there is
+     * nowhere to put a photograph.
+     *
+     * The pending target goes on the handle rather than into the state
+     * flow. Opening the camera puts this app in the background holding a
+     * decoded form and a screen's worth of bitmaps, which is precisely
+     * when Android reclaims it; the result then arrives on a view model
+     * that never made the request, and the handle is what still knows
+     * where the photograph went.
+     */
+    fun newCaptureTarget(): String? {
+        val target = captureTargets.newTarget()
+        if (target == null) {
+            _uiState.update { it.copy(cameraProblem = CameraProblem.NoStorage) }
+            return null
+        }
+
+        savedState[KEY_PENDING_CAPTURE] = target
+        _uiState.update { it.copy(cameraProblem = null) }
+        return target
+    }
+
+    /**
+     * [captured] is the camera app's own report. False covers both a
+     * cancelled capture and a failed one — see [CameraProblem] for why
+     * neither says anything.
+     */
+    fun onCaptureFinished(captured: Boolean) {
+        val pending: String? = savedState[KEY_PENDING_CAPTURE]
+        savedState[KEY_PENDING_CAPTURE] = null
+
+        if (!captured || pending == null) return
+        updateForm({ it.copy(images = it.images + pending) })
+    }
+
+    /**
+     * [canAskAgain] is `shouldShowRequestPermissionRationale` read after
+     * the refusal: true while the system will still show the dialog,
+     * false once it has stopped. The two need different words because
+     * they need different actions — one is "tap again", the other is a
+     * trip to Settings, and offering the first when only the second works
+     * is a button that does nothing.
+     */
+    fun onCameraPermissionRefused(canAskAgain: Boolean) = _uiState.update {
+        it.copy(
+            cameraProblem = if (canAskAgain) {
+                CameraProblem.PermissionRefused
+            } else {
+                CameraProblem.PermissionBlocked
+            },
+        )
+    }
+
+    fun onCameraUnavailable() =
+        _uiState.update { it.copy(cameraProblem = CameraProblem.NoCameraApp) }
 
     fun save() {
         val current = _uiState.value
@@ -232,6 +322,10 @@ class AddProductViewModel @Inject constructor(
         savedState[KEY_DESCRIPTION] = form.description
         savedState[KEY_TAGS] = form.tags
         savedState[KEY_FEATURED] = form.featured
+        // ArrayList, not List: the handle writes to a Bundle, and a
+        // Bundle stores an ArrayList of strings. A plain List goes in as
+        // a Serializable and comes back as something else.
+        savedState[KEY_IMAGES] = ArrayList(form.images)
     }
 
     private fun restoreForm() = ProductForm(
@@ -242,6 +336,7 @@ class AddProductViewModel @Inject constructor(
         description = savedState[KEY_DESCRIPTION] ?: "",
         tags = savedState[KEY_TAGS] ?: "",
         featured = savedState[KEY_FEATURED] ?: false,
+        images = savedState.get<ArrayList<String>>(KEY_IMAGES) ?: emptyList(),
     )
 
     private companion object {
@@ -252,6 +347,8 @@ class AddProductViewModel @Inject constructor(
         const val KEY_DESCRIPTION = "description"
         const val KEY_TAGS = "tags"
         const val KEY_FEATURED = "featured"
+        const val KEY_IMAGES = "images"
+        const val KEY_PENDING_CAPTURE = "pending_capture"
     }
 }
 

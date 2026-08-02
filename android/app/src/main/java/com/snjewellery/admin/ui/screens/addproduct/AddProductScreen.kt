@@ -55,9 +55,10 @@ import com.snjewellery.admin.ui.theme.snTextStyles
 /**
  * Add Product — the screen the shop actually bought this platform for.
  *
- * Every field the PRD's Add Product section names, in its order.
- * Photographs and the thirty-second pipeline follow in M7.3–M7.7; what
- * exists here writes the `products` row.
+ * Every field the PRD's Add Product section names, in its order, and
+ * since M7.3 the photographs too. Compression and the thirty-second
+ * upload pipeline follow in M7.6–M7.7; what exists here writes the
+ * `products` row.
  *
  * ── Built for one hand, between customers ────────────────────────────
  * The form scrolls with `imePadding`, so the keyboard never covers the
@@ -75,6 +76,16 @@ fun AddProductScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Built here rather than inside the form: activity result launchers
+    // need an ActivityResultRegistryOwner, which a @Preview has none of.
+    // See ProductImages.kt.
+    val camera = rememberCameraCapture(
+        onNewTarget = viewModel::newCaptureTarget,
+        onCaptured = viewModel::onCaptureFinished,
+        onRefused = viewModel::onCameraPermissionRefused,
+        onUnavailable = viewModel::onCameraUnavailable,
+    )
+
     AddProductScreen(
         uiState = uiState,
         onNameChange = viewModel::onNameChange,
@@ -88,6 +99,8 @@ fun AddProductScreen(
         onWeightBlur = viewModel::onWeightBlur,
         onSave = viewModel::save,
         onRetryOptions = viewModel::loadOptions,
+        onTakePhoto = camera.takePhoto,
+        onOpenCameraSettings = camera.openSettings,
         onSaved = onSaved,
         onBack = onBack,
         modifier = modifier,
@@ -110,6 +123,8 @@ internal fun AddProductScreen(
     onWeightBlur: () -> Unit = {},
     onSave: () -> Unit = {},
     onRetryOptions: () -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    onOpenCameraSettings: () -> Unit = {},
     onSaved: (String) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
@@ -246,6 +261,15 @@ internal fun AddProductScreen(
                 )
                 Switch(checked = uiState.form.featured, onCheckedChange = onFeaturedChange)
             }
+
+            // After Featured and before Save, which is the PRD's own
+            // order for this form.
+            ProductImages(
+                images = uiState.form.images,
+                cameraProblem = uiState.cameraProblem,
+                onTakePhoto = onTakePhoto,
+                onOpenSettings = onOpenCameraSettings,
+            )
 
             Button(
                 onClick = {

@@ -880,9 +880,23 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **Verified on an emulator:** leaving the name empty and moving on shows its error, and only then; `abc` in Weight shows the weight error; **rotating landscape → portrait mid-form kept the name, the category and the weight, error state included**; `am kill` with the process confirmed gone, then relaunch, came back to the same form with the same values; a fresh form shows no errors at all; and Save on an empty form surfaces *"Give the piece a name."* and *"Choose a category."* rather than doing nothing. Selected images are not part of this check — M7.3–M7.5 have not built them yet.
 
-- **`M7.3` Camera capture** — `M`
+  **Part of this verification did not hold.** "Survives backgrounding" was checked with `am kill`, which restores through the `SavedStateHandle` and never exercised the ordinary resume path — where an M6.10 defect was destroying the navigation back stack, and the whole form with it. Found and fixed in M7.3; re-checked there with the photographs included.
+
+- **`M7.3` Camera capture** — `M` — ✅ **complete** (driven on an emulator, 2026-08-02)
   Capture from camera with Android 13+ media permission handling and a graceful denied-permission path.
   *Done when:* denying the permission produces an explanation and a working alternative, not a crash.
+
+  **A defect in M6.10 was found here, and M7.3 could not work until it was fixed.** The Supabase SDK reloads its session every time the app returns to the foreground, so `RootViewModel` went **Admin → Restoring → VerifyingAccess → Admin**. `MainActivity` picks a whole screen from that value, so the two middle emissions replaced `AdminNavHost` with the waiting indicator and back — and a `NavHost` that leaves composition takes its back stack, and every view model scoped to it, with it. Filling in the Add Product form, opening the camera and coming back landed on the **dashboard, with everything typed gone**. The photograph was on disk; nothing was left that knew about it. It reproduces with a plain twelve-second backgrounding, so it was never about the camera — M7.3 is just the first task that leaves the app while on a screen that is not the start destination. Fixed by holding `Admin` through a re-check: `Restoring` and `VerifyingAccess` mean *the answer is not known yet*, which is true at launch and not true on the way back from the camera. Two false starts before that — deduplicating the auth state, and `SharingStarted.Lazily` — were each necessary but neither was sufficient, and both are kept.
+
+  **This also invalidates part of M7.2's verification.** Its backgrounding check was done with `am kill`, which restores through `SavedStateHandle` and never exercised the resume path that was broken. Re-checked here: rotation and process death both keep the form *and* the photographs.
+
+  **`CAMERA` is declared, and that is what creates the permission dialog.** `ACTION_IMAGE_CAPTURE` asks nothing of an app that does not declare it — the camera app holds the permission, not us. Declared anyway because this task asks for a permission path and [android-build.md §2](docs/architecture/android-build.md) committed to exactly this one permission; removing the line and the request flow in `ProductImages.kt` would give the owner zero dialogs. Worth deciding deliberately rather than by inertia.
+
+  **Refused and blocked are worded apart.** `shouldShowRequestPermissionRationale` read *after* a refusal is the only thing that distinguishes "not this time" from "stop asking", and offering *Tap Take photo to be asked again* when the system has stopped asking is a button that does nothing. The blocked case offers **Open Settings** instead.
+
+  **Verified on an emulator:** first refusal shows *"Photographs need the camera. Tap Take photo to be asked again."*; the second shows the blocked wording and **Open Settings**, which opens the app's settings page; granting it and tapping Take photo opens the camera; confirming a shot writes `capture-<uuid>.jpg` into `cache/captures/` and shows it as a thumbnail; a second capture appends in order; **rotating landscape → portrait kept the name and both photographs**; and `am kill` with the process confirmed gone, then relaunch, came back to the same form with both photographs. Sign-out was **not** driven — it would have left the emulator signed out with no credentials to hand — but `SignedOut` is a settled state and passes straight through the new filter.
+
+  Not driven: the no-camera-app and no-storage paths. Both are handled and worded, neither is reachable on this emulator.
 
 - **`M7.4` Gallery selection** — `S`
   Multi-select from the gallery with correct permission handling.

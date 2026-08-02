@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-      CAMERA arrives with the upload pipeline in M7, added in the
-      milestone that needs it — a permission requested before a feature
-      exists is one the owner is asked to grant for no reason. Choosing
-      existing photographs needs none at all: the Photo Picker is
-      permission-free on every supported version.
-    -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
@@ -16,6 +9,36 @@
       a lost connection.
     -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      M7.3. The only runtime permission this app asks for, as
+      docs/architecture/android-build.md §2 predicted: choosing existing
+      photographs needs none at all, because the Photo Picker is
+      permission-free on every supported version.
+
+      Worth being plain about: declaring it is what makes it required.
+      ACTION_IMAGE_CAPTURE asks nothing of an app that does not declare
+      CAMERA — the camera app holds the permission, not us — but an app
+      that DOES declare it must also hold it, or the system refuses the
+      launch. So this line creates the one permission dialog the owner
+      ever sees, and deleting it plus the request flow in ProductImages.kt
+      would remove it.
+
+      It stays because M7.3 asks for a permission path and because
+      docs/architecture/android-build.md §2 committed to exactly this one.
+      Revisit if the dialog turns out to be friction that buys nothing.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      required="false" so a phone with no camera still installs. The app
+      is usable without one — the gallery path in M7.4 needs no camera at
+      all — and the capture button reports the absence rather than
+      disappearing.
+    -->
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
 
     <application
         android:name=".SnJewelleryApp"
@@ -48,6 +71,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          M7.3. A camera app cannot write into this app's private storage,
+          and it must not be handed a `file://` URI — that has thrown
+          FileUriExposedException since Android 7. FileProvider gives it a
+          `content://` URI scoped to one file, granted for one launch.
+
+          The authority carries ${applicationId}, so the debug build's
+          `.debug` suffix gives it a different one. Two providers claiming
+          the same authority is an install failure, and the debug and
+          release builds are meant to sit on the same phone.
+
+          exported="false" with grantUriPermissions="true": nothing may
+          query this provider, and the temporary grant that rides on the
+          capture intent is the only access anything gets.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.captures"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
