@@ -60,9 +60,28 @@ The compression target set in M7.6 effectively defines the catalogue's maximum i
 | Cloudinary or imgix | Excellent transformation and optimisation, but a second vendor, a second bill, and a second set of credentials for a capability Storage already provides. |
 | Store renditions as separate objects | Adding or changing a rendition later means reprocessing the whole catalogue. |
 
-## Open sub-questions
+## The compression target (set in M7.6)
 
-- **The exact compression target** — maximum dimension and file size. Set in M7.6, with the owner reviewing real photographs. This is the highest-stakes open detail in this ADR.
+The sub-question this ADR left open. **Provisional — the owner has not yet reviewed real photographs**, which is the check that decides whether these numbers stay.
+
+| Setting | Value |
+|---|---|
+| Longest edge | **2048 px** (never enlarged) |
+| Format | **WebP**, lossy |
+| Quality | **82**, stepping to 70 then 58 only if needed |
+| File size ceiling | **900 KB** |
+
+**Why 2048.** It is set from what the website actually asks for, not from a round number. The largest request any page makes is the product gallery's `sizes="(min-width: 1024px) 50vw, 100vw"` — half of a wide desktop viewport, or the full width of a phone. 2048 px covers a 1024 px CSS slot at 2× and a modern phone's full-screen view at 3× (a 430 pt-wide phone is 1290 device px). Anything larger is resolution the site would never serve, paid for in upload seconds against M7.13's thirty-second budget.
+
+**Why the quality steps rather than one number.** File size depends on the photograph, not the setting: a ring on plain cloth compresses to a fraction of a temple necklace covered in detail. A single quality either bloats the second or ruins the first. The lowest step is a floor rather than a target — if even 58 is over the ceiling the photograph is uploaded anyway, because a slightly heavy image beats refusing the owner's piece.
+
+**Why EXIF orientation is baked into the pixels.** `BitmapFactory` ignores the tag and re-encoding drops it, so a photograph taken with the phone upright would arrive on the website lying on its side. Rotating during compression is also what lets Supabase's transformations and `next/image` treat the file as simply what it looks like.
+
+**How to change it.** The constants are in `PhotoCompressor`, which points back here. Changing them affects only photographs uploaded afterwards — anything already in the bucket keeps the quality it was uploaded at, and compression is irreversible, so a later increase does not improve the existing catalogue.
+
+**What is verified, and what is not.** `PhotoCompressorTest` asserts the edge, the container format, the ceiling, that a small image is not enlarged, and that a quarter-turn comes out with its edges swapped. It cannot assert that the result is *visibly acceptable for jewellery detail at full-screen size*, which is a judgement about real photographs on a real screen and remains outstanding.
+
+## Open sub-questions
 - **Open Question 2** — projected storage and egress against Supabase tier limits. Needs an estimate before M5.
 - Whether to archive originals separately at lower storage cost, if the shop later wants print-quality assets.
 - Whether WebP is right for every case, or whether some images warrant a different format.

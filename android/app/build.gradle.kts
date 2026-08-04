@@ -147,6 +147,23 @@ android {
         // Every suppression is in app/lint.xml with its reason.
         warningsAsErrors = false
         abortOnError = true
+
+        /**
+         * Lint does not read the instrumented tests. Not a preference —
+         * `lintAnalyzeDebugAndroidTest` crashes on them, inside its own
+         * Kotlin light-class machinery
+         * (`SymbolLightClassForClassOrObject.isRecord`, via
+         * `LLFirModuleLazyDeclarationResolver`), on this AGP 8.10 and
+         * Kotlin 2.1 pair. It is a tooling failure rather than a finding,
+         * and it takes the whole build down with it.
+         *
+         * The cost is small: test sources are not shipped, and lint's
+         * value is almost entirely in what the APK contains. Try removing
+         * this the next time AGP or Kotlin moves — see
+         * docs/architecture/android-build.md §1 for why those two are
+         * upgraded together.
+         */
+        ignoreTestSources = true
     }
 
     packaging {
@@ -188,4 +205,11 @@ dependencies {
 
     // Tooling is debug-only: @Preview rendering must not ship in the APK.
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Instrumented, not local: PhotoCompressor is Bitmap, BitmapFactory
+    // and ExifInterface all the way down, and those are stubs on the JVM.
+    // Run with `gradlew :app:connectedDebugAndroidTest`.
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

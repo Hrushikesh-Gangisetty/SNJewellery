@@ -928,9 +928,23 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **Verified on an emulator:** three photographs added, then Photograph 2 moved up — it became **Main image** and the previous main became Photograph 2, thumbnails following; removing Photograph 2 renumbered the rest **and** deleted `chosen-b9812ee7-….png` from `cache/staged/`, confirmed by listing the directory before and after; the end arrows are greyed at each end; and `am kill` with the process gone, then relaunch, restored the **reordered** list in exactly that order.
 
-- **`M7.6` Compression and resizing** — `M`
+- **`M7.6` Compression and resizing** — `M` — ◐ **implemented and asserted on a device; the visual check is outstanding**
   Compress and resize before upload to a documented maximum dimension and file size.
   *Done when:* the target is documented, and the result is visibly acceptable for jewellery detail at full-screen size on the website.
+
+  **The target is set and documented** in [ADR-0005](docs/adr/0005-image-storage-and-renditions.md), which is where that ADR asked M7.6 to put it: **2048 px longest edge, WebP, quality 82 stepping to 70 then 58, under 900 KB**. The 2048 is derived from the website's own `sizes` attributes rather than picked as a round number — the largest request any page makes is the gallery's `50vw` on desktop, which 2048 covers at 2× DPR, and a phone's full-screen view at 3×. Anything more is resolution the site would never serve, paid for in seconds against M7.13's budget. **These numbers were chosen by the agent at the owner's direction, not against real jewellery**, and ADR-0005 is explicit that the second check is the one that matters.
+
+  **The second half of the *Done when* cannot be met yet and is not claimed.** Nothing uploads until M7.7, so there is no way to look at a compressed photograph at full-screen size on the website. It also needs real jewellery — the emulator's synthetic camera scene says nothing about chain links or gemstone facets, and compression is irreversible.
+
+  **This task introduced the project's first tests**, because what M7.6 produces is a number and a screenshot cannot check a number. `PhotoCompressorTest` runs on a device and asserts the longest edge, the WebP container header, the size ceiling, that a small image is **not** enlarged, and that a quarter-turn of EXIF rotation comes out with its edges swapped. Instrumented rather than local: every line of the compressor is `Bitmap`, `BitmapFactory` or `ExifInterface`, which are stubs on the JVM. Three test-only dependencies were added; none ships in the APK.
+
+  **It earned its place on the first run.** All four tests failed with *"compression reported failure"*: `BitmapFactory.decodeStream` returns `null` by design while `inJustDecodeBounds` is set, so `openStream(…)?.use { … } ?: return null` read as a guard on the stream and in fact aborted **every** decode. Every photograph would have silently failed to compress, and the form would have reported *"could not be added"* for a camera and a gallery that both worked perfectly. Reading the code back would not have found it.
+
+  **Both routes now compress**, so `copyIn` became `stage` and the camera's raw capture is staged and then discarded — it is larger by an order of magnitude and ADR-0005 does not archive originals. Staging is also why this is the one place in the form that shows progress and disables a control.
+
+  **Lint no longer reads test sources.** Not a preference: `lintAnalyzeDebugAndroidTest` crashes inside its own Kotlin light-class machinery on this AGP 8.10 / Kotlin 2.1 pair and takes the build down. Reason and revisit note are in `app/build.gradle.kts`.
+
+  **Not driven through the app.** The emulator restarted mid-task, cold-booted, and its stored session no longer refreshes — the app is on the login screen and no credentials are to hand. The camera and gallery paths were driven end to end in M7.3 and M7.4 and are unchanged except for the compression step, which is what the tests cover; but the owner should add one photograph by each route after signing in.
 
 - **`M7.7` Upload pipeline with progress** — `M`
   Upload to Supabase Storage using the M3.6 path convention, with per-image and overall progress indicators.

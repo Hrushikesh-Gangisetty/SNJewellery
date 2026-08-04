@@ -27,6 +27,7 @@ import javax.inject.Singleton
 @Singleton
 class CacheStagedImages @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val compressor: PhotoCompressor,
 ) : StagedImages {
 
     /**
@@ -36,28 +37,18 @@ class CacheStagedImages @Inject constructor(
      */
     override fun newCaptureTarget(): String? = newFile(CAPTURE_PREFIX, JPEG_EXTENSION)?.let(::uriFor)
 
-    override suspend fun copyIn(sourceUri: String): String? = withContext(Dispatchers.IO) {
-        val source = sourceUri.toUri()
-        val target = newFile(CHOSEN_PREFIX, extensionOf(source)) ?: return@withContext null
+    /**
+     * `Default`, not `IO`: this opens a few streams but the time is
+     * dominated by decoding and re-encoding several megapixels, which is
+     * processor work.
+     */
+    override suspend fun stage(sourceUri: String): String? = withContext(Dispatchers.Default) {
+        val target = newFile(PHOTO_PREFIX, WEBP_EXTENSION) ?: return@withContext null
 
-        try {
-            val stream = context.contentResolver.openInputStream(source)
-                ?: return@withContext null
-            stream.use { input -> target.outputStream().use(input::copyTo) }
-        } catch (e: IOException) {
-            // A half-written file is worse than none: it would render as
-            // a broken thumbnail and upload as a corrupt photograph.
-            target.delete()
-            return@withContext null
-        } catch (e: SecurityException) {
-            // The picker's read grant does not outlive the process. It is
-            // live when this runs, because the copy happens the moment
-            // the selection comes back — but the app being reclaimed in
-            // between is possible, and a crash is not an acceptable way
-            // to find out.
-            target.delete()
-            return@withContext null
-        }
+        // A half-written file is worse than none: it would render as a
+        // broken thumbnail and upload as a corrupt photograph. The
+        // compressor leaves nothing behind when it fails.
+        if (!compressor.compress(sourceUri.toUri(), target)) return@withContext null
 
         uriFor(target)
     }
@@ -98,25 +89,21 @@ class CacheStagedImages @Inject constructor(
     private fun uriFor(file: File): String =
         FileProvider.getUriForFile(context, AUTHORITY, file).toString()
 
-    /**
-     * A gallery photograph is not necessarily a JPEG, and naming a PNG
-     * `.jpg` would be a small lie that M7.7 has to work around when it
-     * decides a content type. Taken from what the source says it is,
-     * falling back to JPEG when it says nothing.
-     */
-    private fun extensionOf(source: android.net.Uri): String =
-        context.contentResolver.getType(source)
-            ?.substringAfter('/', JPEG_EXTENSION)
-            ?.takeIf { it.isNotBlank() && it.all(Char::isLetterOrDigit) }
-            ?: JPEG_EXTENSION
-
     private companion object {
         /** Must match `path` in res/xml/file_paths.xml. */
         const val STAGING_DIRECTORY = "staged"
 
+        /**
+         * Two prefixes because the directory holds two different things:
+         * a `capture-` file is the camera's raw output and lives only
+         * until it has been staged, while a `photo-` file is a finished
+         * photograph on the form. Telling them apart matters when reading
+         * the directory to work out what happened.
+         */
         const val CAPTURE_PREFIX = "capture"
-        const val CHOSEN_PREFIX = "chosen"
+        const val PHOTO_PREFIX = "photo"
         const val JPEG_EXTENSION = "jpg"
+        const val WEBP_EXTENSION = "webp"
 
         /**
          * Must match `android:authorities` in the manifest, which carries

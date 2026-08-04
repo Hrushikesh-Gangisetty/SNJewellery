@@ -165,9 +165,12 @@
     <!-- Says how many, because the ones that worked are already on
          screen and a bare "something failed" leaves the owner counting
          thumbnails to work out what they still have to do. -->
+    <!-- Not "try choosing again": since M7.6 this also covers a camera
+         capture that could not be compressed, and telling someone to
+         re-pick a photo they just took would be nonsense. -->
     <plurals name="add_product_photos_not_added">
-        <item quantity="one">One photo could not be added. Try choosing it again.</item>
-        <item quantity="other">%1$d photos could not be added. Try choosing them again.</item>
+        <item quantity="one">One photo could not be added. Please try again.</item>
+        <item quantity="other">%1$d photos could not be added. Please try again.</item>
     </plurals>
 
     <!-- ── Login (M6.7) ──────────────────────────────────────────── -->

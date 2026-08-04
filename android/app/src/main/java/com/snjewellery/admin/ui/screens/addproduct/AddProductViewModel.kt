@@ -230,39 +230,56 @@ class AddProductViewModel @Inject constructor(
      * [captured] is the camera app's own report. False covers both a
      * cancelled capture and a failed one — see [PhotoProblem] for why
      * neither says anything.
+     *
+     * What the camera wrote is a raw full-resolution photograph, so it is
+     * staged like any other source and then thrown away. It is the larger
+     * of the two by an order of magnitude, and keeping it would fill the
+     * cache over a morning's shooting for no benefit — ADR-0005 does not
+     * archive originals.
      */
     fun onCaptureFinished(captured: Boolean) {
         val pending: String? = savedState[KEY_PENDING_CAPTURE]
         savedState[KEY_PENDING_CAPTURE] = null
 
         if (!captured || pending == null) return
-        updateForm({ it.copy(images = it.images + pending) })
+        addPhotos(listOf(pending), discardSources = true)
     }
 
     /**
-     * Copies a gallery selection into the app's own storage, in the order
-     * the picker returned it.
-     *
-     * The copy is the point — see [StagedImages]. It is also why this is
-     * the one way in that shows progress: several full-size photographs
-     * are megabytes, and a button that appears to do nothing for two
-     * seconds gets pressed again.
-     *
-     * Each is added as it lands rather than all at once at the end, so a
-     * selection that partly fails still gives the owner what worked.
+     * Stages a gallery selection, in the order the picker returned it.
      */
     fun onGallerySelection(sourceUris: List<String>) {
         // Dismissing the picker returns nothing. That is not a failure
         // and must not be reported as one.
         if (sourceUris.isEmpty()) return
+        addPhotos(sourceUris, discardSources = false)
+    }
 
+    /**
+     * The one path both routes take: compress, add, and say what failed.
+     *
+     * ── Why this is the only place the form shows progress ───────────
+     * Staging is real work — several megapixels decoded, rotated,
+     * resized and re-encoded, per photograph — and a control that appears
+     * to do nothing for a second gets pressed again.
+     *
+     * Each photograph is added as it lands rather than all at once at the
+     * end, so a selection that partly fails still gives the owner what
+     * worked, and a long selection fills in as it goes.
+     *
+     * [discardSources] is true only for a camera capture, which is the
+     * one source this app owns and is therefore entitled to delete.
+     */
+    private fun addPhotos(sourceUris: List<String>, discardSources: Boolean) {
         _uiState.update { it.copy(photoProblem = null, addingPhotos = true) }
 
         viewModelScope.launch {
             var failed = 0
+
             sourceUris.forEach { source ->
-                val staged = stagedImages.copyIn(source)
+                val staged = stagedImages.stage(source)
                 if (staged == null) failed++ else updateForm({ it.copy(images = it.images + staged) })
+                if (discardSources) stagedImages.discard(source)
             }
 
             _uiState.update {
