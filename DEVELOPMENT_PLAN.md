@@ -960,9 +960,17 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **A failure part-way through gets its own state.** *"Nothing was saved, tap Save again"* is true of every other failure on this screen and would be a lie here — the piece **is** in the catalogue, and tapping Save again would add it twice. So the message says so, and says not to. M7.9 owns making that recoverable; this only makes it honest.
 
-- **`M7.8` Database writes with ordering** — `S`
+- **`M7.8` Database writes with ordering** — `S` — ◐ **written and building; never run against the live project**
   Write `products` and `product_images` rows with `display_order` matching the chosen order.
   *Done when:* the website gallery order matches the app's order exactly.
+
+  **Not verified**, for the same reason as M7.7 — no credentials to hand. Done together with M7.7 rather than after it, because uploading photographs that no row points at would leave orphaned storage objects on **every** save, which ADR-0005 names as a cost that accumulates silently.
+
+  **`display_order` is the index in the list the owner arranged**, so M7.5's promise holds end to end: position 0 is the primary image because it is the one at the top of the screen. There is no second ordering to keep in step.
+
+  **One insert, after every upload has landed.** A row pointing at an object that is not in the bucket yet is a broken image on the website; and `display_order` is unique per product, so a per-photograph insert failing half-way would leave a partly ordered gallery, where one statement takes all the rows or none.
+
+  **`aspect` is derived from the photograph rather than asked.** `product-portrait` when the image is more than 15% taller than wide, `product` otherwise — responsive.md §2 names necklaces, long chains and bridal sets as the case the 4:5 frame exists for, and the owner should not have to answer "which frame?" between customers. The threshold is not "taller than wide" because a photograph a few percent off square is a square one held slightly crooked. **A rule chosen here, not specified anywhere** — M8.3's edit screen is the natural place to let the owner override it.
 
 - **`M7.9` Transactional integrity** — `M`
   If an image upload fails mid-way, either complete via retry or roll back so no orphaned product row and no orphaned storage object remains. Per-image retry.

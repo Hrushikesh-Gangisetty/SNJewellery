@@ -1,6 +1,7 @@
 package com.snjewellery.admin.data.media
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import com.snjewellery.admin.BuildConfig
@@ -51,6 +52,26 @@ class CacheStagedImages @Inject constructor(
         if (!compressor.compress(sourceUri.toUri(), target)) return@withContext null
 
         uriFor(target)
+    }
+
+    /**
+     * Bounds only — no pixels are decoded, so this costs a header read
+     * rather than a bitmap.
+     *
+     * The threshold is deliberately not "taller than wide". A photograph
+     * a few percent off square is a square photograph held slightly
+     * crooked, and framing it 4:5 would letterbox it for no reason. The
+     * portrait frame is for pieces that are genuinely long.
+     */
+    override suspend fun isPortrait(uri: String): Boolean = withContext(Dispatchers.IO) {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val stream = context.contentResolver.openInputStream(uri.toUri())
+            ?: return@withContext false
+
+        stream.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext false
+
+        bounds.outHeight > bounds.outWidth * PORTRAIT_THRESHOLD
     }
 
     override suspend fun discard(uri: String): Unit = withContext(Dispatchers.IO) {
@@ -104,6 +125,12 @@ class CacheStagedImages @Inject constructor(
         const val PHOTO_PREFIX = "photo"
         const val JPEG_EXTENSION = "jpg"
         const val WEBP_EXTENSION = "webp"
+
+        /**
+         * 15% taller than wide before the portrait frame is used. Below
+         * that it is a square photograph held slightly crooked.
+         */
+        const val PORTRAIT_THRESHOLD = 1.15
 
         /**
          * Must match `android:authorities` in the manifest, which carries

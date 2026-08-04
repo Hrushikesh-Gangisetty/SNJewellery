@@ -9,6 +9,7 @@ import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.media.StagedImages
+import com.snjewellery.admin.domain.product.AttachImagesResult
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.domain.product.ProductDraft
@@ -16,6 +17,7 @@ import com.snjewellery.admin.domain.product.ProductFormRules
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.UploadImageResult
+import com.snjewellery.admin.domain.product.UploadedImage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -440,8 +442,12 @@ class AddProductViewModel @Inject constructor(
      * whether this meets the thirty-second target and is the place to
      * revisit it with a number rather than an opinion.
      *
-     * The rows that point at these objects are M7.8; until then the
-     * upload happens and nothing references it.
+     * The `product_images` rows are written **after** every upload has
+     * landed, in one insert. A row pointing at an object that is not
+     * there yet is a broken image on the website, and `display_order` is
+     * unique per product — so a per-photograph insert that failed
+     * half-way would leave a partly ordered gallery, where one statement
+     * takes all the rows or none.
      */
     private suspend fun uploadImages(productId: String, slug: String) {
         val images = _uiState.value.form.images
@@ -453,6 +459,8 @@ class AddProductViewModel @Inject constructor(
         _uiState.update {
             it.copy(saveState = SaveState.Uploading(completed = 0, total = images.size))
         }
+
+        val uploaded = mutableListOf<UploadedImage>()
 
         images.forEachIndexed { index, localUri ->
             val result = productImageRepository.upload(productId, localUri) { sent, total ->
@@ -480,20 +488,51 @@ class AddProductViewModel @Inject constructor(
                     return
                 }
 
-                is UploadImageResult.Uploaded -> _uiState.update { state ->
-                    state.copy(
-                        // Pinned to 1f: the last progress callback can
-                        // arrive a little short of the total, and a bar
-                        // that stops at 98% on a photograph that is
-                        // finished reads as a stall.
-                        uploadProgress = state.uploadProgress + (localUri to 1f),
-                        saveState = SaveState.Uploading(index + 1, images.size),
+                is UploadImageResult.Uploaded -> {
+                    uploaded += UploadedImage(
+                        storagePath = result.storagePath,
+                        url = result.url,
+                        // The index in the list the owner arranged, which
+                        // is what makes M7.5's promise true: position 0
+                        // is the primary image because it is the one at
+                        // the top of the screen.
+                        displayOrder = index,
+                        portrait = stagedImages.isPortrait(localUri),
                     )
+
+                    _uiState.update { state ->
+                        state.copy(
+                            // Pinned to 1f: the last progress callback
+                            // can arrive a little short of the total, and
+                            // a bar that stops at 98% on a photograph
+                            // that is finished reads as a stall.
+                            uploadProgress = state.uploadProgress + (localUri to 1f),
+                            saveState = SaveState.Uploading(index + 1, images.size),
+                        )
+                    }
                 }
             }
         }
 
-        _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
+        when (val attached = productImageRepository.attach(productId, uploaded)) {
+            is AttachImagesResult.Attached ->
+                _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
+
+            // The objects are in the bucket with nothing pointing at
+            // them. Reported as the same class of problem as a failed
+            // upload, because it is the same thing from the owner's
+            // side — the piece is saved and its pictures are not on it.
+            is AttachImagesResult.Failed -> _uiState.update {
+                it.copy(
+                    saveState = SaveState.ImagesIncomplete(
+                        slug = slug,
+                        uploaded = 0,
+                        total = images.size,
+                        failure = attached.failure,
+                    ),
+                )
+            }
+        }
     }
 
     /** Lets the screen dismiss an error without re-entering everything. */

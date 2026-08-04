@@ -2,16 +2,21 @@ package com.snjewellery.admin.data.product
 
 import androidx.core.net.toUri
 import com.snjewellery.admin.data.remote.RequestFailureClassifier
+import com.snjewellery.admin.domain.product.AttachImagesResult
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.StoragePaths
 import com.snjewellery.admin.domain.product.UploadImageResult
+import com.snjewellery.admin.domain.product.UploadedImage
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.UploadStatus
 import io.github.jan.supabase.storage.storage
 import io.github.jan.supabase.storage.uploadAsFlow
 import io.ktor.http.ContentType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -80,7 +85,49 @@ class SupabaseProductImageRepository @Inject constructor(
         }
     }
 
+    override suspend fun attach(
+        productId: String,
+        images: List<UploadedImage>,
+    ): AttachImagesResult = try {
+        client.postgrest.from(TABLE_PRODUCT_IMAGES).insert(images.map { it.toInsert(productId) })
+        AttachImagesResult.Attached
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AttachImagesResult.Failed(failures.classify(e))
+    }
+
+    /**
+     * The insert payload.
+     *
+     * A write type rather than the M6.6 `ProductImageRow`, for the reason
+     * `ProductInsert` exists: that mirrors what the database *returns*,
+     * including `id` and `created_at`, which are the database's to set.
+     */
+    @Serializable
+    private data class ProductImageInsert(
+        @SerialName("product_id") val productId: String,
+        @SerialName("url") val url: String,
+        @SerialName("storage_path") val storagePath: String,
+        @SerialName("display_order") val displayOrder: Int,
+        @SerialName("aspect") val aspect: String,
+    )
+
+    private fun UploadedImage.toInsert(productId: String) = ProductImageInsert(
+        productId = productId,
+        url = url,
+        storagePath = storagePath,
+        displayOrder = displayOrder,
+        aspect = if (portrait) ASPECT_PORTRAIT else ASPECT_SQUARE,
+    )
+
     private companion object {
+        const val TABLE_PRODUCT_IMAGES = "product_images"
+
+        /** Values of the `product_image_aspect` enum. */
+        const val ASPECT_SQUARE = "product"
+        const val ASPECT_PORTRAIT = "product-portrait"
+
         /** Ktor predefines GIF, JPEG, PNG and SVG, but not this one. */
         val WEBP = ContentType("image", "webp")
     }

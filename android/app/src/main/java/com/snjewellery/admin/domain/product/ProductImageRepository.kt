@@ -19,6 +19,29 @@ sealed interface UploadImageResult {
 }
 
 /**
+ * One uploaded photograph, ready to become a `product_images` row.
+ *
+ * [displayOrder] is zero-based and unique per product, and **position 0
+ * is the primary image** — the one the website's product card shows and
+ * the one its gallery opens on. It is the index in the list the owner
+ * arranged in M7.5, which is what makes "the on-screen order is the
+ * order that gets persisted" true rather than merely intended.
+ */
+data class UploadedImage(
+    val storagePath: String,
+    val url: String,
+    val displayOrder: Int,
+    /** 4:5 rather than the square default. See responsive.md §2. */
+    val portrait: Boolean,
+)
+
+/** Whether the rows landed. */
+sealed interface AttachImagesResult {
+    data object Attached : AttachImagesResult
+    data class Failed(val failure: RequestFailure) : AttachImagesResult
+}
+
+/**
  * Puts a product's photographs in Storage.
  *
  * ── One photograph at a time, on purpose ─────────────────────────────
@@ -50,4 +73,17 @@ interface ProductImageRepository {
         localUri: String,
         onProgress: (sentBytes: Long, totalBytes: Long) -> Unit,
     ): UploadImageResult
+
+    /**
+     * Writes the `product_images` rows for [images], in one insert.
+     *
+     * One statement rather than one per photograph, because
+     * `display_order` is unique per product: inserting them separately
+     * would leave a half-ordered gallery behind if the third failed, and
+     * a single insert either takes all the rows or none of them.
+     *
+     * Called once, after every upload has landed — a row pointing at an
+     * object that is not there yet is a broken image on the website.
+     */
+    suspend fun attach(productId: String, images: List<UploadedImage>): AttachImagesResult
 }

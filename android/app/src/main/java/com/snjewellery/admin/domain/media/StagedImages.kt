@@ -55,6 +55,17 @@ interface StagedImages {
     suspend fun stage(sourceUri: String): String?
 
     /**
+     * How tall a staged photograph is relative to its width.
+     *
+     * `true` when the website should frame it in the 4:5 portrait ratio
+     * rather than the square default — responsive.md names necklaces,
+     * long chains and bridal sets as the case that exists for. `false`
+     * when it cannot be read, because square is the documented default
+     * and a wrong frame is better than a failed save.
+     */
+    suspend fun isPortrait(uri: String): Boolean
+
+    /**
      * Throws away a staged photograph the owner has removed.
      *
      * Nothing depends on it having worked — the photograph is already off
