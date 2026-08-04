@@ -1,0 +1,53 @@
+package com.snjewellery.admin.domain.product
+
+import com.snjewellery.admin.domain.RequestFailure
+
+/** Where one photograph ended up, once it is in the bucket. */
+sealed interface UploadImageResult {
+    /**
+     * [storagePath] is what `product_images.storage_path` stores, so the
+     * website can derive renditions; [url] is what it stores in `url`, so
+     * a consumer that only wants the picture need not derive anything.
+     * ADR-0005 keeps both deliberately.
+     */
+    data class Uploaded(
+        val storagePath: String,
+        val url: String,
+    ) : UploadImageResult
+
+    data class Failed(val failure: RequestFailure) : UploadImageResult
+}
+
+/**
+ * Puts a product's photographs in Storage.
+ *
+ * ── One photograph at a time, on purpose ─────────────────────────────
+ * The obvious shape is "upload these five and tell me when you are
+ * done". This one takes a single photograph, and the caller loops.
+ *
+ * That is what makes the two things M7 needs possible. Progress has to
+ * be **per image** as well as overall, and a batch call can only report
+ * a total. And M7.9 requires per-image retry after a failure part-way
+ * through — which means the caller has to know exactly which ones
+ * landed, and be able to ask again for only the rest.
+ */
+interface ProductImageRepository {
+
+    /**
+     * Uploads the staged photograph at [localUri] as a photograph of
+     * [productId], and returns where it landed.
+     *
+     * [onProgress] is called as the bytes go out, from whichever thread
+     * the HTTP client is writing on — it must be cheap and must not
+     * assume it is on the main thread. `totalBytes` is what the request
+     * declared, which for a local file is its size.
+     *
+     * **Does not throw** for an expected failure. A crash here would
+     * strand a product row that has just been written.
+     */
+    suspend fun upload(
+        productId: String,
+        localUri: String,
+        onProgress: (sentBytes: Long, totalBytes: Long) -> Unit,
+    ): UploadImageResult
+}

@@ -13,7 +13,9 @@ import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductFormRules
+import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.UploadImageResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,10 +100,39 @@ data class FormProblems(
 /** The outcome of a save, once. */
 sealed interface SaveState {
     data object Idle : SaveState
+
+    /** The `products` row is being written. */
     data object Saving : SaveState
+
+    /**
+     * The row is written and the photographs are going up.
+     *
+     * A state of its own rather than a longer [Saving], because they fail
+     * differently and the owner can act on the difference: nothing is in
+     * the catalogue if the first fails, and a piece already is if the
+     * second does.
+     */
+    data class Uploading(val completed: Int, val total: Int) : SaveState
+
     data class Saved(val slug: String) : SaveState
     data class Failed(val failure: RequestFailure) : SaveState
     data object NameUnavailable : SaveState
+
+    /**
+     * The piece saved, but a photograph did not go up.
+     *
+     * Deliberately not folded into [Failed]. "Nothing was saved, try
+     * again" would be a lie — the product is in the catalogue, without
+     * all of its pictures, and telling the owner to press Save again
+     * would give them a second copy of the piece. M7.9 owns making this
+     * recoverable rather than merely honest.
+     */
+    data class ImagesIncomplete(
+        val slug: String,
+        val uploaded: Int,
+        val total: Int,
+        val failure: RequestFailure,
+    ) : SaveState
 }
 
 data class AddProductUiState(
@@ -112,6 +143,13 @@ data class AddProductUiState(
     val photoProblem: PhotoProblem? = null,
     /** A gallery selection is being copied in. Can be several megabytes. */
     val addingPhotos: Boolean = false,
+    /**
+     * How far each photograph has got, `0f`–`1f`, keyed by its staged
+     * URI. Present only while uploading, and only for photographs that
+     * have started — M7.7 requires progress visible for **every** image,
+     * which a single overall bar cannot give.
+     */
+    val uploadProgress: Map<String, Float> = emptyMap(),
 )
 
 /**
@@ -134,6 +172,7 @@ data class AddProductUiState(
 class AddProductViewModel @Inject constructor(
     private val catalogueRepository: CatalogueRepository,
     private val productRepository: ProductRepository,
+    private val productImageRepository: ProductImageRepository,
     private val stagedImages: StagedImages,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -346,8 +385,10 @@ class AddProductViewModel @Inject constructor(
         val current = _uiState.value
         // Double-tap guard. M7.10 owns the rest of that task; this much
         // belongs with the only Save button that exists, because without
-        // it two taps are two products.
+        // it two taps are two products. Uploading counts: the row is
+        // already written by then, so a second tap would write a second.
         if (current.saveState is SaveState.Saving) return
+        if (current.saveState is SaveState.Uploading) return
 
         // Everything is checked here, not only on blur: a field never
         // touched has never blurred, and Save must still say what is
@@ -368,20 +409,91 @@ class AddProductViewModel @Inject constructor(
         // would be a crash on the owner's only Save button.
         val categoryId = current.form.categoryId ?: return
 
-        _uiState.update { it.copy(problems = problems, saveState = SaveState.Saving) }
+        _uiState.update {
+            it.copy(problems = problems, saveState = SaveState.Saving, uploadProgress = emptyMap())
+        }
 
         viewModelScope.launch {
-            val result = productRepository.create(current.form.toDraft(categoryId))
-            _uiState.update {
-                it.copy(
-                    saveState = when (result) {
-                        is CreateProductResult.Created -> SaveState.Saved(result.slug)
-                        is CreateProductResult.Failed -> SaveState.Failed(result.failure)
-                        is CreateProductResult.SlugExhausted -> SaveState.NameUnavailable
-                    },
-                )
+            when (val result = productRepository.create(current.form.toDraft(categoryId))) {
+                is CreateProductResult.Failed ->
+                    _uiState.update { it.copy(saveState = SaveState.Failed(result.failure)) }
+
+                is CreateProductResult.SlugExhausted ->
+                    _uiState.update { it.copy(saveState = SaveState.NameUnavailable) }
+
+                is CreateProductResult.Created ->
+                    uploadImages(productId = result.id, slug = result.slug)
             }
         }
+    }
+
+    /**
+     * Puts the photographs in Storage, in the order the owner arranged
+     * them.
+     *
+     * **Sequential, not concurrent.** Three uploads at once would finish
+     * sooner on a good connection, but this app's connection is Indian
+     * mobile data: parallel streams there share the same narrow pipe,
+     * each one slower, and a stall takes all three with it. Sequential
+     * also means a failure has an unambiguous answer to "which ones
+     * landed", which is what M7.9's retry will need. M7.13 measures
+     * whether this meets the thirty-second target and is the place to
+     * revisit it with a number rather than an opinion.
+     *
+     * The rows that point at these objects are M7.8; until then the
+     * upload happens and nothing references it.
+     */
+    private suspend fun uploadImages(productId: String, slug: String) {
+        val images = _uiState.value.form.images
+        if (images.isEmpty()) {
+            _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
+            return
+        }
+
+        _uiState.update {
+            it.copy(saveState = SaveState.Uploading(completed = 0, total = images.size))
+        }
+
+        images.forEachIndexed { index, localUri ->
+            val result = productImageRepository.upload(productId, localUri) { sent, total ->
+                // Called from whichever thread is writing the request
+                // body. `update` is atomic, which is why the progress map
+                // lives in the state flow rather than beside it.
+                val fraction = if (total > 0) sent.toFloat() / total else 0f
+                _uiState.update { state ->
+                    state.copy(uploadProgress = state.uploadProgress + (localUri to fraction))
+                }
+            }
+
+            when (result) {
+                is UploadImageResult.Failed -> {
+                    _uiState.update {
+                        it.copy(
+                            saveState = SaveState.ImagesIncomplete(
+                                slug = slug,
+                                uploaded = index,
+                                total = images.size,
+                                failure = result.failure,
+                            ),
+                        )
+                    }
+                    return
+                }
+
+                is UploadImageResult.Uploaded -> _uiState.update { state ->
+                    state.copy(
+                        // Pinned to 1f: the last progress callback can
+                        // arrive a little short of the total, and a bar
+                        // that stops at 98% on a photograph that is
+                        // finished reads as a stall.
+                        uploadProgress = state.uploadProgress + (localUri to 1f),
+                        saveState = SaveState.Uploading(index + 1, images.size),
+                    )
+                }
+            }
+        }
+
+        _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
     }
 
     /** Lets the screen dismiss an error without re-entering everything. */

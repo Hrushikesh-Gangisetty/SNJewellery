@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -69,6 +70,7 @@ internal fun ProductImages(
     photoProblem: PhotoProblem?,
     addingPhotos: Boolean,
     modifier: Modifier = Modifier,
+    uploadProgress: Map<String, Float> = emptyMap(),
     onTakePhoto: () -> Unit = {},
     onChoosePhotos: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -107,6 +109,11 @@ internal fun ProductImages(
                             uri = uri,
                             index = index,
                             total = images.size,
+                            progress = uploadProgress[uri],
+                            // Reordering or removing a photograph while
+                            // its bytes are going up would change an
+                            // order that is already being written.
+                            editable = uploadProgress.isEmpty(),
                             onMoveEarlier = { onMoveEarlier(index) },
                             onMoveLater = { onMoveLater(index) },
                             onRemove = { onRemove(index) },
@@ -182,6 +189,8 @@ private fun ProductImageRow(
     uri: String,
     index: Int,
     total: Int,
+    progress: Float?,
+    editable: Boolean,
     onMoveEarlier: () -> Unit,
     onMoveLater: () -> Unit,
     onRemove: () -> Unit,
@@ -209,22 +218,37 @@ private fun ProductImageRow(
                 .clip(MaterialTheme.shapes.small),
         )
 
-        Text(
-            text = if (index == 0) {
-                stringResource(R.string.add_product_image_main)
-            } else {
-                stringResource(R.string.add_product_image_number, position)
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = if (index == 0) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+        Column(
             modifier = Modifier.weight(1f),
-        )
+            verticalArrangement = Arrangement.spacedBy(Tokens.Space.s1),
+        ) {
+            Text(
+                text = if (index == 0) {
+                    stringResource(R.string.add_product_image_main)
+                } else {
+                    stringResource(R.string.add_product_image_number, position)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (index == 0) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
 
-        IconButton(onClick = onMoveEarlier, enabled = index > 0) {
+            // Per image, not just overall — M7.7's requirement, and the
+            // reason it is worth the room: on mobile data the owner needs
+            // to see that *this* photograph is moving, not that some
+            // aggregate is.
+            if (progress != null) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        IconButton(onClick = onMoveEarlier, enabled = editable && index > 0) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowUp,
                 contentDescription = stringResource(
@@ -233,7 +257,7 @@ private fun ProductImageRow(
                 ),
             )
         }
-        IconButton(onClick = onMoveLater, enabled = index < total - 1) {
+        IconButton(onClick = onMoveLater, enabled = editable && index < total - 1) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = stringResource(
@@ -242,7 +266,7 @@ private fun ProductImageRow(
                 ),
             )
         }
-        IconButton(onClick = onRemove) {
+        IconButton(onClick = onRemove, enabled = editable) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = stringResource(R.string.add_product_image_remove, position),

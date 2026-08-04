@@ -93,6 +93,25 @@
          thing that can: a different name. -->
     <string name="add_product_error_name_taken">There are already too many pieces with this name. Please give this one a slightly different name.</string>
 
+    <!-- ── Upload (M7.7) ─────────────────────────────────────────────
+      The overall figure. The per-image bars sit in the Photographs
+      section, and M7.7 asks for both.
+    -->
+    <string name="add_product_uploading">Uploading photo %1$d of %2$d…</string>
+
+    <!--
+      Worded apart from every other failure on this screen, because the
+      advice is the opposite of all of them. The piece IS saved. Telling
+      the owner "nothing was lost, tap Save again" — true everywhere else
+      here — would put a second copy of the piece in the catalogue.
+
+      Neither message says the piece is fine, because it is not: it is in
+      the catalogue with some of its pictures missing. M7.9 makes this
+      recoverable; today it is only honest.
+    -->
+    <string name="add_product_error_images_offline">The piece was saved, but the connection dropped and only %1$d of %2$d photos went up. Do not tap Save again — that would add the piece twice. Edit the piece to add the rest.</string>
+    <string name="add_product_error_images_server">The piece was saved, but only %1$d of %2$d photos went up. Do not tap Save again — that would add the piece twice. Edit the piece to add the rest.</string>
+
     <!-- ── Field validation (M7.2) ───────────────────────────────────
       Each mirrors a constraint the database enforces anyway, said in
       words the owner can act on and before a round trip — never instead

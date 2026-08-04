@@ -6,6 +6,7 @@ import com.snjewellery.admin.data.catalogue.SupabaseCatalogueRepository
 import com.snjewellery.admin.data.config.BuildConfigRepository
 import com.snjewellery.admin.data.dashboard.SupabaseDashboardRepository
 import com.snjewellery.admin.data.media.CacheStagedImages
+import com.snjewellery.admin.data.product.SupabaseProductImageRepository
 import com.snjewellery.admin.data.product.SupabaseProductRepository
 import com.snjewellery.admin.domain.auth.AdminAccessRepository
 import com.snjewellery.admin.domain.auth.AuthRepository
@@ -13,6 +14,7 @@ import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.dashboard.DashboardRepository
 import com.snjewellery.admin.domain.media.StagedImages
+import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import dagger.Binds
 import dagger.Module
@@ -70,6 +72,12 @@ abstract class DataModule {
     abstract fun bindProductRepository(
         impl: SupabaseProductRepository,
     ): ProductRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProductImageRepository(
+        impl: SupabaseProductImageRepository,
+    ): ProductImageRepository
 
     @Binds
     @Singleton

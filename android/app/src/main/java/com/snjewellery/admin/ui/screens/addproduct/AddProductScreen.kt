@@ -278,6 +278,7 @@ internal fun AddProductScreen(
                 images = uiState.form.images,
                 photoProblem = uiState.photoProblem,
                 addingPhotos = uiState.addingPhotos,
+                uploadProgress = uiState.uploadProgress,
                 onTakePhoto = onTakePhoto,
                 onChoosePhotos = onChoosePhotos,
                 onOpenSettings = onOpenCameraSettings,
@@ -296,18 +297,29 @@ internal fun AddProductScreen(
                 // nothing happens when it is pressed; pressing it puts
                 // the reason under the field that needs it. Same rule as
                 // the login screen.
-                enabled = saveState !is SaveState.Saving,
+                enabled = saveState !is SaveState.Saving && saveState !is SaveState.Uploading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Tokens.Layout.touchTarget),
             ) {
-                if (saveState is SaveState.Saving) {
-                    CircularProgressIndicator(
+                when (saveState) {
+                    is SaveState.Saving -> CircularProgressIndicator(
                         modifier = Modifier.size(Tokens.Space.s5),
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
-                } else {
-                    Text(stringResource(R.string.add_product_save))
+
+                    // The overall figure. The per-image bars are in the
+                    // Photographs section above; together they are what
+                    // M7.7 asks for.
+                    is SaveState.Uploading -> Text(
+                        stringResource(
+                            R.string.add_product_uploading,
+                            saveState.completed + 1,
+                            saveState.total,
+                        ),
+                    )
+
+                    else -> Text(stringResource(R.string.add_product_save))
                 }
             }
 
@@ -329,6 +341,19 @@ private fun SaveError(saveState: SaveState) {
         }
 
         is SaveState.NameUnavailable -> stringResource(R.string.add_product_error_name_taken)
+
+        // Worded apart from every other failure because the advice is the
+        // opposite: the piece is saved, so pressing Save again would put
+        // a second copy of it in the catalogue.
+        is SaveState.ImagesIncomplete -> stringResource(
+            if (saveState.failure.offline) {
+                R.string.add_product_error_images_offline
+            } else {
+                R.string.add_product_error_images_server
+            },
+            saveState.uploaded,
+            saveState.total,
+        )
 
         else -> null
     }

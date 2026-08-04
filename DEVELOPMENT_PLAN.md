@@ -946,9 +946,19 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **Not driven through the app.** The emulator restarted mid-task, cold-booted, and its stored session no longer refreshes — the app is on the login screen and no credentials are to hand. The camera and gallery paths were driven end to end in M7.3 and M7.4 and are unchanged except for the compression step, which is what the tests cover; but the owner should add one photograph by each route after signing in.
 
-- **`M7.7` Upload pipeline with progress** — `M`
+- **`M7.7` Upload pipeline with progress** — `M` — ◐ **written and building; never run against the live project**
   Upload to Supabase Storage using the M3.6 path convention, with per-image and overall progress indicators.
   *Done when:* progress is accurate and visible for every image.
+
+  **Not verified, and that matters more here than usual.** The emulator cold-booted during M7.6 and its stored session no longer refreshes, so there are no credentials to hand and this upload path has never made a single request. Everything downstream — M7.9's rollback, M7.10's interruption handling, M7.13's timing — is built on it. **The owner should sign in and save one product with three photographs before more is built on top.** The things most likely to bite on first contact: the SDK's Android `Uri` overload resolves its `ContentResolver` through supabase-kt's own context holder; the admin-insert storage policy; and the bucket's 5 MB limit against what M7.6 actually produces.
+
+  **`StoragePaths` is now the only place an image location is constructed**, in either client — ADR-0005 §5. `products/{product_id}/{image_id}.webp`, with the extension fixed because M7.6 makes every upload a WebP.
+
+  **One photograph per call, and sequential.** A batch call can only report a total, and M7.7 asks for per-image progress; M7.9's per-image retry also needs to know exactly which ones landed. Sequential rather than concurrent because this app's connection is Indian mobile data, where parallel streams share the same narrow pipe and a stall takes all of them with it — M7.13 is the place to revisit that with a number rather than an opinion.
+
+  **Progress is bytes, not files.** It comes from `uploadAsFlow`'s counts, so the bar reflects what has actually been written. One honest limitation: those are bytes handed to the socket, not bytes acknowledged by the far end, so on a stalling connection the bar can finish slightly early. Every HTTP client on the platform reports it this way.
+
+  **A failure part-way through gets its own state.** *"Nothing was saved, tap Save again"* is true of every other failure on this screen and would be a lie here — the piece **is** in the catalogue, and tapping Save again would add it twice. So the message says so, and says not to. M7.9 owns making that recoverable; this only makes it honest.
 
 - **`M7.8` Database writes with ordering** — `S`
   Write `products` and `product_images` rows with `display_order` matching the chosen order.
