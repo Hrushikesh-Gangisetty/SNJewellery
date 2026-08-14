@@ -1053,9 +1053,26 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **Not driven on a device**, inheriting M7.7's blocker. **What the owner should check:** that the confirmation names the piece, that Add another gives a genuinely empty form, and — once M5 is live and `WEBSITE_URL` is set — that View opens the right page.
 
-- **`M7.13` Timing measurement and tuning** — `M`
+- **`M7.13` Timing measurement and tuning** — `M` — ⛔ **blocked, and not on a decision**
   Measure end-to-end upload time on mobile data; tune compression and upload concurrency against the PRD's thirty-second target.
   *Done when:* a three-image product uploads in under 30 seconds on mobile data, with the measurement recorded in the repository.
+
+  **This task is a number, and the number cannot be obtained here.** It needs three things at once: a **physical phone** (an emulator's network is the host's, so any figure it produced would be a fiction), **mobile data** rather than Wi-Fi, and the **admin password**, which is the owner's. No amount of code closes it, and guessing a plausible figure would be exactly the kind of committed measurement CLAUDE.md §7 rule 5 exists to prevent.
+
+  **What to record when it is run**, so one session produces a usable answer rather than an impression:
+
+  | Figure | How |
+  |---|---|
+  | End to end | Stopwatch from the Save tap to the confirmation screen. This is the PRD's actual target, and it is the only one that matters if it passes. |
+  | Photographs | Three, of real jewellery, from the camera — not the gallery, and not one photograph three times. |
+  | Connection | Carrier, and the reported signal bars. A 30-second figure on four bars says nothing about the shop's back room. |
+  | Compressed sizes | Each photograph's bytes, from the bucket. ADR-0005's ceiling is 900 KB; if all three sit near it, compression is the lever. |
+
+  **What to change if it fails, in order.** If the total is dominated by the seconds *before* the first progress bar moves, it is compression, and ADR-0005's quality steps are the lever. If it is dominated by the bars themselves, it is upload, and the decision to go **sequential rather than concurrent** (M7.7) is the thing to revisit — with the number, which is why it was left as a stated choice rather than a settled one.
+
+  **Also outstanding and in the same session:** ADR-0005's own open check — whether the compressed result is *visibly acceptable for jewellery detail at full-screen size*. It needs real jewellery on a real screen, and compression is irreversible.
+
+  Not blocked on any Open Question, and it blocks nothing: M8 depends on M7's form and pipeline, both of which exist.
 
 ### Dependencies
 
