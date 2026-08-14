@@ -1115,9 +1115,31 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
 ### Tasks
 
-- **`M8.1` Product list** — `M`
+- **`M8.1` Product list** — `M` — ◐ **built and tested; the smoothness check needs a device and a real catalogue**
   Paginated or lazily loaded list showing thumbnail, name, category, and status badges, most-recent-first.
   *Done when:* the list scrolls smoothly over several hundred products.
+
+  **Keyset, not offset** — CLAUDE.md §8, and it matters for a reason beyond speed. `OFFSET 400` makes the database walk and discard four hundred rows to return twenty, so the last page of a large catalogue is the slowest; worse, a piece uploaded while the owner is scrolling shifts every later row by one, which shows a duplicate or skips a piece silently. The cursor pins the position to a row.
+
+  **The cursor is `(created_at, id)`, not `created_at` alone.** `created_at` is not unique, and PostgREST has no row-value comparison, so the boundary is written as a disjunction: *older than the cursor's timestamp, **or** the same timestamp with a smaller id*. The tempting one-field version loses every piece sharing a timestamp with the cursor row; `lte` instead repeats it.
+
+  **Whether there is a next page comes from the rows.** The query asks for `PAGE_SIZE + 1` and returns the first `PAGE_SIZE`; the extra row's existence *is* the answer. A separate count would be a second round trip to learn something the rows already say.
+
+  **One request per page, not one plus N.** The category name and the photograph arrive as embedded resources, so twenty pieces cost one round trip rather than forty-one — which on mobile data is where the time goes. `product_images` is embedded **unfiltered** and the primary chosen client-side by `display_order`: PostgREST can narrow an embed, but a piece with no photographs is exactly the row that must still appear in the owner's list, and narrowing risks dropping it.
+
+  **Archived pieces appear here, badged.** A decision, and the opposite of the dashboard's. §2.6b excludes them from the counts because those answer "how big is my catalogue"; this list answers "what have I got", and archiving is reversible — a piece missing from the website *and* the app would be unrecoverable, which is precisely what M8.5 promises it is not. M8.2 adds the filter.
+
+  **Three badges, not one status word.** Featured, Sold and Archived are not exclusive: a featured piece that has sold is a real state, and collapsing it would silently drop whichever the app decided mattered less.
+
+  **Two failure states, deliberately.** A first-page failure gets the screen. A later page's failure sits at the bottom with the list intact — replacing a screenful the owner already has because page four did not arrive is the app throwing away working content. ux.md rule 3, applied twice on one screen.
+
+  **Two adjacent fixes, made and named.** The dashboard now reaches this list (an `OutlinedButton` in the body rather than a third top-bar action — three short words in a top bar is where it stops being readable). And **M6.11's empty state finally has its next step**: it shipped without one because "Add your first product" had nowhere to go, and M7 built the destination.
+
+  **Verified by test.** `CatalogueViewModelTest` — 11 tests — covers the paging state machine, which is where the logic is: the cursor advancing, append-not-replace, the last page stopping, a flick near the bottom not requesting the same page a dozen times, a failed page waiting to be retried rather than hammering a refused connection, refresh discarding rather than merging, and the empty state not flashing while the first page is in flight. Mutating out the `loadingMore` guard fails **`a flick near the bottom does not request the same page repeatedly`** and nothing else. Project total: **32 local tests, all passing**; `lint` 0 errors and 8 warnings, none new; `assembleDebug` and `assembleRelease` pass.
+
+  **Not verified: the *Done when* itself**, and it is doubly blocked. It needs a physical device *and* several hundred products, and neither exists — see the finding on the dev project below.
+
+  **The query shape is unverified against a real database.** M6.11 checked its queries out of band with `curl` and the anon key; that is impossible now (same finding). The embedded-resource select and the disjunction cursor compile and are reasoned about, but **they have not returned a row**. First thing to check when the backend is reachable.
 
 - **`M8.2` In-app search and status filters** — `S`
   Search by name, category, and tags; filter by status.
@@ -1606,6 +1628,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | 18 | **Social links and a Maps location.** Partly answered 2026-07-27: **there is no map**, so the embed was removed and M4.10's map criterion is superseded. Social handles remain pending, and no coordinates have been supplied. | M11.3 | Social links hide cleanly per ADR-0010, so nothing is blocked. Two things still ride on a location, and neither is the embed: **Get Directions** (M4.12, a PRD-required conversion action) renders nothing without `geo` or `mapsUrl`, and M11.3's `LocalBusiness` structured data wants real coordinates. A plain Google Maps share link into `mapsUrl` satisfies the first; coordinates satisfy both. |
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
 | 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
+| 22 | **The development Supabase project appears to be gone.** Its hostname no longer resolves in DNS, from a machine where general DNS and HTTPS both work, and where M6.11 was querying that same project successfully with `curl` on 2026-08-02. A free-tier project that has been paused or removed is by far the likeliest explanation. **Needs the owner to check the Supabase dashboard.** | **verification of M7.6–M7.12, M8.1, and everything after** | This reframes what the last several tasks recorded as "no credentials to hand". If the project is gone, the blocker is not a password: there is no backend to sign in to, which also explains the emulator session that "no longer refreshes". Nothing is lost — the schema is entirely in `supabase/migrations/` and the seed in `supabase/seed.sql`, so a new project is `db push` plus `seed`, then a new URL and anon key in `web/.env.local` and `android/local.properties`, and a new admin account (M3.8). But **every *Done when* that requires a live database is blocked until it exists**, and the code written since is reasoned-about rather than exercised. |
 | 21 | **Nobody can set a metal rate until M7.** `metal_rates` ships with both rows unpublished and the website hides the panel, which is correct — but the rate stays invisible until the Android app has a screen for it. | M7 | The panel is dead on the live site until then. If rates are wanted sooner, the interim is a direct SQL update by the owner, which needs a documented runbook. |
 
 ---

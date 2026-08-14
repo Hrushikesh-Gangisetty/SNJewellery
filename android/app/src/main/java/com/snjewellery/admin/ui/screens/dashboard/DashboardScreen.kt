@@ -17,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -65,6 +66,7 @@ import java.util.Locale
 fun DashboardScreen(
     onSignOut: () -> Unit,
     onAddProduct: () -> Unit,
+    onViewCatalogue: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -79,6 +81,7 @@ fun DashboardScreen(
         uiState = uiState,
         onSignOut = onSignOut,
         onAddProduct = onAddProduct,
+        onViewCatalogue = onViewCatalogue,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -91,6 +94,7 @@ internal fun DashboardScreen(
     modifier: Modifier = Modifier,
     onSignOut: () -> Unit = {},
     onAddProduct: () -> Unit = {},
+    onViewCatalogue: () -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
     Scaffold(
@@ -154,9 +158,21 @@ internal fun DashboardScreen(
                 )
 
                 is DashboardState.Loaded -> if (state.metrics.isEmpty) {
-                    EmptyCatalogue()
+                    EmptyCatalogue(onAddProduct = onAddProduct)
                 } else {
                     Metrics(metrics = state.metrics)
+
+                    // In the body rather than a third top-bar action: the
+                    // bar already holds two, and a row of three short
+                    // words is where a top bar stops being readable.
+                    OutlinedButton(
+                        onClick = onViewCatalogue,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Tokens.Layout.touchTarget),
+                    ) {
+                        Text(stringResource(R.string.dashboard_view_catalogue))
+                    }
                 }
             }
         }
@@ -338,16 +354,16 @@ private fun MetricsError(failure: RequestFailure, onRetry: () -> Unit) {
 /**
  * Nothing uploaded yet. A statement, not an error.
  *
- * ux.md rule 1 asks every empty state for a next step, and the one this
- * wants — "Add your first product" — has nowhere to go until M7 builds
- * the upload screen. A button that does nothing would be worse than the
- * missing one, so the action arrives with the destination.
+ * ux.md rule 1 asks every empty state for a next step. M6.11 shipped this
+ * without one because the step it wanted — "Add your first product" — had
+ * nowhere to go, and a button that does nothing is worse than a missing
+ * one. M7 built the destination, so the action arrives here now.
  */
 @Composable
-private fun EmptyCatalogue() {
+private fun EmptyCatalogue(onAddProduct: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+        verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -356,6 +372,12 @@ private fun EmptyCatalogue() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        Button(
+            onClick = onAddProduct,
+            modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+        ) {
+            Text(stringResource(R.string.dashboard_add_first_product))
+        }
     }
 }
 

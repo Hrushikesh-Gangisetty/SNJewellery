@@ -278,4 +278,36 @@
     <string name="product_saved_view">View on the website</string>
     <string name="product_saved_done">Back to the dashboard</string>
     <string name="product_saved_no_browser">This phone has no browser to open the website in. The piece is saved either way.</string>
+
+    <!-- ── Catalogue list (M8.1) ─────────────────────────────────────
+      Three states, worded apart (ux.md rule 3). "Nothing here yet" is a
+      statement with a next step, not an error. A first-page failure gets
+      the screen; a later page's failure sits at the bottom with the list
+      intact, because throwing away a screenful the owner already has is
+      worse than the page they did not get.
+    -->
+    <string name="catalogue_title">Catalogue</string>
+    <string name="catalogue_back">Back</string>
+    <string name="catalogue_empty">No pieces yet. Tap Add product on the dashboard to enter the first one.</string>
+    <string name="catalogue_offline">No connection, so the catalogue could not be loaded. Check your signal and tap Try again.</string>
+    <string name="catalogue_error">The catalogue could not be loaded (%1$s). Please tap Try again.</string>
+    <string name="catalogue_no_detail">no details</string>
+    <string name="catalogue_retry">Try again</string>
+    <string name="catalogue_more_offline">No connection, so more pieces could not be loaded. The ones above are still here.</string>
+    <string name="catalogue_more_error">More pieces could not be loaded. The ones above are still here.</string>
+
+    <!-- Shown in the thumbnail's place, so a piece with no photograph
+         keeps the row's shape rather than shrinking it. -->
+    <string name="catalogue_no_photo">No photo</string>
+
+    <!-- All three can be true at once — a featured piece that has sold is
+         a real state — so they are three badges, not one status word. -->
+    <string name="catalogue_badge_featured">Featured</string>
+    <string name="catalogue_badge_sold">Sold</string>
+    <string name="catalogue_badge_archived">Archived</string>
+
+    <string name="dashboard_view_catalogue">View catalogue</string>
+    <!-- M6.11 left the dashboard's empty state without a next step because
+         the one it wanted had nowhere to go. M7 built the destination. -->
+    <string name="dashboard_add_first_product">Add your first product</string>
 </resources>

@@ -26,6 +26,10 @@ data object Dashboard
 @Serializable
 data object AddProduct
 
+/** The owner's whole catalogue, newest first (M8.1). */
+@Serializable
+data object Catalogue
+
 /**
  * The confirmation after a piece is saved (M7.12).
  *
