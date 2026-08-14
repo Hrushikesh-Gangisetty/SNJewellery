@@ -5,8 +5,10 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.snjewellery.admin.ui.screens.addproduct.AddProductScreen
 import com.snjewellery.admin.ui.screens.dashboard.DashboardScreen
+import com.snjewellery.admin.ui.screens.productsaved.ProductSavedScreen
 
 /**
  * The authenticated app's navigation graph.
@@ -43,13 +45,36 @@ fun AdminNavHost(
 
         composable<AddProduct> {
             AddProductScreen(
-                // The dashboard reloads on resume, so popping back shows
-                // a total that includes what was just saved. M7.12
-                // replaces this with a confirmation that links to the
-                // new product; returning to updated counts is the
-                // honest minimum until then.
-                onSaved = { navController.popBackStack() },
+                onSaved = { name, slug ->
+                    navController.navigate(ProductSaved(name, slug)) {
+                        // The form is left behind, not stacked under the
+                        // confirmation. Its Save button stays live and its
+                        // attempt record has been cleared, so a Back into
+                        // it followed by a tap would enter the same piece
+                        // a second time. Popping it is a correctness
+                        // requirement, not tidiness.
+                        popUpTo(AddProduct) { inclusive = true }
+                    }
+                },
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ProductSaved> { entry ->
+            val saved = entry.toRoute<ProductSaved>()
+            ProductSavedScreen(
+                name = saved.name,
+                slug = saved.slug,
+                // A fresh back stack entry, so the next form arrives with
+                // an empty SavedStateHandle and nothing of the last piece.
+                onAddAnother = {
+                    navController.navigate(AddProduct) {
+                        popUpTo(Dashboard)
+                    }
+                },
+                // The dashboard reloads on resume, so its counts include
+                // the piece just saved.
+                onDone = { navController.popBackStack() },
             )
         }
     }

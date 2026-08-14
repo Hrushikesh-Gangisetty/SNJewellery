@@ -69,7 +69,7 @@ import com.snjewellery.admin.ui.theme.snTextStyles
  */
 @Composable
 fun AddProductScreen(
-    onSaved: (String) -> Unit,
+    onSaved: (name: String, slug: String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AddProductViewModel = hiltViewModel(),
@@ -137,14 +137,14 @@ internal fun AddProductScreen(
     onMoveImageEarlier: (Int) -> Unit = {},
     onMoveImageLater: (Int) -> Unit = {},
     onRemoveImage: (Int) -> Unit = {},
-    onSaved: (String) -> Unit = {},
+    onSaved: (name: String, slug: String) -> Unit = { _, _ -> },
     onBack: () -> Unit = {},
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val saveState = uiState.saveState
 
     if (saveState is SaveState.Saved) {
-        LaunchedEffect(saveState.slug) { onSaved(saveState.slug) }
+        LaunchedEffect(saveState.slug) { onSaved(saveState.name, saveState.slug) }
     }
 
     Scaffold(

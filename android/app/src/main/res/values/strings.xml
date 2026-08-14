@@ -261,4 +261,21 @@
 
     <string name="access_retry">Try again</string>
     <string name="access_sign_out">Sign out</string>
+
+    <!-- ── Saved confirmation (M7.12) ────────────────────────────────
+      Names the piece rather than only confirming. "Saved" on its own is
+      the sort of message someone stops reading, and after a morning of
+      uploads the owner needs to know which one it was.
+
+      "Add another" is first because it is what actually happens next:
+      the owner is photographing jewellery between customers, not going
+      off to admire it. View appears only when the build was told where
+      the website is — see local.properties.example.
+    -->
+    <string name="product_saved_title">Saved</string>
+    <string name="product_saved_body">%1$s is in the catalogue. It will appear on the website within a minute.</string>
+    <string name="product_saved_add_another">Add another piece</string>
+    <string name="product_saved_view">View on the website</string>
+    <string name="product_saved_done">Back to the dashboard</string>
+    <string name="product_saved_no_browser">This phone has no browser to open the website in. The piece is saved either way.</string>
 </resources>

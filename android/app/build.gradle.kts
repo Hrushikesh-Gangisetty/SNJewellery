@@ -70,6 +70,11 @@ android {
             "SUPABASE_ANON_KEY",
             "\"${localProperty("SUPABASE_ANON_KEY")}\"",
         )
+        // Optional, unlike the two above: the app works without it and
+        // simply does not offer to open a saved piece on the website. It
+        // stays blank until M5 puts the site on a domain, and a button
+        // pointing at nothing would be worse than no button (M7.12).
+        buildConfigField("String", "WEBSITE_URL", "\"${localProperty("WEBSITE_URL")}\"")
     }
 
     /**

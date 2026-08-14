@@ -121,7 +121,14 @@ sealed interface SaveState {
     /** The rollback is running. */
     data object Discarding : SaveState
 
-    data class Saved(val slug: String) : SaveState
+    /**
+     * [name] is carried alongside the slug so the confirmation can name
+     * the piece rather than showing a URL fragment. They are read together
+     * because the form is cleared the moment the screen leaves, and a
+     * confirmation that says "Saved" without saying *what* is the kind of
+     * message someone stops reading.
+     */
+    data class Saved(val name: String, val slug: String) : SaveState
 
     /**
      * The name cannot be made into a free slug. Its own state because
@@ -808,7 +815,9 @@ class AddProductViewModel @Inject constructor(
         when (val written = productImageRepository.replaceImages(productId, images)) {
             is WriteImagesResult.Written -> {
                 progress = null
-                _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
+                _uiState.update {
+                    it.copy(saveState = SaveState.Saved(it.form.name.trim(), slug))
+                }
             }
 
             // The row is in the catalogue and its photographs are not on

@@ -16,4 +16,16 @@ package com.snjewellery.admin.domain.config
  */
 interface ConfigRepository {
     fun status(): ConfigStatus
+
+    /**
+     * The customer website's origin, or **null when this build was not
+     * told one**.
+     *
+     * Optional rather than part of [ConfigStatus], because the app is
+     * fully usable without it — the only thing it enables is opening a
+     * saved piece on the live site (M7.12). Null while M5 has not yet put
+     * the site on a domain, and the screen offers no such button rather
+     * than one that would open a 404 on the shop's own site.
+     */
+    fun websiteUrl(): String?
 }

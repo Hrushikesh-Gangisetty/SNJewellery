@@ -41,6 +41,11 @@ class BuildConfigRepository @Inject constructor() : ConfigRepository {
         }
     }
 
+    // Blank and absent are the same thing here: `localProperty` returns
+    // "" for a line that is missing and for one left empty, and neither
+    // is a website.
+    override fun websiteUrl(): String? = BuildConfig.WEBSITE_URL.ifBlank { null }
+
     private companion object {
         // The names as they appear in local.properties, so the message
         // names the line to edit rather than a Kotlin symbol.

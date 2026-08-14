@@ -37,6 +37,17 @@ SUPABASE_ANON_KEY=
 #   See docs/adr/0004-authentication-and-roles.md
 
 
+# ── Customer website ─────────────────────────────────────────
+# Optional. When set, the app offers to open a piece it has just
+# saved on the live site. Leave it blank and that button simply
+# does not appear — a link to nothing is worse than no link.
+#
+# Must match web/.env NEXT_PUBLIC_SITE_URL, without a trailing
+# slash. Blank until M5 puts the site on a domain.
+#   e.g. WEBSITE_URL=https://www.example.com
+WEBSITE_URL=
+
+
 # ── Release signing ──────────────────────────────────────────
 # Needed only when building a release variant. Keep the keystore
 # file itself outside the repository — *.keystore is gitignored,

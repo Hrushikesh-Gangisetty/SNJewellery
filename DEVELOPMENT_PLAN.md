@@ -1019,7 +1019,7 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **Verified by test, and the tests were verified in turn.** `AddProductSaveTest` is now 17 tests, all passing. Reclaiming the process is modelled by building a second view model over the same handle — which is exactly what survives. The double-tap tests needed a fake that genuinely blocks (`CompletableDeferred`), because with fakes that return immediately the first save finishes before the second tap and the guard is never exercised. Both new groups were then mutated to confirm they bite: removing the `inFlight` guard fails **`double-tapping Save creates exactly one product`** and nothing else; removing the write-through fails **`an attempt the app did not outlive is offered back, not forgotten`**, **`a reopened attempt carries on rather than re-uploading`** and **`a reopened attempt keeps the same product id`**, and nothing else.
 
-  `testDebugUnitTest`, `lint`, `assembleDebug` and `assembleRelease` all pass; lint reports 0 errors and 7 warnings — one more than before, `PluralsCandidate` on the new message, the same construction as the two beside it that were already accepted.
+  `testDebugUnitTest`, `lint`, `assembleDebug` and `assembleRelease` all pass; lint reports 0 errors and 8 warnings — one more than before, `PluralsCandidate` on the new message, the same construction as the two beside it that were already accepted.
 
   **Not verified on a device**, inheriting M7.7's blocker: no admin credentials to hand, so no request on this path has been made. **The owner should force-stop the app mid-upload and confirm the screen reopens offering Carry on**, and separately background it for a minute mid-upload and confirm the upload simply continues.
 
@@ -1035,9 +1035,23 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **Verified:** two products both named `M7-Verification-Piece` saved as `m7-verification-piece` and `m7-verification-piece-2`.
 
-- **`M7.12` Success confirmation** — `S`
+- **`M7.12` Success confirmation** — `S` — ◐ **the confirmation is built; its link cannot be shown to resolve until M5 deploys the site**
   Clear confirmation with a path to view or edit the created product.
   *Done when:* the confirmation appears and its link resolves to the new product.
+
+  **A destination, not a message on the form — and that is a correctness fix, not tidiness.** Save stays live after a successful save and the attempt record is cleared, so pressing it again inserts a *new* product. Navigating to `ProductSaved` and popping `AddProduct` off the back stack means there is no route back into a form holding a piece already entered. Before this, Back-then-Save was a second copy of the piece.
+
+  **`ProductSaved` carries the name and slug in the route**, so a confirmation the app was reclaimed on comes back still knowing which piece it is confirming rather than saying "Saved" over nothing.
+
+  **"Add another piece" is the primary action.** The owner photographs jewellery between customers; the question after a save is "next piece", not "let me go and admire it". It navigates to a fresh `AddProduct` entry, so the form arrives with an empty `SavedStateHandle` and nothing of the last piece carried over.
+
+  **The second half of the *Done when* cannot be met yet, and is not claimed.** "Its link resolves to the new product" needs somewhere for the link to go, and **there is nowhere**: M5 has not put the site on a domain, and Edit Product — the other option the task offers — is M8.3. So the View button is wired end to end and **appears only when the build was given a `WEBSITE_URL`**, which is blank today. A button opening a 404 on the shop's own site would read to the owner as the piece not having saved; the same rule the website follows for social links it has not been given (M4.10).
+
+  `WEBSITE_URL` is optional rather than part of `ConfigStatus`, because the app is entirely usable without it. `WebsiteLinks` is the one place a website address is built — the same argument `StoragePaths` makes for Storage paths, and it holds the fact that the route is `/product/{slug}`, which nothing else would catch if the website changed it. `WebsiteLinksTest` (4 tests) covers the trailing-slash forms, because that value is typed by hand into `local.properties` and both spellings will be entered.
+
+  `testDebugUnitTest` (21 tests, all passing), `lint` (0 errors, 8 warnings, none new), `assembleDebug` and `assembleRelease` all pass.
+
+  **Not driven on a device**, inheriting M7.7's blocker. **What the owner should check:** that the confirmation names the piece, that Add another gives a genuinely empty form, and — once M5 is live and `WEBSITE_URL` is set — that View opens the right page.
 
 - **`M7.13` Timing measurement and tuning** — `M`
   Measure end-to-end upload time on mobile data; tune compression and upload concurrency against the PRD's thirty-second target.

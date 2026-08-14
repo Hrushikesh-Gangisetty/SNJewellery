@@ -25,3 +25,14 @@ data object Dashboard
 /** The Add Product form (M7.1). */
 @Serializable
 data object AddProduct
+
+/**
+ * The confirmation after a piece is saved (M7.12).
+ *
+ * A `data class` rather than an object, so the piece it is confirming
+ * travels in the route and survives process death with the back stack.
+ * Holding it in a view model instead would show "Saved" with no name
+ * after the app was reclaimed on the confirmation screen.
+ */
+@Serializable
+data class ProductSaved(val name: String, val slug: String)
