@@ -1000,9 +1000,28 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **A known gap, left to M7.10 on purpose:** the attempt record lives in the view model, not on the `SavedStateHandle`. Killing the *network* does not kill the process, which is what this task's *Done when* asks about — but a process reclaimed mid-upload still leaks the objects already in the bucket, and "app backgrounded mid-upload" is M7.10's wording.
 
-- **`M7.10` Interruption handling** — `S`
+- **`M7.10` Interruption handling** — `S` — ◐ **all three cases handled and tested; the live check is outstanding with M7.7–M7.9**
   Connection lost mid-upload, app backgrounded mid-upload, double-tap submission.
   *Done when:* each case is handled, and double-tapping Save creates exactly one product.
+
+  **The three cases are not three mechanisms.** Each one is "the save stopped part-way", which M7.9 already made resumable and undoable, so this task is mostly about making sure each *reaches* that state rather than falling through a gap:
+
+  - **Connection lost mid-upload** — M7.9's. Nothing added here.
+  - **Backgrounded without the process dying** — nothing to do, and that is the correct answer rather than an omission: `viewModelScope` outlives a stop, so the upload keeps going and comes back to a live progress bar. Verifying that meant *not* writing the pause-and-resume that looks like the diligent thing to build.
+  - **Backgrounded and reclaimed** — the gap M7.9 flagged. The attempt record now lives on the `SavedStateHandle`, so a reopened screen says *"This piece was part-way through saving when the app closed — 2 of 3 photos went up, and nothing has been added to the catalogue"*, with the same Carry on and Discard. Without it the screen came back looking untouched over objects in the bucket that nothing referred to.
+  - **Double-tap** — the `inFlight` guard, now covering Discard too.
+
+  **`Interrupted.failure` became nullable, and that is the point of it.** Null means *nothing failed* — the app was closed. Reusing "no connection" here would send the owner to check a signal that was never the problem, which is the same mistake M6.7 and M6.9 were each built around, in a third place.
+
+  **Persisted as JSON on the handle, not as fields.** A `Bundle` cannot hold a list of records, and four parallel `ArrayList`s is how the fourth ends up a different length from the other three. That decided the shape of the record: `SaveProgress.uploaded` is a `List<StagedUpload>` rather than a map keyed by URI, and `StagedUpload` carries no `display_order` — the order is still the index on screen when the rows are written, so a photograph promoted while the app was closed still lands where the owner put it.
+
+  **Written through on every change, not at a checkpoint**, because there is no moment at which Android says it is about to reclaim an app. The invariant is now stated in [android-app.md §2.6c](docs/architecture/android-app.md): **no object exists in the bucket that this record does not mention.**
+
+  **Verified by test, and the tests were verified in turn.** `AddProductSaveTest` is now 17 tests, all passing. Reclaiming the process is modelled by building a second view model over the same handle — which is exactly what survives. The double-tap tests needed a fake that genuinely blocks (`CompletableDeferred`), because with fakes that return immediately the first save finishes before the second tap and the guard is never exercised. Both new groups were then mutated to confirm they bite: removing the `inFlight` guard fails **`double-tapping Save creates exactly one product`** and nothing else; removing the write-through fails **`an attempt the app did not outlive is offered back, not forgotten`**, **`a reopened attempt carries on rather than re-uploading`** and **`a reopened attempt keeps the same product id`**, and nothing else.
+
+  `testDebugUnitTest`, `lint`, `assembleDebug` and `assembleRelease` all pass; lint reports 0 errors and 7 warnings — one more than before, `PluralsCandidate` on the new message, the same construction as the two beside it that were already accepted.
+
+  **Not verified on a device**, inheriting M7.7's blocker: no admin credentials to hand, so no request on this path has been made. **The owner should force-stop the app mid-upload and confirm the screen reopens offering Carry on**, and separately background it for a minute mid-upload and confirm the upload simply continues.
 
 - **`M7.11` Slug generation** — `S` — ✅ **complete** (done early: M7.1's insert cannot write a row without one)
   Generate the product `slug` with guaranteed uniqueness, including for two products with identical names.

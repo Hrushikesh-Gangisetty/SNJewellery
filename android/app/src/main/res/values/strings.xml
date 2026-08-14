@@ -116,6 +116,12 @@
          failed. So "nothing was saved" would be a lie here. -->
     <string name="add_product_error_rows">The piece is in the catalogue, but its photos are not attached to it yet. Tap Carry on to finish — this will not add the piece twice.</string>
     <string name="add_product_save_continue">Carry on</string>
+    <!-- M7.10: nothing failed — Android reclaimed the app while the upload
+         was running, which is likeliest precisely then, with several
+         megabytes of bitmap held and a request in flight. Saying "no
+         connection" here would send the owner to check a signal that was
+         never the problem. -->
+    <string name="add_product_error_reopened">This piece was part-way through saving when the app closed — %1$d of %2$d photos went up, and nothing has been added to the catalogue. Tap Carry on to finish it, or discard it.</string>
 
     <!-- Discard is the other half of M7.9: undo what reached the server.
          It does not clear the form or the photographs — those are still

@@ -186,9 +186,20 @@ Two consequences to carry into M8:
   retry that can hit a unique violation is a retry that can never
   succeed.
 
+- **What reached the server is recorded where the process cannot take it.**
+  The record of a part-finished attempt lives on the screen's
+  `SavedStateHandle`, written through on every change rather than at a
+  checkpoint — there is no moment at which Android tells an app it is
+  about to be reclaimed, and being reclaimed is likeliest precisely
+  mid-upload, holding several megabytes of bitmap. The rule is that **no
+  object exists in the bucket that this record does not mention**, so a
+  reopened screen can always offer both ways out instead of coming back
+  blank over storage nobody remembers.
+
 *Check:* with the network dropped mid-upload, `select count(*) from
 products` is unchanged, and the objects under `products/{id}/` are
-removed by Discard.
+removed by Discard. Force-stopped mid-upload, the screen reopens saying
+what got as far as the bucket.
 
 ### 2.7 No screen declares a visual value
 

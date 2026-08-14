@@ -16,9 +16,11 @@ import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
 import com.snjewellery.admin.domain.product.WriteImagesResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -48,15 +50,33 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddProductSaveTest {
 
+    /**
+     * One dispatcher for `Dispatchers.Main` and for `runTest`, so that
+     * `advanceUntilIdle` drives the very coroutines `viewModelScope`
+     * started. Two would each have their own scheduler and the gated tests
+     * would hang.
+     *
+     * Unconfined, so an ungated `launch` runs to completion without
+     * advancing — which is what lets most of these tests read as
+     * "call it, then assert".
+     */
+    private val dispatcher = UnconfinedTestDispatcher()
+
     private lateinit var products: FakeProductRepository
     private lateinit var images: FakeProductImageRepository
+
+    /**
+     * The handle outlives the view model on purpose: it is what survives
+     * process death, so a second view model built from the same one is
+     * what the owner comes back to.
+     */
+    private lateinit var handle: SavedStateHandle
 
     @Before
     fun setUp() {
         // `viewModelScope` posts to Dispatchers.Main, which does not exist
-        // off-device. Unconfined so a `launch` runs to its first real
-        // suspension immediately and the assertions need no advancing.
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        // off-device.
+        Dispatchers.setMain(dispatcher)
         products = FakeProductRepository()
         images = FakeProductImageRepository()
     }
@@ -67,7 +87,7 @@ class AddProductSaveTest {
     // ── The invariant ────────────────────────────────────────────────
 
     @Test
-    fun `an upload failing part-way writes no product row`() = runTest {
+    fun `an upload failing part-way writes no product row`() = runTest(dispatcher) {
         images.failFrom = 2
         val viewModel = viewModel(photos = 3)
 
@@ -88,7 +108,7 @@ class AddProductSaveTest {
     }
 
     @Test
-    fun `discarding an interrupted save removes every uploaded object`() = runTest {
+    fun `discarding an interrupted save removes every uploaded object`() = runTest(dispatcher) {
         images.failFrom = 2
         val viewModel = viewModel(photos = 3)
         viewModel.save()
@@ -105,7 +125,7 @@ class AddProductSaveTest {
     }
 
     @Test
-    fun `discarding leaves the form and its photographs alone`() = runTest {
+    fun `discarding leaves the form and its photographs alone`() = runTest(dispatcher) {
         images.failFrom = 1
         val viewModel = viewModel(photos = 2)
         viewModel.save()
@@ -121,7 +141,7 @@ class AddProductSaveTest {
     // ── Carrying on ──────────────────────────────────────────────────
 
     @Test
-    fun `carrying on uploads only the photographs that did not land`() = runTest {
+    fun `carrying on uploads only the photographs that did not land`() = runTest(dispatcher) {
         images.failFrom = 2
         val viewModel = viewModel(photos = 3)
         viewModel.save()
@@ -143,7 +163,7 @@ class AddProductSaveTest {
     }
 
     @Test
-    fun `carrying on writes one product, not two`() = runTest {
+    fun `carrying on writes one product, not two`() = runTest(dispatcher) {
         images.failFrom = 1
         val viewModel = viewModel(photos = 2)
         viewModel.save()
@@ -160,7 +180,7 @@ class AddProductSaveTest {
     }
 
     @Test
-    fun `a name rejected after the uploads does not resend them`() = runTest {
+    fun `a name rejected after the uploads does not resend them`() = runTest(dispatcher) {
         products.slugExhausted = true
         val viewModel = viewModel(photos = 2)
         viewModel.save()
@@ -179,7 +199,7 @@ class AddProductSaveTest {
     // ── The one failure that leaves a public piece ────────────────────
 
     @Test
-    fun `image rows failing is reported as the piece being in the catalogue`() = runTest {
+    fun `image rows failing is reported as the piece being in the catalogue`() = runTest(dispatcher) {
         images.failRows = true
         val viewModel = viewModel(photos = 2)
 
@@ -190,7 +210,7 @@ class AddProductSaveTest {
     }
 
     @Test
-    fun `discarding after the row was written deletes the row and the objects`() = runTest {
+    fun `discarding after the row was written deletes the row and the objects`() = runTest(dispatcher) {
         images.failRows = true
         val viewModel = viewModel(photos = 2)
         viewModel.save()
@@ -202,7 +222,7 @@ class AddProductSaveTest {
     }
 
     @Test
-    fun `a failed rollback keeps the piece discardable rather than silently giving up`() = runTest {
+    fun `a failed rollback keeps the piece discardable rather than silently giving up`() = runTest(dispatcher) {
         images.failFrom = 2
         val viewModel = viewModel(photos = 3)
         viewModel.save()
@@ -222,7 +242,7 @@ class AddProductSaveTest {
     // ── Ordering ─────────────────────────────────────────────────────
 
     @Test
-    fun `display order is the order on screen, not the order uploaded`() = runTest {
+    fun `display order is the order on screen, not the order uploaded`() = runTest(dispatcher) {
         images.failFrom = 2
         val viewModel = viewModel(photos = 3)
         viewModel.save()
@@ -243,7 +263,7 @@ class AddProductSaveTest {
 
     @Test
     fun `a photograph removed after it was uploaded is deleted rather than left paid for`() =
-        runTest {
+        runTest(dispatcher) {
             images.failFrom = 2
             val viewModel = viewModel(photos = 3)
             viewModel.save()
@@ -256,24 +276,122 @@ class AddProductSaveTest {
             assertEquals(2, images.written.size)
         }
 
-    // Two taps landing as two products is M7.10's `Done when`, and testing
-    // it needs a fake that actually blocks so the second tap arrives while
-    // the first is in flight. Left there rather than half-done here.
+    // ── Interruption (M7.10) ─────────────────────────────────────────
+
+    @Test
+    fun `double-tapping Save creates exactly one product`() = runTest(dispatcher) {
+        // A gate, because the guard is only meaningful while a request is
+        // actually outstanding — with fakes that return immediately the
+        // first save finishes before the second tap and the test proves
+        // nothing.
+        val gate = CompletableDeferred<Unit>()
+        images.gate = gate
+        val viewModel = viewModel(photos = 2)
+
+        viewModel.save()
+        viewModel.save()
+        viewModel.save()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, products.created.size)
+        assertEquals(
+            "each photograph goes up once, not three times",
+            listOf("staged-0", "staged-1"),
+            images.uploads,
+        )
+    }
+
+    @Test
+    fun `discard cannot be double-tapped either`() = runTest(dispatcher) {
+        images.failFrom = 1
+        val viewModel = viewModel(photos = 2)
+        viewModel.save()
+
+        val gate = CompletableDeferred<Unit>()
+        images.gate = gate
+        viewModel.discard()
+        viewModel.discard()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("path/staged-0"), images.removed)
+    }
+
+    @Test
+    fun `an attempt the app did not outlive is offered back, not forgotten`() = runTest(dispatcher) {
+        images.failFrom = 2
+        val first = viewModel(photos = 3)
+        first.save()
+        // The handle is what survives process death, so a second view
+        // model built from the same one is what the owner comes back to.
+        val reopened = reopen()
+
+        val state = reopened.uiState.value.saveState as SaveState.Interrupted
+        assertEquals(2, state.uploaded)
+        assertEquals(3, state.total)
+        assertNull("nothing failed — the app closed", state.failure)
+        assertTrue("the two objects in the bucket must still be removable", state.canDiscard)
+    }
+
+    @Test
+    fun `a reopened attempt carries on rather than re-uploading`() = runTest(dispatcher) {
+        images.failFrom = 2
+        viewModel(photos = 3).save()
+        val reopened = reopen()
+
+        images.failFrom = null
+        reopened.save()
+
+        assertEquals(listOf("staged-0", "staged-1", "staged-2"), images.uploads)
+        assertEquals(1, products.created.size)
+        assertTrue("${reopened.uiState.value.saveState}", reopened.uiState.value.saveState is SaveState.Saved)
+    }
+
+    @Test
+    fun `a reopened attempt keeps the same product id`() = runTest(dispatcher) {
+        images.failRows = true
+        viewModel(photos = 1).save()
+        val idBefore = products.created.single()
+
+        val reopened = reopen()
+        images.failRows = false
+        reopened.save()
+
+        // A new id would be a second piece in the catalogue for one the
+        // owner entered once.
+        assertEquals(listOf(idBefore), products.created)
+    }
+
+    @Test
+    fun `a finished save leaves nothing behind for the next one to resume`() = runTest(dispatcher) {
+        viewModel(photos = 1).save()
+
+        val reopened = reopen()
+
+        assertEquals(SaveState.Idle, reopened.uiState.value.saveState)
+    }
 
     // ── Fixtures ─────────────────────────────────────────────────────
 
-    private fun viewModel(photos: Int) = AddProductViewModel(
-        catalogueRepository = FakeCatalogueRepository(),
-        productRepository = products,
-        productImageRepository = images,
-        stagedImages = FakeStagedImages(),
-        savedState = SavedStateHandle(
+    private fun viewModel(photos: Int): AddProductViewModel {
+        handle = SavedStateHandle(
             mapOf(
                 "name" to "Kundan Choker",
                 "category_id" to CATEGORY_ID,
                 "images" to ArrayList((0 until photos).map { "staged-$it" }),
             ),
-        ),
+        )
+        return reopen()
+    }
+
+    /** A view model over whatever the handle currently holds. */
+    private fun reopen() = AddProductViewModel(
+        catalogueRepository = FakeCatalogueRepository(),
+        productRepository = products,
+        productImageRepository = images,
+        stagedImages = FakeStagedImages(),
+        savedState = handle,
     )
 
     private class FakeCatalogueRepository : CatalogueRepository {
@@ -319,6 +437,13 @@ class AddProductSaveTest {
         var failRows = false
         var failRemove = false
 
+        /**
+         * Holds the first request open, so a second tap arrives while the
+         * first is genuinely in flight. Without it the fakes return before
+         * the second tap and the guard is never exercised.
+         */
+        var gate: CompletableDeferred<Unit>? = null
+
         /** The paths of everything that actually landed. */
         val uploadedPaths get() = uploads.map { "path/$it" }
 
@@ -327,6 +452,8 @@ class AddProductSaveTest {
             localUri: String,
             onProgress: (Long, Long) -> Unit,
         ): UploadImageResult {
+            gate?.await()
+
             val index = localUri.substringAfterLast('-').toInt()
             failFrom?.let { if (index >= it) return UploadImageResult.Failed(OFFLINE) }
 
@@ -348,6 +475,7 @@ class AddProductSaveTest {
         }
 
         override suspend fun remove(storagePaths: List<String>): RemoveImagesResult {
+            gate?.await()
             if (failRemove) return RemoveImagesResult.Failed(OFFLINE)
             removed += storagePaths
             return RemoveImagesResult.Removed

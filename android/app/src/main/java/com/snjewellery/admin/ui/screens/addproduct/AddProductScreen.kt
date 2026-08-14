@@ -361,6 +361,8 @@ private fun SaveError(saveState: SaveState, onDiscard: () -> Unit) {
     val interrupted = saveState as? SaveState.Interrupted ?: return
 
     Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
+        val failure = interrupted.failure
+
         ErrorText(
             when {
                 // The piece is public and its photographs are not on it.
@@ -368,19 +370,28 @@ private fun SaveError(saveState: SaveState, onDiscard: () -> Unit) {
                 // and the only one that says so.
                 interrupted.inCatalogue -> stringResource(R.string.add_product_error_rows)
 
+                // Nothing failed: the app was reclaimed while the upload
+                // was running. Borrowing "check your signal" here would
+                // send the owner looking for a problem that was never
+                // theirs.
+                failure == null -> stringResource(
+                    R.string.add_product_error_reopened,
+                    interrupted.uploaded,
+                    interrupted.total,
+                )
+
                 // Nothing reached the server at all: no photograph landed
                 // and no row was written, so this is the plain failure the
                 // form has always reported.
-                interrupted.uploaded == 0 && !interrupted.failure.offline -> stringResource(
+                interrupted.uploaded == 0 && !failure.offline -> stringResource(
                     R.string.add_product_error_server,
-                    interrupted.failure.detail
-                        ?: stringResource(R.string.add_product_error_no_detail),
+                    failure.detail ?: stringResource(R.string.add_product_error_no_detail),
                 )
 
                 interrupted.uploaded == 0 -> stringResource(R.string.add_product_error_offline)
 
                 else -> stringResource(
-                    if (interrupted.failure.offline) {
+                    if (failure.offline) {
                         R.string.add_product_error_images_offline
                     } else {
                         R.string.add_product_error_images_server

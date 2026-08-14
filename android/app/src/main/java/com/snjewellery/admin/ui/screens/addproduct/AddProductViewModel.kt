@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 
@@ -148,7 +150,14 @@ sealed interface SaveState {
          * ordinary case, because the row is written last.
          */
         val inCatalogue: Boolean,
-        val failure: RequestFailure,
+        /**
+         * Why it stopped — or **null when nothing failed**: the app was
+         * reclaimed while the upload was running, so there is no request
+         * to report on. It needs different words rather than a borrowed
+         * "no connection", which would send the owner to look at their
+         * signal for a problem that was never theirs.
+         */
+        val failure: RequestFailure?,
         /** Set when a rollback was asked for and could not finish. */
         val discardFailure: RequestFailure? = null,
     ) : SaveState {
@@ -164,6 +173,31 @@ internal val SaveState.inFlight: Boolean
         this is SaveState.Discarding
 
 /**
+ * One staged photograph that is now in the bucket.
+ *
+ * Not [UploadedImage], which is the row payload and carries a
+ * `display_order`. That is deliberately **not** recorded here: the order
+ * is the index in the list on screen at the moment the rows are written,
+ * so a photograph promoted between two attempts still lands where the
+ * owner put it. What this remembers is only where the object went and
+ * which staged file it came from.
+ */
+@Serializable
+internal data class StagedUpload(
+    val localUri: String,
+    val storagePath: String,
+    val url: String,
+    val portrait: Boolean,
+) {
+    fun toRow(displayOrder: Int) = UploadedImage(
+        storagePath = storagePath,
+        url = url,
+        displayOrder = displayOrder,
+        portrait = portrait,
+    )
+}
+
+/**
  * What a save attempt has already achieved, so the next one does not do
  * it again.
  *
@@ -172,21 +206,29 @@ internal val SaveState.inFlight: Boolean
  * rejected name clears the error but must not throw away four photographs
  * that are already in the bucket.
  *
- * [uploaded] is keyed by staged URI rather than by position, which is what
- * lets the owner reorder or remove a photograph between attempts without
- * anything being uploaded twice or left behind. `display_order` is
- * therefore *not* stored here — it is the index in the list on screen at
- * the moment the rows are written.
+ * Since M7.10 it must also outlive the **process**. The app is reclaimed
+ * mid-upload exactly when it is most loaded — several megabytes of bitmap
+ * and a request in flight — and without this the objects already in the
+ * bucket become orphans nothing remembers, on a screen that comes back
+ * looking as though nothing had happened. So it is written to the
+ * `SavedStateHandle` as JSON, which is why every field here is a
+ * primitive or a list of them.
  */
-private data class SaveProgress(
+@Serializable
+internal data class SaveProgress(
     /**
      * Chosen here rather than by the database, because the photographs go
      * up under `products/{id}/…` before the row exists. Fixed for the
      * whole attempt, so a save that somehow ran twice would write the same
      * row twice rather than two rows.
      */
-    val productId: String = UUID.randomUUID().toString(),
-    val uploaded: Map<String, UploadedImage> = emptyMap(),
+    val productId: String,
+    /**
+     * A list, not a map keyed by URI: the lookups are by `localUri` all
+     * the same, but there are three or four of them and a list survives a
+     * round trip through JSON without a key-type question.
+     */
+    val uploaded: List<StagedUpload> = emptyList(),
     /** Non-null once the `products` row exists. */
     val slug: String? = null,
     /**
@@ -197,7 +239,12 @@ private data class SaveProgress(
      */
     val abandoned: List<String> = emptyList(),
 ) {
-    fun orphanedPaths(): List<String> = abandoned + uploaded.values.map { it.storagePath }
+    fun landed(localUri: String): StagedUpload? = uploaded.firstOrNull { it.localUri == localUri }
+
+    fun orphanedPaths(): List<String> = abandoned + uploaded.map { it.storagePath }
+
+    /** Whether anything reached the server that would have to be undone. */
+    val outstanding: Boolean get() = uploaded.isNotEmpty() || slug != null || abandoned.isNotEmpty()
 }
 
 data class AddProductUiState(
@@ -245,20 +292,45 @@ class AddProductViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AddProductUiState(form = restoreForm()))
     val uiState: StateFlow<AddProductUiState> = _uiState.asStateFlow()
 
+    private var progressBacking: SaveProgress? = restoreProgress()
+
     /**
      * What the current save attempt has already got done. Null when there
      * is no attempt outstanding.
      *
-     * **Not on the [SavedStateHandle], and that is a known gap.** If the
-     * process is reclaimed mid-upload this record goes with it, and the
-     * objects already in the bucket become orphans nothing remembers.
-     * M7.10 owns "app backgrounded mid-upload" and is where that belongs;
-     * M7.9's *Done when* is about losing the network, which does not lose
-     * the process.
+     * Written through to the [SavedStateHandle] on every change rather than
+     * at some checkpoint, because there is no moment at which the app is
+     * told it is about to be reclaimed. The one thing that must never
+     * happen is an object in the bucket that this record does not mention.
      */
-    private var progress: SaveProgress? = null
+    private var progress: SaveProgress?
+        get() = progressBacking
+        set(value) {
+            progressBacking = value
+            savedState[KEY_PROGRESS] = value?.let { Json.encodeToString(it) }
+        }
 
     init {
+        // An attempt that outlived its own coroutine. The upload stopped
+        // when the process did, so the screen must say so and offer the
+        // same two ways out as any other interruption — coming back to a
+        // blank Save button would leave paid-for objects in the bucket
+        // that nothing on screen refers to.
+        progressBacking?.takeIf { it.outstanding }?.let { attempt ->
+            _uiState.update {
+                it.copy(
+                    saveState = SaveState.Interrupted(
+                        uploaded = attempt.uploaded.size,
+                        total = it.form.images.size,
+                        inCatalogue = attempt.slug != null,
+                        // Nothing failed. The app was closed.
+                        failure = null,
+                    ),
+                    uploadProgress = attempt.uploaded.associate { u -> u.localUri to 1f },
+                )
+            }
+        }
+
         loadOptions()
     }
 
@@ -498,7 +570,8 @@ class AddProductViewModel @Inject constructor(
         // would be a crash on the owner's only Save button.
         val categoryId = current.form.categoryId ?: return
 
-        val attempt = progress ?: SaveProgress().also { progress = it }
+        val attempt = progress
+            ?: SaveProgress(productId = UUID.randomUUID().toString()).also { progress = it }
         val images = current.form.images
 
         _uiState.update {
@@ -507,7 +580,7 @@ class AddProductViewModel @Inject constructor(
                 saveState = SaveState.Uploading(attempt.uploaded.size, images.size),
                 // Photographs carried over from an interrupted attempt are
                 // shown finished from the outset, because they are.
-                uploadProgress = attempt.uploaded.keys.associateWith { 1f },
+                uploadProgress = attempt.uploaded.associate { u -> u.localUri to 1f },
             )
         }
 
@@ -533,7 +606,7 @@ class AddProductViewModel @Inject constructor(
             val objects = attempt.orphanedPaths()
             val removed = productImageRepository.remove(objects)
             if (removed is RemoveImagesResult.Failed) {
-                progress = attempt.copy(abandoned = objects, uploaded = emptyMap())
+                progress = attempt.copy(abandoned = objects, uploaded = emptyList())
                 _uiState.update {
                     it.copy(saveState = interrupted.copy(discardFailure = removed.failure))
                 }
@@ -545,7 +618,7 @@ class AddProductViewModel @Inject constructor(
                 if (deleted is DeleteProductResult.Failed) {
                     // The objects are gone, so a second attempt has only
                     // the row left to remove.
-                    progress = attempt.copy(uploaded = emptyMap(), abandoned = emptyList())
+                    progress = attempt.copy(uploaded = emptyList(), abandoned = emptyList())
                     _uiState.update {
                         it.copy(
                             saveState = interrupted.copy(
@@ -608,11 +681,11 @@ class AddProductViewModel @Inject constructor(
     private suspend fun clearAbandoned(attempt: SaveProgress): Boolean {
         val wanted = _uiState.value.form.images.toSet()
         val abandoned = attempt.abandoned +
-            attempt.uploaded.filterKeys { it !in wanted }.values.map { it.storagePath }
+            attempt.uploaded.filterNot { it.localUri in wanted }.map { it.storagePath }
 
         if (abandoned.isEmpty()) return true
 
-        val kept = attempt.uploaded.filterKeys { it in wanted }
+        val kept = attempt.uploaded.filter { it.localUri in wanted }
 
         return when (val removed = productImageRepository.remove(abandoned)) {
             is RemoveImagesResult.Removed -> {
@@ -647,7 +720,7 @@ class AddProductViewModel @Inject constructor(
         val images = _uiState.value.form.images
 
         images.forEach { localUri ->
-            if (progress?.uploaded?.containsKey(localUri) == true) return@forEach
+            if (progress?.landed(localUri) != null) return@forEach
 
             val result = productImageRepository.upload(attempt.productId, localUri) { sent, total ->
                 // Called from whichever thread is writing the request
@@ -666,17 +739,11 @@ class AddProductViewModel @Inject constructor(
                 }
 
                 is UploadImageResult.Uploaded -> {
-                    // `displayOrder` is filled in below rather than here.
-                    // A photograph uploaded on the first attempt can be at
-                    // a different position by the time the second one
-                    // runs, and the order that gets persisted has to be
-                    // the one currently on screen (M7.5).
                     record(
-                        localUri,
-                        UploadedImage(
+                        StagedUpload(
+                            localUri = localUri,
                             storagePath = result.storagePath,
                             url = result.url,
-                            displayOrder = 0,
                             portrait = stagedImages.isPortrait(localUri),
                         ),
                     )
@@ -698,13 +765,13 @@ class AddProductViewModel @Inject constructor(
             }
         }
 
-        val landed = progress?.uploaded ?: emptyMap()
+        val landed = progress ?: return null
         // The index in the list the owner is looking at, which is what
         // makes M7.5's promise true: position 0 is the primary image
-        // because it is the one at the top of the screen.
-        return images.mapIndexedNotNull { index, uri ->
-            landed[uri]?.copy(displayOrder = index)
-        }
+        // because it is the one at the top of the screen. Assigned here
+        // rather than at upload time, so a photograph promoted between two
+        // attempts still lands where the owner put it.
+        return images.mapIndexedNotNull { index, uri -> landed.landed(uri)?.toRow(index) }
     }
 
     /** Returns the slug, or null when the save has stopped. */
@@ -767,8 +834,8 @@ class AddProductViewModel @Inject constructor(
         }
     }
 
-    private fun record(localUri: String, image: UploadedImage) {
-        progress = progress?.let { it.copy(uploaded = it.uploaded + (localUri to image)) }
+    private fun record(upload: StagedUpload) {
+        progress = progress?.let { it.copy(uploaded = it.uploaded + upload) }
     }
 
     /** Lets the screen dismiss an error without re-entering everything. */
@@ -836,6 +903,22 @@ class AddProductViewModel @Inject constructor(
         images = savedState.get<ArrayList<String>>(KEY_IMAGES) ?: emptyList(),
     )
 
+    /**
+     * Stored as JSON rather than as fields, because a `Bundle` has no way
+     * to hold a list of records and spreading four parallel `ArrayList`s
+     * across the handle is how the fourth one ends up a different length
+     * from the other three.
+     *
+     * A value that will not parse is treated as no value. It should not
+     * happen; if it does, the alternative is a form that cannot open, and
+     * the cost of being wrong here is orphaned objects rather than a lost
+     * piece.
+     */
+    private fun restoreProgress(): SaveProgress? =
+        savedState.get<String>(KEY_PROGRESS)?.let { stored ->
+            runCatching { Json.decodeFromString<SaveProgress>(stored) }.getOrNull()
+        }
+
     private companion object {
         const val KEY_NAME = "name"
         const val KEY_CATEGORY = "category_id"
@@ -846,6 +929,7 @@ class AddProductViewModel @Inject constructor(
         const val KEY_FEATURED = "featured"
         const val KEY_IMAGES = "images"
         const val KEY_PENDING_CAPTURE = "pending_capture"
+        const val KEY_PROGRESS = "save_progress"
     }
 }
 
