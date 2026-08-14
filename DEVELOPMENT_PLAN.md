@@ -972,9 +972,33 @@ Deliver the feature the shop owner actually bought this platform for: photograph
 
   **`aspect` is derived from the photograph rather than asked.** `product-portrait` when the image is more than 15% taller than wide, `product` otherwise — responsive.md §2 names necklaces, long chains and bridal sets as the case the 4:5 frame exists for, and the owner should not have to answer "which frame?" between customers. The threshold is not "taller than wide" because a photograph a few percent off square is a square one held slightly crooked. **A rule chosen here, not specified anywhere** — M8.3's edit screen is the natural place to let the owner override it.
 
-- **`M7.9` Transactional integrity** — `M`
+- **`M7.9` Transactional integrity** — `M` — ◐ **the guarantee is implemented and tested; the live check is outstanding for the same reason M7.7 and M7.8 are**
   If an image upload fails mid-way, either complete via retry or roll back so no orphaned product row and no orphaned storage object remains. Per-image retry.
   *Done when:* killing the network mid-upload leaves neither a partial product row nor an orphaned storage object.
+
+  **The pipeline is reversed: photographs first, the `products` row last.** M7.7 shipped the obvious order — write the row, then upload against it — and that order cannot meet this task's *Done when*. Kill the network half-way and there is a piece in the catalogue with two of its five photographs, and undoing it needs a `DELETE` over the connection that just failed. **A compensating write cannot be relied on to run at the moment it is most needed.** Written the other way round, an interruption leaves objects in a bucket that nothing points at and *no row at all*, so nothing a customer can reach is ever half-made — and that holds without the network's cooperation. Recorded as [android-app.md §2.6c](docs/architecture/android-app.md), with the consequence for M8 noted in [ADR-0005](docs/adr/0005-image-storage-and-renditions.md).
+
+  **The cost, stated rather than hidden:** a rejected field or an exhausted name is now discovered *after* the uploads instead of before. Acceptable because M7.2 mirrors every constraint the database holds, so a rejection here is close to unreachable — and the photographs are kept, so fixing the name and saving again does not send them twice. There is a test for exactly that.
+
+  **There is no retry function.** `save()` reads what the attempt has already achieved and does only the rest, so a retry takes the same code path as a first attempt. A separate retry is a second implementation of the same thing, and the interesting bugs live in the difference between them.
+
+  **Every step is safe to repeat, and the case that forces that is not the obvious one.** It is not a request that was *refused* — it is one whose **response was lost**, where the write landed and the app believes it failed. So the product insert answers with the existing row when its id is already present, and image rows are *replaced* rather than appended (`product_images_unique_order` would otherwise make a retry that can never succeed). Telling a slug collision from an id collision needs the database asked which row exists, not the constraint name read out of the message — the string M6.7's rule is about.
+
+  **The client now chooses the product id**, because a photograph's path is `products/{product_id}/…` and it has to be known before there is a row to read it from.
+
+  **`display_order` is not recorded with the upload.** It is the index in the list on screen when the rows are written, so a photograph promoted *between* two attempts still lands where the owner put it — M7.5's promise held across an interruption rather than only within one attempt. Likewise a photograph removed after it was uploaded has its object deleted rather than left paid for, and a delete that fails is retried on the next save rather than forgotten.
+
+  **Discard is the other half**, and it does not clear the form or the photographs: rollback undoes what reached the server, not what the owner typed. Objects go before the row — the reverse order would leave orphaned storage that nothing remembers, where a row whose objects are gone is still on screen and still discardable.
+
+  **Two strings were wrong and are replaced.** M7.7's told the owner *"Do not tap Save again — that would add the piece twice."* That was true then and is the opposite of true now.
+
+  **Verified by test, and the tests were verified in turn.** What this task produces is an *ordering*, which no screenshot shows, so `AddProductSaveTest` drives the whole pipeline on the JVM against recording fakes: 11 tests, all passing, covering the invariant, resumption, rollback, a failed rollback, and ordering across attempts. They passed on the first run, so the ordering was then deliberately reversed to M7.7's — **`an upload failing part-way writes no product row` and `discarding an interrupted save removes every uploaded object` both fail**, and nothing else does. First local unit tests in the project; `PhotoCompressorTest` stays instrumented because it needs a real `Bitmap`.
+
+  `testDebugUnitTest`, `lint`, `assembleDebug` and `assembleRelease` all pass; lint reports 0 errors and the same 6 warnings as before, all pre-existing.
+
+  **Not verified against the live project**, and this inherits M7.7's blocker exactly: the emulator's stored session no longer refreshes and the account password is the owner's, so no request on this path has ever been made. **The owner should save one product with three photographs, then repeat it with aeroplane mode switched on part-way** — and confirm afterwards that `select count(*) from products` is unchanged and that Discard empties `products/{id}/`.
+
+  **A known gap, left to M7.10 on purpose:** the attempt record lives in the view model, not on the `SavedStateHandle`. Killing the *network* does not kill the process, which is what this task's *Done when* asks about — but a process reclaimed mid-upload still leaks the objects already in the bucket, and "app backgrounded mid-upload" is M7.10's wording.
 
 - **`M7.10` Interruption handling** — `S`
   Connection lost mid-upload, app backgrounded mid-upload, double-tap submission.

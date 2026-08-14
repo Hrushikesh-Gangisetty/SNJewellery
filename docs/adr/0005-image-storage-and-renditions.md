@@ -46,6 +46,7 @@ Two independent decisions are needed: what the app uploads, and how renditions a
 - The original photograph is not archived. If a higher resolution is ever wanted, it must be re-shot.
 - Transformation quality and cost are Supabase's, not ours.
 - A cascade delete on `products` removes the image rows but **not** the storage objects. M8.4 must delete both explicitly, and its acceptance criterion is inspecting the bucket afterwards — orphaned objects accumulate silently and cost money.
+- **An object can exist before the product it belongs to does.** M7.9 uploads the photographs before writing the `products` row, so that an interrupted save leaves nothing a customer can reach rather than a half-made piece — see [android-app.md §2.6c](../architecture/android-app.md). The trade is that an abandoned save leaves objects under `products/{id}/` for an id that will never be a row. The app removes them when the owner discards the save, and retries the removal if that itself fails; a save the process does not outlive still leaks them, which is M7.10's to close. `ProductImageRepository.remove` is the one place either client deletes an object.
 
 ### What this commits us to
 

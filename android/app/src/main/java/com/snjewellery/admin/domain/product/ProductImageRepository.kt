@@ -36,9 +36,15 @@ data class UploadedImage(
 )
 
 /** Whether the rows landed. */
-sealed interface AttachImagesResult {
-    data object Attached : AttachImagesResult
-    data class Failed(val failure: RequestFailure) : AttachImagesResult
+sealed interface WriteImagesResult {
+    data object Written : WriteImagesResult
+    data class Failed(val failure: RequestFailure) : WriteImagesResult
+}
+
+/** Whether the objects are gone from the bucket. */
+sealed interface RemoveImagesResult {
+    data object Removed : RemoveImagesResult
+    data class Failed(val failure: RequestFailure) : RemoveImagesResult
 }
 
 /**
@@ -75,7 +81,8 @@ interface ProductImageRepository {
     ): UploadImageResult
 
     /**
-     * Writes the `product_images` rows for [images], in one insert.
+     * Makes [images] the complete set of `product_images` rows for
+     * [productId] — replacing whatever is there, in one insert.
      *
      * One statement rather than one per photograph, because
      * `display_order` is unique per product: inserting them separately
@@ -84,6 +91,31 @@ interface ProductImageRepository {
      *
      * Called once, after every upload has landed — a row pointing at an
      * object that is not there yet is a broken image on the website.
+     *
+     * **Replaces rather than appends**, so that calling it twice is the
+     * same as calling it once. That matters because M7.9 lets the owner
+     * retry a save that was interrupted, and the way this call gets made
+     * twice is a response that was lost rather than a request that was
+     * refused — where a plain insert would hit
+     * `product_images_unique_order` and leave a retry that can never
+     * succeed. It is also the semantic M8.3's edit screen needs: the set
+     * on screen is the set that should exist.
      */
-    suspend fun attach(productId: String, images: List<UploadedImage>): AttachImagesResult
+    suspend fun replaceImages(productId: String, images: List<UploadedImage>): WriteImagesResult
+
+    /**
+     * Deletes the objects at [storagePaths] from the bucket.
+     *
+     * This is the half of a rollback that the M3.3 cascade cannot do: a
+     * `products` delete takes the image rows with it and leaves the
+     * objects, which ADR-0005 names as a cost that accumulates silently.
+     *
+     * Called by M7.9 when an interrupted save is discarded, and by M8.4
+     * when a product is deleted outright.
+     *
+     * Deleting nothing succeeds, and so does deleting an object that has
+     * already gone — the caller wants the objects absent, not a report on
+     * how absent they already were.
+     */
+    suspend fun remove(storagePaths: List<String>): RemoveImagesResult
 }

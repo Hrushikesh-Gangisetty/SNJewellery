@@ -33,7 +33,7 @@ data class ProductDraft(
 /** The outcome of saving a draft. */
 sealed interface CreateProductResult {
     /** [slug] is what the website's URL will be — M7.12 links to it. */
-    data class Created(val id: String, val slug: String) : CreateProductResult
+    data class Created(val slug: String) : CreateProductResult
 
     data class Failed(val failure: RequestFailure) : CreateProductResult
 
@@ -46,13 +46,44 @@ sealed interface CreateProductResult {
     data object SlugExhausted : CreateProductResult
 }
 
+/** Whether the row is gone. */
+sealed interface DeleteProductResult {
+    /** Includes the row never having existed — the end state is the same. */
+    data object Deleted : DeleteProductResult
+    data class Failed(val failure: RequestFailure) : DeleteProductResult
+}
+
 interface ProductRepository {
     /**
-     * Creates the `products` row. Images are uploaded separately (M7.7)
-     * and attached to the id this returns.
+     * Creates the `products` row with the given [id], and returns the slug
+     * the database accepted.
+     *
+     * ── Why the caller chooses the id ────────────────────────────────
+     * The column defaults to `gen_random_uuid()`, so letting the database
+     * pick would be the obvious shape. But a photograph's Storage path is
+     * `products/{product_id}/…` (ADR-0005 §2), and M7.9 uploads the
+     * photographs **before** this row exists — so the id has to be known
+     * before there is a row to read it from. Generating it on the device
+     * is what makes that ordering possible, and a v4 UUID is a v4 UUID
+     * whichever side of the wire produces it.
      *
      * **Does not throw** for an expected failure — a crash here loses
      * everything the owner typed.
      */
-    suspend fun create(draft: ProductDraft): CreateProductResult
+    suspend fun create(id: String, draft: ProductDraft): CreateProductResult
+
+    /**
+     * Removes the `products` row, and with it — by the M3.3 cascade — its
+     * `product_images` rows.
+     *
+     * The cascade does **not** reach Storage. Deleting the objects is
+     * [ProductImageRepository.remove]'s job and has to be done as well;
+     * ADR-0005 names the orphans it otherwise leaves as a cost that
+     * accumulates silently.
+     *
+     * Deleting a row that is not there succeeds. Rollback runs when
+     * something has already gone wrong, and refusing on that ground would
+     * report a failure for the state it was trying to reach.
+     */
+    suspend fun delete(id: String): DeleteProductResult
 }

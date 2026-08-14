@@ -100,6 +100,7 @@ fun AddProductScreen(
         onNameBlur = viewModel::onNameBlur,
         onWeightBlur = viewModel::onWeightBlur,
         onSave = viewModel::save,
+        onDiscard = viewModel::discard,
         onRetryOptions = viewModel::loadOptions,
         onTakePhoto = photos.takePhoto,
         onChoosePhotos = photos.choosePhotos,
@@ -128,6 +129,7 @@ internal fun AddProductScreen(
     onNameBlur: () -> Unit = {},
     onWeightBlur: () -> Unit = {},
     onSave: () -> Unit = {},
+    onDiscard: () -> Unit = {},
     onRetryOptions: () -> Unit = {},
     onTakePhoto: () -> Unit = {},
     onChoosePhotos: () -> Unit = {},
@@ -297,13 +299,13 @@ internal fun AddProductScreen(
                 // nothing happens when it is pressed; pressing it puts
                 // the reason under the field that needs it. Same rule as
                 // the login screen.
-                enabled = saveState !is SaveState.Saving && saveState !is SaveState.Uploading,
+                enabled = !saveState.inFlight,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Tokens.Layout.touchTarget),
             ) {
                 when (saveState) {
-                    is SaveState.Saving -> CircularProgressIndicator(
+                    is SaveState.Saving, is SaveState.Discarding -> CircularProgressIndicator(
                         modifier = Modifier.size(Tokens.Space.s5),
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
@@ -319,54 +321,108 @@ internal fun AddProductScreen(
                         ),
                     )
 
+                    // Carrying on is the same button doing the same thing,
+                    // so it is not a second control — only a word that
+                    // says the photographs already up will not go again.
+                    is SaveState.Interrupted -> Text(
+                        stringResource(
+                            if (saveState.uploaded > 0 || saveState.inCatalogue) {
+                                R.string.add_product_save_continue
+                            } else {
+                                R.string.add_product_save
+                            },
+                        ),
+                    )
+
                     else -> Text(stringResource(R.string.add_product_save))
                 }
             }
 
-            SaveError(saveState)
+            SaveError(saveState, onDiscard = onDiscard)
+        }
+    }
+}
+
+/**
+ * What went wrong, and what to do about it.
+ *
+ * Every recoverable failure says the same two things — whether the piece
+ * is in the catalogue, and that Save carries on rather than starting
+ * again — because that is what stops the owner either giving up on a
+ * piece or entering it twice.
+ */
+@Composable
+private fun SaveError(saveState: SaveState, onDiscard: () -> Unit) {
+    if (saveState is SaveState.NameUnavailable) {
+        ErrorText(stringResource(R.string.add_product_error_name_taken))
+        return
+    }
+
+    val interrupted = saveState as? SaveState.Interrupted ?: return
+
+    Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
+        ErrorText(
+            when {
+                // The piece is public and its photographs are not on it.
+                // The one case where "nothing was saved" would be a lie,
+                // and the only one that says so.
+                interrupted.inCatalogue -> stringResource(R.string.add_product_error_rows)
+
+                // Nothing reached the server at all: no photograph landed
+                // and no row was written, so this is the plain failure the
+                // form has always reported.
+                interrupted.uploaded == 0 && !interrupted.failure.offline -> stringResource(
+                    R.string.add_product_error_server,
+                    interrupted.failure.detail
+                        ?: stringResource(R.string.add_product_error_no_detail),
+                )
+
+                interrupted.uploaded == 0 -> stringResource(R.string.add_product_error_offline)
+
+                else -> stringResource(
+                    if (interrupted.failure.offline) {
+                        R.string.add_product_error_images_offline
+                    } else {
+                        R.string.add_product_error_images_server
+                    },
+                    interrupted.uploaded,
+                    interrupted.total,
+                )
+            },
+        )
+
+        if (interrupted.discardFailure != null) {
+            ErrorText(
+                if (interrupted.discardFailure.offline) {
+                    stringResource(R.string.add_product_discard_offline)
+                } else {
+                    stringResource(
+                        R.string.add_product_discard_error,
+                        interrupted.discardFailure.detail
+                            ?: stringResource(R.string.add_product_error_no_detail),
+                    )
+                },
+            )
+        }
+
+        if (interrupted.canDiscard) {
+            TextButton(
+                onClick = onDiscard,
+                modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+            ) {
+                Text(stringResource(R.string.add_product_discard))
+            }
         }
     }
 }
 
 @Composable
-private fun SaveError(saveState: SaveState) {
-    val message = when (saveState) {
-        is SaveState.Failed -> if (saveState.failure.offline) {
-            stringResource(R.string.add_product_error_offline)
-        } else {
-            stringResource(
-                R.string.add_product_error_server,
-                saveState.failure.detail ?: stringResource(R.string.add_product_error_no_detail),
-            )
-        }
-
-        is SaveState.NameUnavailable -> stringResource(R.string.add_product_error_name_taken)
-
-        // Worded apart from every other failure because the advice is the
-        // opposite: the piece is saved, so pressing Save again would put
-        // a second copy of it in the catalogue.
-        is SaveState.ImagesIncomplete -> stringResource(
-            if (saveState.failure.offline) {
-                R.string.add_product_error_images_offline
-            } else {
-                R.string.add_product_error_images_server
-            },
-            saveState.uploaded,
-            saveState.total,
-        )
-
-        else -> null
-    }
-
-    if (message != null) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
+private fun ErrorText(message: String) = Text(
+    text = message,
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.error,
+    modifier = Modifier.fillMaxWidth(),
+)
 
 @Composable
 private fun OptionsError(failure: RequestFailure, onRetry: () -> Unit) {

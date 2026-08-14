@@ -2,11 +2,12 @@ package com.snjewellery.admin.data.product
 
 import androidx.core.net.toUri
 import com.snjewellery.admin.data.remote.RequestFailureClassifier
-import com.snjewellery.admin.domain.product.AttachImagesResult
 import com.snjewellery.admin.domain.product.ProductImageRepository
+import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.StoragePaths
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
+import com.snjewellery.admin.domain.product.WriteImagesResult
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.UploadStatus
@@ -85,16 +86,40 @@ class SupabaseProductImageRepository @Inject constructor(
         }
     }
 
-    override suspend fun attach(
+    override suspend fun replaceImages(
         productId: String,
         images: List<UploadedImage>,
-    ): AttachImagesResult = try {
-        client.postgrest.from(TABLE_PRODUCT_IMAGES).insert(images.map { it.toInsert(productId) })
-        AttachImagesResult.Attached
+    ): WriteImagesResult = try {
+        val table = client.postgrest.from(TABLE_PRODUCT_IMAGES)
+
+        // Clear first, so a second call with the same set is a no-op
+        // rather than a `product_images_unique_order` violation. On a
+        // first save this deletes nothing; the round trip is paid once
+        // per save, after uploads that took seconds.
+        table.delete { filter { eq("product_id", productId) } }
+        if (images.isNotEmpty()) table.insert(images.map { it.toInsert(productId) })
+
+        WriteImagesResult.Written
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        AttachImagesResult.Failed(failures.classify(e))
+        WriteImagesResult.Failed(failures.classify(e))
+    }
+
+    override suspend fun remove(storagePaths: List<String>): RemoveImagesResult {
+        // An empty `delete` would be a pointless round trip, and the
+        // common rollback — a save that failed before its first upload
+        // finished — has nothing to remove.
+        if (storagePaths.isEmpty()) return RemoveImagesResult.Removed
+
+        return try {
+            client.storage.from(StoragePaths.PRODUCT_IMAGES_BUCKET).delete(storagePaths)
+            RemoveImagesResult.Removed
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            RemoveImagesResult.Failed(failures.classify(e))
+        }
     }
 
     /**

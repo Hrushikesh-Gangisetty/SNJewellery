@@ -56,6 +56,14 @@ junit = "4.13.2"
 androidxTestJunit = "1.2.1"
 androidxTestRunner = "1.6.2"
 
+# Local JVM tests, added in M7.9. `runTest` and `Dispatchers.setMain` are
+# what let a view model's `viewModelScope` be driven to completion in a
+# test — without them the save pipeline's steps are unobservable.
+# Version-less: the Kotlin plugin's coroutines BOM would be the tidier
+# route, but supabase-kt already pins coroutines transitively and a second
+# pin is how the two disagree.
+kotlinxCoroutinesTest = "1.10.1"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
@@ -99,6 +107,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

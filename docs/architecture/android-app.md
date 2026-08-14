@@ -154,6 +154,42 @@ in M8's catalogue list; it is not a default and cannot be.
 non-archived products and an admin counts 12 — the difference is the one
 product in a hidden category, which the owner must be able to manage.
 
+### 2.6c A write the customer can see comes last
+
+A save that spans several requests orders them so that **the row a
+customer can reach is written after everything it depends on**. For a
+product that means: photographs into Storage first, then the `products`
+row, then the `product_images` rows.
+
+The reason is not tidiness. The obvious order — row first, so the images
+have a parent to attach to — is fine until the connection dies half-way,
+and then there is a piece in the catalogue with two of its five
+photographs and the only way to undo it is a `DELETE` over the same
+connection that just failed. **A compensating write cannot be relied on
+to run at the moment it is most needed.** Ordered the other way, an
+interruption leaves objects in a bucket that nothing points at and no row
+at all, so nothing public is ever half-made — and that holds without the
+network's cooperation.
+
+Two consequences to carry into M8:
+
+- **The client chooses the id.** A photograph's path is
+  `products/{product_id}/…` ([ADR-0005](../adr/0005-image-storage-and-renditions.md) §2),
+  and it has to be known before there is a row to read it from. So
+  `ProductRepository.create` takes the id rather than letting the column
+  default.
+- **Every step is safe to repeat.** Resuming an interrupted save re-runs
+  whatever did not visibly finish, and the request that most often needs
+  repeating is one whose *response* was lost rather than one that was
+  refused. So the product insert answers with the existing row when its
+  id is already present, and `replaceImages` clears before it inserts. A
+  retry that can hit a unique violation is a retry that can never
+  succeed.
+
+*Check:* with the network dropped mid-upload, `select count(*) from
+products` is unchanged, and the objects under `products/{id}/` are
+removed by Discard.
+
 ### 2.7 No screen declares a visual value
 
 Colour, size, radius, duration: all from `MaterialTheme` or `Tokens`,

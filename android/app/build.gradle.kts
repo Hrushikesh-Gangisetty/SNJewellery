@@ -212,4 +212,11 @@ dependencies {
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+
+    // Local, not instrumented: what M7.9 has to prove is the ORDER the
+    // save pipeline issues its requests in, and that is observable from
+    // fake repositories on the JVM. A device adds nothing and would make
+    // the check slow enough to stop being run.
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

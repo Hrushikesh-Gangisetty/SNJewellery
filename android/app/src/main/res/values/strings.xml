@@ -99,18 +99,30 @@
     -->
     <string name="add_product_uploading">Uploading photo %1$d of %2$d…</string>
 
-    <!--
-      Worded apart from every other failure on this screen, because the
-      advice is the opposite of all of them. The piece IS saved. Telling
-      the owner "nothing was lost, tap Save again" — true everywhere else
-      here — would put a second copy of the piece in the catalogue.
+    <!-- ── Interrupted saves (M7.9) ──────────────────────────────────
+      These replace M7.7's wording, which told the owner NOT to tap Save
+      again. That was correct then and is wrong now: the photographs go up
+      before the row is written, so an interruption leaves nothing in the
+      catalogue, and tapping Save is exactly the right thing — it carries
+      on from where it stopped rather than starting again.
 
-      Neither message says the piece is fine, because it is not: it is in
-      the catalogue with some of its pictures missing. M7.9 makes this
-      recoverable; today it is only honest.
+      Every message says whether the piece is in the catalogue, because
+      that is the one fact that changes what the owner should do.
     -->
-    <string name="add_product_error_images_offline">The piece was saved, but the connection dropped and only %1$d of %2$d photos went up. Do not tap Save again — that would add the piece twice. Edit the piece to add the rest.</string>
-    <string name="add_product_error_images_server">The piece was saved, but only %1$d of %2$d photos went up. Do not tap Save again — that would add the piece twice. Edit the piece to add the rest.</string>
+    <string name="add_product_error_images_offline">The connection dropped after %1$d of %2$d photos. Nothing has been added to the catalogue yet. Tap Carry on when you have signal — the photos already sent will not be sent again.</string>
+    <string name="add_product_error_images_server">Only %1$d of %2$d photos went up. Nothing has been added to the catalogue yet. Tap Carry on to send the rest — the ones already sent will not be sent again.</string>
+    <!-- The one case where the piece IS public: every photograph is in
+         Storage, the row is written, and only the rows linking them
+         failed. So "nothing was saved" would be a lie here. -->
+    <string name="add_product_error_rows">The piece is in the catalogue, but its photos are not attached to it yet. Tap Carry on to finish — this will not add the piece twice.</string>
+    <string name="add_product_save_continue">Carry on</string>
+
+    <!-- Discard is the other half of M7.9: undo what reached the server.
+         It does not clear the form or the photographs — those are still
+         the owner's, and re-typing them is the thing to avoid. -->
+    <string name="add_product_discard">Discard this piece</string>
+    <string name="add_product_discard_offline">It could not be discarded without a connection. Nothing has been added to the catalogue — try again when you have signal, or tap Carry on instead.</string>
+    <string name="add_product_discard_error">It could not be discarded (%1$s). Try again, or tap Carry on instead.</string>
 
     <!-- ── Field validation (M7.2) ───────────────────────────────────
       Each mirrors a constraint the database enforces anyway, said in

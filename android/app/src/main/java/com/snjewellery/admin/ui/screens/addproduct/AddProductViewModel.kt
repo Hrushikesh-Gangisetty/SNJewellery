@@ -9,21 +9,24 @@ import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.media.StagedImages
-import com.snjewellery.admin.domain.product.AttachImagesResult
 import com.snjewellery.admin.domain.product.CreateProductResult
+import com.snjewellery.admin.domain.product.DeleteProductResult
 import com.snjewellery.admin.domain.product.FieldProblem
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductFormRules
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
+import com.snjewellery.admin.domain.product.WriteImagesResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 /** Where the category and purity lists are in their loading. */
@@ -99,42 +102,102 @@ data class FormProblems(
     val any: Boolean get() = name != null || category != null || weight != null
 }
 
-/** The outcome of a save, once. */
+/** Where a save has got to. */
 sealed interface SaveState {
     data object Idle : SaveState
 
-    /** The `products` row is being written. */
-    data object Saving : SaveState
-
     /**
-     * The row is written and the photographs are going up.
-     *
-     * A state of its own rather than a longer [Saving], because they fail
-     * differently and the owner can act on the difference: nothing is in
-     * the catalogue if the first fails, and a piece already is if the
-     * second does.
+     * The photographs are going up. First, because until every one has
+     * landed there is nothing in the catalogue to be half-finished —
+     * see [AddProductViewModel].
      */
     data class Uploading(val completed: Int, val total: Int) : SaveState
 
+    /** The photographs are up and the rows are being written. */
+    data object Saving : SaveState
+
+    /** The rollback is running. */
+    data object Discarding : SaveState
+
     data class Saved(val slug: String) : SaveState
-    data class Failed(val failure: RequestFailure) : SaveState
+
+    /**
+     * The name cannot be made into a free slug. Its own state because
+     * nothing about it is transient — retrying unchanged gets the same
+     * answer, and the owner has to change the name. The photographs
+     * already uploaded are kept, so changing it and saving again does not
+     * send them a second time.
+     */
     data object NameUnavailable : SaveState
 
     /**
-     * The piece saved, but a photograph did not go up.
+     * The save stopped part-way and can be finished or undone.
      *
-     * Deliberately not folded into [Failed]. "Nothing was saved, try
-     * again" would be a lie — the product is in the catalogue, without
-     * all of its pictures, and telling the owner to press Save again
-     * would give them a second copy of the piece. M7.9 owns making this
-     * recoverable rather than merely honest.
+     * One state for every recoverable failure, rather than a separate one
+     * per step, because the owner's two choices are the same whichever
+     * step it was: carry on, or discard it. What differs is only the
+     * wording, and that is what the fields are for.
      */
-    data class ImagesIncomplete(
-        val slug: String,
+    data class Interrupted(
+        /** Photographs already in Storage. Zero when the first one failed. */
         val uploaded: Int,
         val total: Int,
+        /**
+         * True once the `products` row exists — so the piece is on the
+         * website, and "nothing was saved" would be a lie. False in the
+         * ordinary case, because the row is written last.
+         */
+        val inCatalogue: Boolean,
         val failure: RequestFailure,
-    ) : SaveState
+        /** Set when a rollback was asked for and could not finish. */
+        val discardFailure: RequestFailure? = null,
+    ) : SaveState {
+        /** Nothing to undo means no reason to offer undoing it. */
+        val canDiscard: Boolean get() = uploaded > 0 || inCatalogue
+    }
+}
+
+/** Whether a request belonging to a save is out on the wire right now. */
+internal val SaveState.inFlight: Boolean
+    get() = this is SaveState.Uploading ||
+        this is SaveState.Saving ||
+        this is SaveState.Discarding
+
+/**
+ * What a save attempt has already achieved, so the next one does not do
+ * it again.
+ *
+ * Held outside [AddProductUiState] because it is not something the screen
+ * draws, and because it must **outlive** the state it produced: fixing a
+ * rejected name clears the error but must not throw away four photographs
+ * that are already in the bucket.
+ *
+ * [uploaded] is keyed by staged URI rather than by position, which is what
+ * lets the owner reorder or remove a photograph between attempts without
+ * anything being uploaded twice or left behind. `display_order` is
+ * therefore *not* stored here — it is the index in the list on screen at
+ * the moment the rows are written.
+ */
+private data class SaveProgress(
+    /**
+     * Chosen here rather than by the database, because the photographs go
+     * up under `products/{id}/…` before the row exists. Fixed for the
+     * whole attempt, so a save that somehow ran twice would write the same
+     * row twice rather than two rows.
+     */
+    val productId: String = UUID.randomUUID().toString(),
+    val uploaded: Map<String, UploadedImage> = emptyMap(),
+    /** Non-null once the `products` row exists. */
+    val slug: String? = null,
+    /**
+     * Objects that should be gone from the bucket but are not, because the
+     * delete that would have removed them failed. Retried on the next
+     * save or discard — an object nothing points at costs money for as
+     * long as it is there.
+     */
+    val abandoned: List<String> = emptyList(),
+) {
+    fun orphanedPaths(): List<String> = abandoned + uploaded.values.map { it.storagePath }
 }
 
 data class AddProductUiState(
@@ -181,6 +244,19 @@ class AddProductViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(AddProductUiState(form = restoreForm()))
     val uiState: StateFlow<AddProductUiState> = _uiState.asStateFlow()
+
+    /**
+     * What the current save attempt has already got done. Null when there
+     * is no attempt outstanding.
+     *
+     * **Not on the [SavedStateHandle], and that is a known gap.** If the
+     * process is reclaimed mid-upload this record goes with it, and the
+     * objects already in the bucket become orphans nothing remembers.
+     * M7.10 owns "app backgrounded mid-upload" and is where that belongs;
+     * M7.9's *Done when* is about losing the network, which does not lose
+     * the process.
+     */
+    private var progress: SaveProgress? = null
 
     init {
         loadOptions()
@@ -383,14 +459,25 @@ class AddProductViewModel @Inject constructor(
     fun onGalleryUnavailable() =
         _uiState.update { it.copy(photoProblem = PhotoProblem.NoGalleryApp) }
 
+    /**
+     * Saves the piece — or carries on saving it, if a previous attempt
+     * stopped part-way.
+     *
+     * There is no separate retry function, deliberately. A retry that
+     * takes a different code path from the first attempt is a second
+     * implementation of the same thing, and the interesting bugs live in
+     * the difference between them. So this reads [progress] to see what
+     * has already been done and does only the rest — which on a first
+     * attempt is all of it.
+     */
     fun save() {
         val current = _uiState.value
-        // Double-tap guard. M7.10 owns the rest of that task; this much
-        // belongs with the only Save button that exists, because without
-        // it two taps are two products. Uploading counts: the row is
-        // already written by then, so a second tap would write a second.
-        if (current.saveState is SaveState.Saving) return
-        if (current.saveState is SaveState.Uploading) return
+        // Two taps must not be two products. Every in-flight state counts,
+        // and since M7.9 that guard is a second line rather than the only
+        // one: the product id is fixed per attempt, so even a save that
+        // somehow started twice would insert the same row twice and the
+        // database would recognise it.
+        if (current.saveState.inFlight) return
 
         // Everything is checked here, not only on blur: a field never
         // touched has never blurred, and Save must still say what is
@@ -411,59 +498,158 @@ class AddProductViewModel @Inject constructor(
         // would be a crash on the owner's only Save button.
         val categoryId = current.form.categoryId ?: return
 
+        val attempt = progress ?: SaveProgress().also { progress = it }
+        val images = current.form.images
+
         _uiState.update {
-            it.copy(problems = problems, saveState = SaveState.Saving, uploadProgress = emptyMap())
+            it.copy(
+                problems = problems,
+                saveState = SaveState.Uploading(attempt.uploaded.size, images.size),
+                // Photographs carried over from an interrupted attempt are
+                // shown finished from the outset, because they are.
+                uploadProgress = attempt.uploaded.keys.associateWith { 1f },
+            )
         }
 
+        viewModelScope.launch { runSave(categoryId) }
+    }
+
+    /**
+     * Undoes an interrupted save: the objects out of the bucket, and the
+     * row out of the catalogue if one was written.
+     *
+     * The objects go first. If the row were deleted first and the object
+     * delete then failed, what is left is orphaned storage that nothing
+     * remembers — whereas a row whose objects are gone is still on the
+     * screen, still recorded in [progress], and still discardable.
+     */
+    fun discard() {
+        val attempt = progress ?: return
+        val interrupted = _uiState.value.saveState as? SaveState.Interrupted ?: return
+
+        _uiState.update { it.copy(saveState = SaveState.Discarding) }
+
         viewModelScope.launch {
-            when (val result = productRepository.create(current.form.toDraft(categoryId))) {
-                is CreateProductResult.Failed ->
-                    _uiState.update { it.copy(saveState = SaveState.Failed(result.failure)) }
+            val objects = attempt.orphanedPaths()
+            val removed = productImageRepository.remove(objects)
+            if (removed is RemoveImagesResult.Failed) {
+                progress = attempt.copy(abandoned = objects, uploaded = emptyMap())
+                _uiState.update {
+                    it.copy(saveState = interrupted.copy(discardFailure = removed.failure))
+                }
+                return@launch
+            }
 
-                is CreateProductResult.SlugExhausted ->
-                    _uiState.update { it.copy(saveState = SaveState.NameUnavailable) }
+            if (attempt.slug != null) {
+                val deleted = productRepository.delete(attempt.productId)
+                if (deleted is DeleteProductResult.Failed) {
+                    // The objects are gone, so a second attempt has only
+                    // the row left to remove.
+                    progress = attempt.copy(uploaded = emptyMap(), abandoned = emptyList())
+                    _uiState.update {
+                        it.copy(
+                            saveState = interrupted.copy(
+                                uploaded = 0,
+                                discardFailure = deleted.failure,
+                            ),
+                        )
+                    }
+                    return@launch
+                }
+            }
 
-                is CreateProductResult.Created ->
-                    uploadImages(productId = result.id, slug = result.slug)
+            // A fresh attempt gets a fresh product id. The form and the
+            // staged photographs are untouched: discarding undoes what
+            // reached the server, not what the owner typed.
+            progress = null
+            _uiState.update { it.copy(saveState = SaveState.Idle, uploadProgress = emptyMap()) }
+        }
+    }
+
+    /**
+     * The pipeline, in the order that makes an interruption harmless.
+     *
+     * **Photographs first, the `products` row last.** The obvious order is
+     * the other way round — the row exists, so the images have something
+     * to attach to — and it is what M7.7 shipped. The trouble is what
+     * happens when the connection dies half-way: there is now a piece in
+     * the catalogue with two of its five photographs, and undoing it needs
+     * a `DELETE` over the same connection that just failed. Compensation
+     * cannot be relied on to run at the moment it is most needed.
+     *
+     * Written this way round, an interrupted save leaves objects in a
+     * bucket that nothing points at and **no row at all**, so nothing a
+     * customer can reach is ever half-made. That is what M7.9's *Done
+     * when* asks for, and it holds without the network's cooperation.
+     *
+     * The cost is that a name collision or a rejected field is discovered
+     * after the uploads rather than before. Acceptable: M7.2 mirrors every
+     * constraint the database holds, so a rejection here is close to
+     * unreachable — and the photographs are kept, so fixing the name and
+     * saving again does not send them twice.
+     */
+    private suspend fun runSave(categoryId: String) {
+        val attempt = progress ?: return
+
+        if (!clearAbandoned(attempt)) return
+        val uploaded = uploadRemaining(attempt) ?: return
+        val slug = createRow(categoryId) ?: return
+        writeImageRows(uploaded, slug)
+    }
+
+    /**
+     * Removes objects from earlier attempts that the current list no
+     * longer wants — a photograph uploaded, then taken off the form.
+     *
+     * Returns false when the save should stop. A failure here is reported
+     * rather than ignored, because carrying on would save the piece and
+     * leave paid-for storage that nothing will ever look at again.
+     */
+    private suspend fun clearAbandoned(attempt: SaveProgress): Boolean {
+        val wanted = _uiState.value.form.images.toSet()
+        val abandoned = attempt.abandoned +
+            attempt.uploaded.filterKeys { it !in wanted }.values.map { it.storagePath }
+
+        if (abandoned.isEmpty()) return true
+
+        val kept = attempt.uploaded.filterKeys { it in wanted }
+
+        return when (val removed = productImageRepository.remove(abandoned)) {
+            is RemoveImagesResult.Removed -> {
+                progress = attempt.copy(uploaded = kept, abandoned = emptyList())
+                true
+            }
+
+            is RemoveImagesResult.Failed -> {
+                progress = attempt.copy(uploaded = kept, abandoned = abandoned)
+                interrupt(removed.failure)
+                false
             }
         }
     }
 
     /**
-     * Puts the photographs in Storage, in the order the owner arranged
-     * them.
+     * Uploads the photographs not already in the bucket, in the order the
+     * owner arranged them, and returns the complete set as rows.
      *
      * **Sequential, not concurrent.** Three uploads at once would finish
      * sooner on a good connection, but this app's connection is Indian
      * mobile data: parallel streams there share the same narrow pipe,
      * each one slower, and a stall takes all three with it. Sequential
      * also means a failure has an unambiguous answer to "which ones
-     * landed", which is what M7.9's retry will need. M7.13 measures
-     * whether this meets the thirty-second target and is the place to
-     * revisit it with a number rather than an opinion.
+     * landed", which is what the retry depends on. M7.13 measures whether
+     * this meets the thirty-second target and is the place to revisit it
+     * with a number rather than an opinion.
      *
-     * The `product_images` rows are written **after** every upload has
-     * landed, in one insert. A row pointing at an object that is not
-     * there yet is a broken image on the website, and `display_order` is
-     * unique per product — so a per-photograph insert that failed
-     * half-way would leave a partly ordered gallery, where one statement
-     * takes all the rows or none.
+     * Returns null when a photograph failed and the save has stopped.
      */
-    private suspend fun uploadImages(productId: String, slug: String) {
+    private suspend fun uploadRemaining(attempt: SaveProgress): List<UploadedImage>? {
         val images = _uiState.value.form.images
-        if (images.isEmpty()) {
-            _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
-            return
-        }
 
-        _uiState.update {
-            it.copy(saveState = SaveState.Uploading(completed = 0, total = images.size))
-        }
+        images.forEach { localUri ->
+            if (progress?.uploaded?.containsKey(localUri) == true) return@forEach
 
-        val uploaded = mutableListOf<UploadedImage>()
-
-        images.forEachIndexed { index, localUri ->
-            val result = productImageRepository.upload(productId, localUri) { sent, total ->
+            val result = productImageRepository.upload(attempt.productId, localUri) { sent, total ->
                 // Called from whichever thread is writing the request
                 // body. `update` is atomic, which is why the progress map
                 // lives in the state flow rather than beside it.
@@ -475,29 +661,24 @@ class AddProductViewModel @Inject constructor(
 
             when (result) {
                 is UploadImageResult.Failed -> {
-                    _uiState.update {
-                        it.copy(
-                            saveState = SaveState.ImagesIncomplete(
-                                slug = slug,
-                                uploaded = index,
-                                total = images.size,
-                                failure = result.failure,
-                            ),
-                        )
-                    }
-                    return
+                    interrupt(result.failure)
+                    return null
                 }
 
                 is UploadImageResult.Uploaded -> {
-                    uploaded += UploadedImage(
-                        storagePath = result.storagePath,
-                        url = result.url,
-                        // The index in the list the owner arranged, which
-                        // is what makes M7.5's promise true: position 0
-                        // is the primary image because it is the one at
-                        // the top of the screen.
-                        displayOrder = index,
-                        portrait = stagedImages.isPortrait(localUri),
+                    // `displayOrder` is filled in below rather than here.
+                    // A photograph uploaded on the first attempt can be at
+                    // a different position by the time the second one
+                    // runs, and the order that gets persisted has to be
+                    // the one currently on screen (M7.5).
+                    record(
+                        localUri,
+                        UploadedImage(
+                            storagePath = result.storagePath,
+                            url = result.url,
+                            displayOrder = 0,
+                            portrait = stagedImages.isPortrait(localUri),
+                        ),
                     )
 
                     _uiState.update { state ->
@@ -507,32 +688,87 @@ class AddProductViewModel @Inject constructor(
                             // a bar that stops at 98% on a photograph
                             // that is finished reads as a stall.
                             uploadProgress = state.uploadProgress + (localUri to 1f),
-                            saveState = SaveState.Uploading(index + 1, images.size),
+                            saveState = SaveState.Uploading(
+                                completed = progress?.uploaded?.size ?: 0,
+                                total = images.size,
+                            ),
                         )
                     }
                 }
             }
         }
 
-        when (val attached = productImageRepository.attach(productId, uploaded)) {
-            is AttachImagesResult.Attached ->
-                _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
+        val landed = progress?.uploaded ?: emptyMap()
+        // The index in the list the owner is looking at, which is what
+        // makes M7.5's promise true: position 0 is the primary image
+        // because it is the one at the top of the screen.
+        return images.mapIndexedNotNull { index, uri ->
+            landed[uri]?.copy(displayOrder = index)
+        }
+    }
 
-            // The objects are in the bucket with nothing pointing at
-            // them. Reported as the same class of problem as a failed
-            // upload, because it is the same thing from the owner's
-            // side — the piece is saved and its pictures are not on it.
-            is AttachImagesResult.Failed -> _uiState.update {
-                it.copy(
-                    saveState = SaveState.ImagesIncomplete(
-                        slug = slug,
-                        uploaded = 0,
-                        total = images.size,
-                        failure = attached.failure,
-                    ),
-                )
+    /** Returns the slug, or null when the save has stopped. */
+    private suspend fun createRow(categoryId: String): String? {
+        val attempt = progress ?: return null
+        // Already written by an earlier attempt whose image rows failed.
+        attempt.slug?.let { return it }
+
+        _uiState.update { it.copy(saveState = SaveState.Saving) }
+
+        val draft = _uiState.value.form.toDraft(categoryId)
+        return when (val result = productRepository.create(attempt.productId, draft)) {
+            is CreateProductResult.Created -> {
+                progress = attempt.copy(slug = result.slug)
+                result.slug
+            }
+
+            is CreateProductResult.SlugExhausted -> {
+                _uiState.update { it.copy(saveState = SaveState.NameUnavailable) }
+                null
+            }
+
+            is CreateProductResult.Failed -> {
+                interrupt(result.failure)
+                null
             }
         }
+    }
+
+    private suspend fun writeImageRows(images: List<UploadedImage>, slug: String) {
+        val productId = progress?.productId ?: return
+        _uiState.update { it.copy(saveState = SaveState.Saving) }
+
+        when (val written = productImageRepository.replaceImages(productId, images)) {
+            is WriteImagesResult.Written -> {
+                progress = null
+                _uiState.update { it.copy(saveState = SaveState.Saved(slug)) }
+            }
+
+            // The row is in the catalogue and its photographs are not on
+            // it. The only failure that reaches this with `inCatalogue`
+            // true, and the one place the owner has to be told the piece
+            // is already public.
+            is WriteImagesResult.Failed -> interrupt(written.failure)
+        }
+    }
+
+    /** Stops the save where it is, in terms the screen can act on. */
+    private fun interrupt(failure: RequestFailure) {
+        val attempt = progress
+        _uiState.update {
+            it.copy(
+                saveState = SaveState.Interrupted(
+                    uploaded = attempt?.uploaded?.size ?: 0,
+                    total = it.form.images.size,
+                    inCatalogue = attempt?.slug != null,
+                    failure = failure,
+                ),
+            )
+        }
+    }
+
+    private fun record(localUri: String, image: UploadedImage) {
+        progress = progress?.let { it.copy(uploaded = it.uploaded + (localUri to image)) }
     }
 
     /** Lets the screen dismiss an error without re-entering everything. */
@@ -566,8 +802,11 @@ class AddProductViewModel @Inject constructor(
                 form = form,
                 problems = clearProblem(state.problems),
                 // A save error describes the previous attempt and stops
-                // being true the moment the form changes.
-                saveState = SaveState.Idle,
+                // being true the moment the form changes. An attempt still
+                // running is a different matter — it is not describing the
+                // past, and clearing it would drop the double-tap guard
+                // and hide a progress bar mid-upload.
+                saveState = if (state.saveState.inFlight) state.saveState else SaveState.Idle,
             )
         }
     }
