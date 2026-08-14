@@ -306,6 +306,27 @@
     <string name="catalogue_badge_sold">Sold</string>
     <string name="catalogue_badge_archived">Archived</string>
 
+    <!-- ── Search and filters (M8.2) ─────────────────────────────────
+      The hint says exactly what the text matches, because it is not
+      obvious and getting it wrong looks like the piece is missing: name
+      by part of it, tags by a whole tag. Category is a pick from the
+      owner's own list rather than typed, so it cannot be misspelt into
+      no results. Proper search — partial tags, case-insensitive — needs a
+      database index and is M10's.
+    -->
+    <string name="catalogue_search">Search</string>
+    <string name="catalogue_search_hint">Part of a name, or a whole tag</string>
+    <string name="catalogue_search_clear">Clear</string>
+    <string name="catalogue_category">Category</string>
+    <string name="catalogue_category_all">Every category</string>
+    <string name="catalogue_filter_live">In catalogue</string>
+    <string name="catalogue_filter_all">All</string>
+
+    <!-- Worded apart from catalogue_empty: the next step is the opposite.
+         Nothing matched means clear the filters, not add a piece. -->
+    <string name="catalogue_no_matches">No pieces match what you are looking for.</string>
+    <string name="catalogue_clear_filters">Clear filters</string>
+
     <string name="dashboard_view_catalogue">View catalogue</string>
     <!-- M6.11 left the dashboard's empty state without a next step because
          the one it wanted had nowhere to go. M7 built the destination. -->

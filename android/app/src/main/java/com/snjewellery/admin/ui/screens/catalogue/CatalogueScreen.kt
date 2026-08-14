@@ -1,6 +1,21 @@
 package com.snjewellery.admin.ui.screens.catalogue
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
+import com.snjewellery.admin.domain.catalogue.CatalogueQuery
+import com.snjewellery.admin.domain.catalogue.Category
+import com.snjewellery.admin.domain.catalogue.StatusFilter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,6 +100,10 @@ fun CatalogueScreen(
         onLoadMore = viewModel::loadMore,
         onRetry = viewModel::refresh,
         onRetryMore = viewModel::retryMore,
+        onSearchChange = viewModel::onSearchChange,
+        onStatusChange = viewModel::onStatusChange,
+        onCategoryChange = viewModel::onCategoryChange,
+        onClearFilters = viewModel::onClearFilters,
         onBack = onBack,
         modifier = modifier,
     )
@@ -98,6 +117,10 @@ internal fun CatalogueScreen(
     onLoadMore: () -> Unit = {},
     onRetry: () -> Unit = {},
     onRetryMore: () -> Unit = {},
+    onSearchChange: (String) -> Unit = {},
+    onStatusChange: (StatusFilter) -> Unit = {},
+    onCategoryChange: (String?) -> Unit = {},
+    onClearFilters: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     Scaffold(
@@ -125,24 +148,194 @@ internal fun CatalogueScreen(
             )
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when {
-                uiState.loading -> CatalogueSkeleton()
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // Above the list and always present, including while it loads
+            // and when nothing matched. A filter row that disappears with
+            // its results is a filter the owner cannot undo.
+            CatalogueFilters(
+                query = uiState.query,
+                categories = uiState.categories,
+                onSearchChange = onSearchChange,
+                onStatusChange = onStatusChange,
+                onCategoryChange = onCategoryChange,
+            )
 
-                uiState.failure != null -> CatalogueError(
-                    failure = uiState.failure,
-                    onRetry = onRetry,
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    uiState.loading -> CatalogueSkeleton()
 
-                uiState.isEmpty -> EmptyCatalogue()
+                    uiState.failure != null -> CatalogueError(
+                        failure = uiState.failure,
+                        onRetry = onRetry,
+                    )
 
-                else -> CatalogueList(
-                    uiState = uiState,
-                    onLoadMore = onLoadMore,
-                    onRetryMore = onRetryMore,
+                    // Nothing matched and nothing exists are different
+                    // messages with different next steps.
+                    uiState.isNoMatch -> NoMatches(onClearFilters)
+
+                    uiState.isEmpty -> EmptyCatalogue()
+
+                    else -> CatalogueList(
+                        uiState = uiState,
+                        onLoadMore = onLoadMore,
+                        onRetryMore = onRetryMore,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Search, status and category.
+ *
+ * ── Status is one choice, not three switches ──────────────────────────
+ * Featured, Sold and Archived are independent properties of a piece, so
+ * three checkboxes would let the owner ask for combinations that mean
+ * nothing and would need explaining on a screen used one-handed over a
+ * counter. What they actually want is one of a short list of questions.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatalogueFilters(
+    query: CatalogueQuery,
+    categories: List<Category>,
+    onSearchChange: (String) -> Unit,
+    onStatusChange: (StatusFilter) -> Unit,
+    onCategoryChange: (String?) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Tokens.Space.s4)
+            .padding(bottom = Tokens.Space.s2),
+        verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+    ) {
+        OutlinedTextField(
+            value = query.text,
+            onValueChange = onSearchChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.catalogue_search)) },
+            supportingText = { Text(stringResource(R.string.catalogue_search_hint)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            trailingIcon = if (query.text.isEmpty()) {
+                null
+            } else {
+                {
+                    TextButton(onClick = { onSearchChange("") }) {
+                        Text(
+                            text = stringResource(R.string.catalogue_search_clear),
+                            style = MaterialTheme.snTextStyles.label,
+                        )
+                    }
+                }
+            },
+        )
+
+        // Scrolls rather than wrapping: five chips will not fit across a
+        // 375 dp phone, and a wrapped row changes the list's start position
+        // as the labels change length.
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+        ) {
+            StatusFilter.entries.forEach { status ->
+                FilterChip(
+                    selected = query.status == status,
+                    onClick = { onStatusChange(status) },
+                    label = { Text(stringResource(status.labelRes())) },
                 )
             }
         }
+
+        // Hidden until the categories arrive: an empty dropdown is a
+        // control that looks broken. Its failure is silent for the same
+        // reason — it costs the filter, not the list.
+        if (categories.isNotEmpty()) {
+            CategoryFilter(
+                categories = categories,
+                selectedId = query.categoryId,
+                onSelect = onCategoryChange,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryFilter(
+    categories: List<Category>,
+    selectedId: String?,
+    onSelect: (String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val allLabel = stringResource(R.string.catalogue_category_all)
+    val selected = categories.firstOrNull { it.id == selectedId }
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selected?.name ?: allLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.catalogue_category)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            // "Every category" has to be reachable once one is chosen, or
+            // the filter is a one-way door.
+            DropdownMenuItem(
+                text = { Text(allLabel) },
+                onClick = {
+                    onSelect(null)
+                    expanded = false
+                },
+            )
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category.name) },
+                    onClick = {
+                        onSelect(category.id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun StatusFilter.labelRes(): Int = when (this) {
+    StatusFilter.Live -> R.string.catalogue_filter_live
+    StatusFilter.All -> R.string.catalogue_filter_all
+    StatusFilter.Featured -> R.string.catalogue_badge_featured
+    StatusFilter.Sold -> R.string.catalogue_badge_sold
+    StatusFilter.Archived -> R.string.catalogue_badge_archived
+}
+
+/**
+ * Nothing matched — with the one action that fixes it.
+ *
+ * Worded apart from an empty catalogue, because the next step is the
+ * opposite: clear the filters, not add a piece. ux.md rule 1 and rule 3.
+ */
+@Composable
+private fun NoMatches(onClearFilters: () -> Unit) = Column(
+    modifier = Modifier.fillMaxSize().padding(Tokens.Space.s4),
+    verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+) {
+    Text(
+        text = stringResource(R.string.catalogue_no_matches),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    TextButton(
+        onClick = onClearFilters,
+        modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+    ) {
+        Text(stringResource(R.string.catalogue_clear_filters))
     }
 }
 

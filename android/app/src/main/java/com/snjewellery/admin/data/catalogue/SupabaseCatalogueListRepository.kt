@@ -6,10 +6,13 @@ import com.snjewellery.admin.domain.catalogue.CatalogueEntry
 import com.snjewellery.admin.domain.catalogue.CatalogueListRepository
 import com.snjewellery.admin.domain.catalogue.CataloguePage
 import com.snjewellery.admin.domain.catalogue.CataloguePageResult
+import com.snjewellery.admin.domain.catalogue.CatalogueQuery
+import com.snjewellery.admin.domain.catalogue.StatusFilter
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -69,11 +72,26 @@ class SupabaseCatalogueListRepository @Inject constructor(
         @SerialName("product_images") val images: List<EmbeddedImage> = emptyList(),
     )
 
-    override suspend fun products(after: CatalogueCursor?): CataloguePageResult = try {
+    override suspend fun products(
+        query: CatalogueQuery,
+        after: CatalogueCursor?,
+    ): CataloguePageResult = try {
         val rows = client.postgrest.from(TABLE_PRODUCTS)
             .select(COLUMNS) {
-                if (after != null) {
-                    filter {
+                filter {
+                    narrowByStatus(query.status)
+                    query.categoryId?.let { eq("category_id", it) }
+                    query.term?.let { term ->
+                        // Name by substring, tags by whole tag. Both are
+                        // columns on `products`, so this disjunction needs
+                        // no embedded resource — which is why category is
+                        // a separate pick rather than part of the text.
+                        or {
+                            ilike("name", "%$term%")
+                            contains("tags", listOf(term))
+                        }
+                    }
+                    if (after != null) {
                         or {
                             lt("created_at", after.addedAt)
                             and {
@@ -106,6 +124,24 @@ class SupabaseCatalogueListRepository @Inject constructor(
         throw e
     } catch (e: Exception) {
         CataloguePageResult.Failed(failures.classify(e))
+    }
+
+    /**
+     * The status filter, as columns.
+     *
+     * `Live` and `All` are the only two that say anything about `archived`,
+     * and they say opposite things: `Live` excludes archived pieces, `All`
+     * mentions it at all. `Featured` and `Sold` deliberately **do not**
+     * filter `archived` either way — the owner asking "what is featured"
+     * wants every featured piece, and silently dropping the archived ones
+     * would give a count that disagrees with the Archived filter's.
+     */
+    private fun PostgrestFilterBuilder.narrowByStatus(status: StatusFilter) = when (status) {
+        StatusFilter.Live -> eq("archived", false)
+        StatusFilter.All -> Unit
+        StatusFilter.Featured -> eq("featured", true)
+        StatusFilter.Sold -> eq("sold", true)
+        StatusFilter.Archived -> eq("archived", true)
     }
 
     private fun EntryRow.toEntry() = CatalogueEntry(

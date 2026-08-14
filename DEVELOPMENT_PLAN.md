@@ -1141,9 +1141,29 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **The query shape is unverified against a real database.** M6.11 checked its queries out of band with `curl` and the anon key; that is impossible now (same finding). The embedded-resource select and the disjunction cursor compile and are reasoned about, but **they have not returned a row**. First thing to check when the backend is reachable.
 
-- **`M8.2` In-app search and status filters** — `S`
+- **`M8.2` In-app search and status filters** — `S` — ◐ **built and tested; "returns correct matches" needs the database**
   Search by name, category, and tags; filter by status.
   *Done when:* each of the three search fields returns correct matches.
+
+  **Filtering happens in the database, not after the fact.** Reading the catalogue and filtering in Kotlin works at eleven products and becomes a full download at a thousand — for a screen whose entire purpose is to avoid looking at the whole catalogue.
+
+  **Category is a pick, not a substring.** The PRD asks for search by name, category and tags. Name and tags are one text field; category is a dropdown over the owner's own eleven, because a category selected cannot be misspelt into no results — and because a top-level `or` mixing a parent column with an embedded resource's is exactly the PostgREST behaviour I cannot verify without a database. Name and `tags` are both columns on `products`, so the disjunction needs no embed.
+
+  **What the text matches, said on the screen** rather than left to be discovered: **name by substring** (`ilike`, case-insensitive) and **tags by whole tag** (`bridal` finds `bridal`, not `bridalwear`, and it is case-sensitive). That is the only matching PostgREST offers on a Postgres array. Partial and case-insensitive tag matching needs a migration — a lowercased expression index or a generated search column — which is **M10's**, the milestone that owns real search and carries a latency budget at 100k products. Flagged rather than half-built.
+
+  **Status is one choice, not three switches.** Featured, Sold and Archived are independent properties of a piece, so three checkboxes would let the owner ask for combinations that mean nothing and would need explaining on a screen used one-handed over a counter. `Featured` and `Sold` deliberately do **not** filter `archived` either way: someone asking "what is featured" wants every featured piece, and silently dropping the archived ones would give a count that disagrees with the Archived filter's.
+
+  **`Live` is the default, not `All`** — the common task is finding a piece that is in the catalogue now, and archived pieces at the top would be noise in front of it. `All` is one tap away.
+
+  **The search debounces, the filters do not.** A keystroke echoes into the field immediately and the request waits 350 ms; a chip tap fires at once, because there is nothing to wait for. A superseded first-page request is cancelled, so typing `cha` then `chai` cannot leave two requests racing — on a slow connection the one that finishes last is quite often the earlier, wrong one.
+
+  **The tests found a real bug before the build did.** `onSearchChange` echoes the keystroke into the query straight away, so by the time the debounce fired, `applyQuery` compared the new query against a state that already said the same thing, concluded nothing had changed, and **never reloaded — search silently did nothing.** Reading the code back would not have found it; two tests failed on the first run. Fixed with `committedText`, the text the server has actually seen, which is the question worth asking.
+
+  **Nothing matched is not nothing exists.** Different message, opposite next step — "clear the filters", not "add a piece" — and there is a test for each, because getting these the same way round is the commonest version of the mistake ux.md rule 3 is about.
+
+  **Verified by test:** `CatalogueViewModelTest` is now **22 tests**, adding the debounce, the immediate filter tap, the default, a filter change restarting from page one, a later page carrying the filters (dropping them shows non-matching pieces, a bug that only appears once someone scrolls), the two empty states, clearing, and re-selecting an unchanged filter not re-requesting. Project total: **43 local tests, all passing**; lint 0 errors, 8 warnings, none new; both variants assemble.
+
+  **Not verified: the *Done when* itself.** "Returns correct matches" is a statement about a database, and the dev project is unreachable — Open Question 22. The `ilike`/`contains` disjunction and the status columns compile and are reasoned about; they have not matched a row.
 
 - **`M8.3` Edit Product** — `M`
   Reuse the M7.1 form: load existing values, add and remove images, reorder images, save changes.
