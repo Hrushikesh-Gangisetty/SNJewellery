@@ -3,6 +3,7 @@ package com.snjewellery.admin.ui.screens.catalogue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import com.snjewellery.admin.domain.product.ProductStatus
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -103,6 +104,7 @@ fun CatalogueScreen(
         onLoadMore = viewModel::loadMore,
         onRetry = viewModel::refresh,
         onRetryMore = viewModel::retryMore,
+        onRefresh = viewModel::pullToRefresh,
         onSearchChange = viewModel::onSearchChange,
         onStatusChange = viewModel::onStatusChange,
         onCategoryChange = viewModel::onCategoryChange,
@@ -127,6 +129,7 @@ internal fun CatalogueScreen(
     onLoadMore: () -> Unit = {},
     onRetry: () -> Unit = {},
     onRetryMore: () -> Unit = {},
+    onRefresh: () -> Unit = {},
     onSearchChange: (String) -> Unit = {},
     onStatusChange: (StatusFilter) -> Unit = {},
     onCategoryChange: (String?) -> Unit = {},
@@ -177,7 +180,14 @@ internal fun CatalogueScreen(
                 onCategoryChange = onCategoryChange,
             )
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            PullToRefreshBox(
+                // `loading` is the first-page state, which already draws
+                // skeletons. Binding the spinner to it too would show the
+                // owner two loading indicators for one request.
+                isRefreshing = uiState.refreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
                 when {
                     uiState.loading -> CatalogueSkeleton()
 

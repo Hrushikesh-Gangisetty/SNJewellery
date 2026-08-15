@@ -1247,9 +1247,17 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
   Automatic sync on reconnect, with visible sync status and surfaced failures.
   *Done when:* a pending draft uploads intact with all images on reconnect, and a failed draft remains retryable rather than silently disappearing.
 
-- **`M8.11` Refresh and state consistency** — `S`
+- **`M8.11` Refresh and state consistency** — `S` — ◐ **done for the catalogue; the category screens (M8.6–M8.8) do not exist yet**
   Pull-to-refresh and consistent empty, loading, and error states per M1.10 throughout.
   *Done when:* every screen in the milestone handles all three states.
+
+  **A pull is not the same request drawn the same way.** A first load draws skeletons where the rows will be; a pull draws the spinner the gesture already put on screen and **keeps the rows underneath**. One flag for both would give two indicators for one request, and would replace a list the owner is looking at with skeletons they did not ask for — they pulled to check it was current, not to make it vanish.
+
+  **A failed pull keeps the rows too**, reported at the bottom rather than as a full-screen error. Same rule a failed later page follows, for the same reason.
+
+  The catalogue's five states are now: skeletons, full-screen error, *nothing matched* (with Clear filters), *nothing exists* (with Add product), and the list — plus the two page-level states beneath it. **Four new tests**, 68 in the project.
+
+  **Outstanding:** M8.6–M8.8's category screens, which is a *Done when* that cannot be met before they exist.
 
 ### Dependencies
 

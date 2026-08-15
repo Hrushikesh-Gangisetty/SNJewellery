@@ -556,6 +556,64 @@ class CatalogueViewModelTest {
         assertNull(viewModel.uiState.value.selected)
     }
 
+    // ── Pull to refresh (M8.11) ──────────────────────────────────────
+
+    @Test
+    fun `a pull keeps the rows on screen instead of showing skeletons`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        repository.gate = CompletableDeferred()
+
+        viewModel.pullToRefresh()
+
+        val during = viewModel.uiState.value
+        assertTrue("the gesture already drew a spinner", during.refreshing)
+        assertTrue("skeletons would take away what they are looking at", !during.loading)
+        assertEquals(listOf("a"), during.entries.map { it.id })
+
+        repository.gate?.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(!viewModel.uiState.value.refreshing)
+    }
+
+    @Test
+    fun `a pull that fails keeps the rows too`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        repository.failFrom = 0
+
+        viewModel.pullToRefresh()
+
+        val state = viewModel.uiState.value
+        assertEquals("a failed pull is not a reason to empty the screen", 1, state.entries.size)
+        assertEquals(OFFLINE, state.moreFailure)
+        assertNull("and not the full-screen error", state.failure)
+        assertTrue(!state.refreshing)
+    }
+
+    @Test
+    fun `a pull re-reads with the current filters`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onStatusChange(StatusFilter.Sold)
+        repository.queries.clear()
+
+        viewModel.pullToRefresh()
+
+        assertEquals(StatusFilter.Sold, repository.queries.single().status)
+    }
+
+    @Test
+    fun `a pull closes the action sheet`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+
+        viewModel.pullToRefresh()
+
+        assertNull("a sheet over a re-read list may be acting on a stale row", viewModel.uiState.value.selected)
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────
 
     private fun viewModel() =

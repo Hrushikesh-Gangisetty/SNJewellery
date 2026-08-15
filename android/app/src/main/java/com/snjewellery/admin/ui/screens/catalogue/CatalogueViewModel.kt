@@ -60,6 +60,16 @@ data class CatalogueUiState(
     val query: CatalogueQuery = CatalogueQuery(),
     /** The owner's categories, for the category filter. Empty until loaded. */
     val categories: List<Category> = emptyList(),
+    /**
+     * A refresh the owner asked for by pulling.
+     *
+     * Separate from [loading] because they look different on purpose: a
+     * first load draws skeletons where the rows will be, and a pull draws
+     * the spinner the gesture already put on screen. Binding both to one
+     * flag gives two indicators for one request, and replaces a list the
+     * owner is looking at with skeletons they did not ask for.
+     */
+    val refreshing: Boolean = false,
     /** The piece whose actions are open. Null when the sheet is closed. */
     val selected: CatalogueEntry? = null,
     /** What that sheet is doing. Null when it is just sitting there. */
@@ -192,12 +202,52 @@ class CatalogueViewModel @Inject constructor(
      * status changed — and keeping old rows to avoid a flicker is how a
      * list shows something that is no longer there.
      */
-    fun refresh() {
-        val query = _uiState.value.query
-        val categories = _uiState.value.categories
+    /**
+     * The pull gesture's refresh: the same read, drawn differently.
+     *
+     * The rows stay on screen under the spinner rather than being replaced
+     * by skeletons — the owner is looking at them, and they pulled to
+     * check the list is current, not to make it disappear.
+     */
+    fun pullToRefresh() = refresh(fromPull = true)
+
+    fun refresh() = refresh(fromPull = false)
+
+    private fun refresh(fromPull: Boolean) {
+        val current = _uiState.value
+        val query = current.query
+        val categories = current.categories
 
         nextCursor = null
         committedText = query.text
+
+        if (fromPull) {
+            _uiState.update { it.copy(refreshing = true, selected = null, action = null) }
+            loadJob?.cancel()
+            loadJob = viewModelScope.launch {
+                when (val result = repository.products(query)) {
+                    is CataloguePageResult.Loaded -> {
+                        nextCursor = result.page.nextCursor
+                        _uiState.update {
+                            it.copy(
+                                entries = result.page.entries,
+                                refreshing = false,
+                                moreFailure = null,
+                                hasMore = result.page.nextCursor != null,
+                            )
+                        }
+                    }
+
+                    // The rows on screen are kept. A pull that fails is
+                    // not a reason to take away what the owner already
+                    // had — the same rule a failed later page follows.
+                    is CataloguePageResult.Failed -> _uiState.update {
+                        it.copy(refreshing = false, moreFailure = result.failure)
+                    }
+                }
+            }
+            return
+        }
         // The sheet is deliberately not carried across: a refresh may
         // find the selected piece changed or gone, and a sheet acting on
         // a stale row is how a toggle lands on the wrong piece.
