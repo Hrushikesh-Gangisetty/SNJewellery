@@ -18,6 +18,7 @@ import com.snjewellery.admin.domain.product.ProductFormRules
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.RemoveImagesResult
+import com.snjewellery.admin.domain.product.StoredPhoto
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UploadedImage
@@ -46,12 +47,14 @@ sealed interface FormMode {
     /**
      * [slug] is carried for the confirmation's link and is **not**
      * re-derived from an edited name — see `ProductRepository.update`.
-     * [imageUrls] are read-only in M8.3a; M8.3b makes them editable.
+     *
+     * The photographs are **not** here: since M8.3b they live in
+     * [ProductForm.images] like any others, because the owner edits them
+     * the same way whichever mode the form is in.
      */
     data class Editing(
         val productId: String,
         val slug: String,
-        val imageUrls: List<String>,
     ) : FormMode
 }
 
@@ -73,6 +76,48 @@ sealed interface OptionsState {
     data class Failed(val failure: RequestFailure) : OptionsState
 }
 
+/**
+ * One photograph on the form, wherever it came from.
+ *
+ * Adding a piece produces only [Staged] entries. **Editing produces a
+ * mixture**, and that mixture is the whole of M8.3b: the two behave
+ * identically to the owner — same thumbnail, same arrows, same remove
+ * button — and completely differently at save time. A [Staged] one has to
+ * be uploaded; a [Stored] one is already in the bucket and must not be
+ * sent again, but must be *deleted* from it if the owner removes it.
+ *
+ * Both render from [displayModel] without the screen asking which it is:
+ * Coil takes a local URI and a remote URL alike.
+ */
+@Serializable
+sealed interface FormPhoto {
+    /** What Coil loads. A file on the device, or a public URL. */
+    val displayModel: String
+
+    /** Stable across a reorder, so `LazyColumn` keys and progress track the right one. */
+    val key: String
+
+    /** Compressed and waiting on the device. Not yet in Storage. */
+    @Serializable
+    data class Staged(val localUri: String) : FormPhoto {
+        override val displayModel: String get() = localUri
+        override val key: String get() = localUri
+    }
+
+    /**
+     * Already in the bucket, on a piece being edited.
+     *
+     * [storagePath] is what a removal has to delete and what the row
+     * points at; [url] is what the screen shows. ADR-0005 keeps both for
+     * exactly this reason.
+     */
+    @Serializable
+    data class Stored(val storagePath: String, val url: String) : FormPhoto {
+        override val displayModel: String get() = url
+        override val key: String get() = storagePath
+    }
+}
+
 /** What the owner typed. Field names match the PRD's and the schema's. */
 data class ProductForm(
     val name: String = "",
@@ -84,11 +129,13 @@ data class ProductForm(
     val tags: String = "",
     val featured: Boolean = false,
     /**
-     * Content URIs of the photographs chosen so far, in the order they
-     * will be uploaded. The first is the primary image — M7.5 makes that
-     * order editable and says so on screen; M7.7 uploads them.
+     * The photographs, in the order they will be persisted. The first is
+     * the primary image — M7.5 makes that order editable and says so on
+     * screen.
+     *
+     * A mixture when editing: see [FormPhoto].
      */
-    val images: List<String> = emptyList(),
+    val images: List<FormPhoto> = emptyList(),
 )
 
 /**
@@ -348,6 +395,17 @@ class AddProductViewModel @Inject constructor(
      */
     private val editingId: String? = savedState[KEY_PRODUCT_ID]
 
+    /**
+     * Objects the owner took off a piece being edited.
+     *
+     * Not deleted when the button is tapped: nothing on this form is
+     * committed until Save, and destroying a photograph that the owner
+     * then backs out of removing would be unrecoverable. Handed to
+     * `clearAbandoned` at save time, which already knows how to retry a
+     * delete that fails.
+     */
+    private val removedStored = mutableListOf<String>()
+
     private var progressBacking: SaveProgress? = restoreProgress()
 
     /**
@@ -411,7 +469,6 @@ class AddProductViewModel @Inject constructor(
                     val mode = FormMode.Editing(
                         productId = product.id,
                         slug = product.slug,
-                        imageUrls = product.imageUrls,
                     )
                     val restored = savedState.get<String>(KEY_NAME) != null
 
@@ -419,7 +476,11 @@ class AddProductViewModel @Inject constructor(
                         it.copy(
                             mode = mode,
                             loadState = LoadState.Ready,
-                            form = if (restored) it.form else product.draft.toForm(),
+                            form = if (restored) {
+                                it.form
+                            } else {
+                                product.draft.toForm().copy(images = product.photos.map(::asFormPhoto))
+                            },
                         )
                     }
                     if (!restored) persist(_uiState.value.form)
@@ -572,7 +633,11 @@ class AddProductViewModel @Inject constructor(
 
             sourceUris.forEach { source ->
                 val staged = stagedImages.stage(source)
-                if (staged == null) failed++ else updateForm({ it.copy(images = it.images + staged) })
+                if (staged == null) {
+                    failed++
+                } else {
+                    updateForm({ it.copy(images = it.images + FormPhoto.Staged(staged)) })
+                }
                 if (discardSources) stagedImages.discard(source)
             }
 
@@ -626,8 +691,18 @@ class AddProductViewModel @Inject constructor(
     fun onRemoveImage(index: Int) {
         val removed = _uiState.value.form.images.getOrNull(index) ?: return
 
-        updateForm({ it.copy(images = it.images - removed) })
-        viewModelScope.launch { stagedImages.discard(removed) }
+        updateForm({ form -> form.copy(images = form.images.filterNot { it.key == removed.key }) })
+
+        when (removed) {
+            // Ours to delete, and never uploaded — a re-take, not a loss.
+            is FormPhoto.Staged -> viewModelScope.launch { stagedImages.discard(removed.localUri) }
+
+            // Already in the bucket. Its object is **not** deleted here:
+            // nothing is committed until Save, and removing a photograph
+            // then backing out of the form must not have destroyed it.
+            // The save records it as abandoned; `clearAbandoned` removes it.
+            is FormPhoto.Stored -> removedStored += removed.storagePath
+        }
     }
 
     fun onCameraUnavailable() =
@@ -675,19 +750,18 @@ class AddProductViewModel @Inject constructor(
         // would be a crash on the owner's only Save button.
         val categoryId = current.form.categoryId ?: return
 
-        // Editing is a different job from creating and shares only the
-        // validation above it. Nothing is uploaded, no id is chosen, no
-        // slug is claimed — the row exists and its address is a promise
-        // already made to the website.
         val mode = current.mode
-        if (mode is FormMode.Editing) {
-            _uiState.update { it.copy(problems = problems, saveState = SaveState.Saving) }
-            viewModelScope.launch { saveEdit(mode, categoryId) }
-            return
-        }
-
-        val attempt = progress
-            ?: SaveProgress(productId = UUID.randomUUID().toString()).also { progress = it }
+        val attempt = progress ?: SaveProgress(
+            // Editing writes to the row that already exists, and its
+            // photographs go under `products/{that id}/…`.
+            productId = when (mode) {
+                is FormMode.Editing -> mode.productId
+                is FormMode.Adding -> UUID.randomUUID().toString()
+            },
+            // Already public. So an interruption part-way through an edit
+            // says so, rather than claiming nothing reached the catalogue.
+            slug = (mode as? FormMode.Editing)?.slug,
+        ).also { progress = it }
         val images = current.form.images
 
         _uiState.update {
@@ -782,9 +856,24 @@ class AddProductViewModel @Inject constructor(
 
         if (!clearAbandoned(attempt)) return
         val uploaded = uploadRemaining(attempt) ?: return
-        val slug = createRow(categoryId) ?: return
+        val slug = writeRow(categoryId) ?: return
         writeImageRows(uploaded, slug)
     }
+
+    /**
+     * Creates the row, or updates the one being edited.
+     *
+     * The only step of the pipeline that differs between the two modes —
+     * which is why editing is a branch here rather than a second pipeline.
+     * Everything around it (clearing abandoned objects, uploading what is
+     * new, writing the image rows in the on-screen order) is identical,
+     * and a second copy of it is how the two start disagreeing.
+     */
+    private suspend fun writeRow(categoryId: String): String? =
+        when (val mode = _uiState.value.mode) {
+            is FormMode.Editing -> updateRow(mode, categoryId)
+            is FormMode.Adding -> createRow(categoryId)
+        }
 
     /**
      * Removes objects from earlier attempts that the current list no
@@ -795,9 +884,16 @@ class AddProductViewModel @Inject constructor(
      * leave paid-for storage that nothing will ever look at again.
      */
     private suspend fun clearAbandoned(attempt: SaveProgress): Boolean {
-        val wanted = _uiState.value.form.images.toSet()
+        val wanted = _uiState.value.form.images
+            .filterIsInstance<FormPhoto.Staged>()
+            .map { it.localUri }
+            .toSet()
         val abandoned = attempt.abandoned +
-            attempt.uploaded.filterNot { it.localUri in wanted }.map { it.storagePath }
+            attempt.uploaded.filterNot { it.localUri in wanted }.map { it.storagePath } +
+            // Photographs the owner took off a piece being edited. Removed
+            // here rather than when the button was tapped, so backing out
+            // of the form leaves them intact.
+            removedStored
 
         if (abandoned.isEmpty()) return true
 
@@ -806,6 +902,7 @@ class AddProductViewModel @Inject constructor(
         return when (val removed = productImageRepository.remove(abandoned)) {
             is RemoveImagesResult.Removed -> {
                 progress = attempt.copy(uploaded = kept, abandoned = emptyList())
+                removedStored.clear()
                 true
             }
 
@@ -835,7 +932,12 @@ class AddProductViewModel @Inject constructor(
     private suspend fun uploadRemaining(attempt: SaveProgress): List<UploadedImage>? {
         val images = _uiState.value.form.images
 
-        images.forEach { localUri ->
+        images.forEach { photo ->
+            // Already in the bucket — from a previous attempt, or because
+            // this is an edit and it was there before the owner opened
+            // the form. Either way it must not be sent again.
+            if (photo is FormPhoto.Stored) return@forEach
+            val localUri = (photo as FormPhoto.Staged).localUri
             if (progress?.landed(localUri) != null) return@forEach
 
             val result = productImageRepository.upload(attempt.productId, localUri) { sent, total ->
@@ -886,8 +988,23 @@ class AddProductViewModel @Inject constructor(
         // makes M7.5's promise true: position 0 is the primary image
         // because it is the one at the top of the screen. Assigned here
         // rather than at upload time, so a photograph promoted between two
-        // attempts still lands where the owner put it.
-        return images.mapIndexedNotNull { index, uri -> landed.landed(uri)?.toRow(index) }
+        // attempts — or between two sessions of editing — still lands
+        // where the owner put it.
+        return images.mapIndexedNotNull { index, photo ->
+            when (photo) {
+                is FormPhoto.Stored -> UploadedImage(
+                    storagePath = photo.storagePath,
+                    url = photo.url,
+                    displayOrder = index,
+                    // `aspect` was decided when it was first uploaded and
+                    // is not re-derived: the file has not changed, and
+                    // guessing again from a URL would need a download.
+                    portrait = false,
+                )
+
+                is FormPhoto.Staged -> landed.landed(photo.localUri)?.toRow(index)
+            }
+        }
     }
 
     /** Returns the slug, or null when the save has stopped. */
@@ -938,37 +1055,31 @@ class AddProductViewModel @Inject constructor(
     }
 
     /**
-     * Writes the changed fields. One request, and no rollback to design.
-     *
-     * The whole reason M7.9 needed an ordering is that creating a piece
-     * spans Storage and two tables. Changing its details touches one row
-     * and one statement, so it either happens or it does not.
+     * Writes the changed fields. Returns the slug it already had — editing
+     * a name does not move the piece's address on the website.
      */
-    private suspend fun saveEdit(mode: FormMode.Editing, categoryId: String) {
-        val form = _uiState.value.form
+    private suspend fun updateRow(mode: FormMode.Editing, categoryId: String): String? {
+        _uiState.update { it.copy(saveState = SaveState.Saving) }
 
-        when (val result = productRepository.update(mode.productId, form.toDraft(categoryId))) {
-            is UpdateProductResult.Updated -> _uiState.update {
-                // The slug is the one it already had: editing a name does
-                // not move the piece's address on the website.
-                it.copy(saveState = SaveState.Saved(form.name.trim(), mode.slug))
-            }
+        return when (
+            val result = productRepository.update(
+                mode.productId,
+                _uiState.value.form.toDraft(categoryId),
+            )
+        ) {
+            is UpdateProductResult.Updated -> mode.slug
 
             // Deleted from another device between opening the form and
             // saving it. Not a failure to retry — there is nothing left to
             // write to, and the form's contents are the only copy.
-            is UpdateProductResult.Missing ->
+            is UpdateProductResult.Missing -> {
                 _uiState.update { it.copy(loadState = LoadState.Missing) }
+                null
+            }
 
-            is UpdateProductResult.Failed -> _uiState.update {
-                it.copy(
-                    saveState = SaveState.Interrupted(
-                        uploaded = 0,
-                        total = 0,
-                        inCatalogue = false,
-                        failure = result.failure,
-                    ),
-                )
+            is UpdateProductResult.Failed -> {
+                interrupt(result.failure)
+                null
             }
         }
     }
@@ -1040,10 +1151,11 @@ class AddProductViewModel @Inject constructor(
         savedState[KEY_DESCRIPTION] = form.description
         savedState[KEY_TAGS] = form.tags
         savedState[KEY_FEATURED] = form.featured
-        // ArrayList, not List: the handle writes to a Bundle, and a
-        // Bundle stores an ArrayList of strings. A plain List goes in as
-        // a Serializable and comes back as something else.
-        savedState[KEY_IMAGES] = ArrayList(form.images)
+        // JSON, since M8.3b made these a sealed type. A Bundle can hold an
+        // ArrayList of strings and nothing richer, and four parallel lists
+        // is how the fourth ends up a different length from the others —
+        // the same argument SaveProgress makes.
+        savedState[KEY_IMAGES] = Json.encodeToString(form.images)
     }
 
     private fun restoreForm() = ProductForm(
@@ -1054,7 +1166,9 @@ class AddProductViewModel @Inject constructor(
         description = savedState[KEY_DESCRIPTION] ?: "",
         tags = savedState[KEY_TAGS] ?: "",
         featured = savedState[KEY_FEATURED] ?: false,
-        images = savedState.get<ArrayList<String>>(KEY_IMAGES) ?: emptyList(),
+        images = savedState.get<String>(KEY_IMAGES)
+            ?.let { runCatching { Json.decodeFromString<List<FormPhoto>>(it) }.getOrNull() }
+            ?: emptyList(),
     )
 
     /**
@@ -1108,6 +1222,10 @@ class AddProductViewModel @Inject constructor(
  * is that empty means "not weighed", and a zero would fail the positive
  * constraint M7.2 mirrors.
  */
+/** A stored photograph as the form holds it. */
+internal fun asFormPhoto(photo: StoredPhoto) =
+    FormPhoto.Stored(storagePath = photo.storagePath, url = photo.url)
+
 internal fun ProductDraft.toForm() = ProductForm(
     name = name,
     categoryId = categoryId,

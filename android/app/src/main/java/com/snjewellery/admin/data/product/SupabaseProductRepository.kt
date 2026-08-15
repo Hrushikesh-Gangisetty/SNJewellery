@@ -10,6 +10,7 @@ import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.Slugs
+import com.snjewellery.admin.domain.product.StoredPhoto
 import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UpdateStatusResult
 import io.github.jan.supabase.SupabaseClient
@@ -194,6 +195,7 @@ class SupabaseProductRepository @Inject constructor(
     @Serializable
     private data class ImageRow(
         @SerialName("url") val url: String,
+        @SerialName("storage_path") val storagePath: String,
         @SerialName("display_order") val displayOrder: Int,
     )
 
@@ -222,7 +224,9 @@ class SupabaseProductRepository @Inject constructor(
                     // PostgREST returns embedded rows in no guaranteed
                     // order, and position 0 being the primary image is a
                     // promise M7.5 made to the owner.
-                    imageUrls = row.images.sortedBy { it.displayOrder }.map { it.url },
+                    photos = row.images
+                        .sortedBy { it.displayOrder }
+                        .map { StoredPhoto(storagePath = it.storagePath, url = it.url) },
                 ),
             )
         }
@@ -311,7 +315,7 @@ class SupabaseProductRepository @Inject constructor(
         /** Everything the edit form fills itself from, in one request. */
         val EDITABLE_COLUMNS = Columns.raw(
             "id,slug,name,description,category_id,purity_id,weight_grams,tags,featured," +
-                "product_images(url,display_order)",
+                "product_images(url,storage_path,display_order)",
         )
     }
 }

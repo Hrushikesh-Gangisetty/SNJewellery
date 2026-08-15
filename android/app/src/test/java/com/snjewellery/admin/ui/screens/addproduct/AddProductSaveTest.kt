@@ -17,6 +17,7 @@ import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.StoragePathsResult
+import com.snjewellery.admin.domain.product.StoredPhoto
 import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UpdateStatusResult
 import com.snjewellery.admin.domain.product.UploadImageResult
@@ -30,6 +31,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -510,6 +512,171 @@ class AddProductSaveTest {
             )
         }
 
+    // ── Editing the photographs (M8.3b) ──────────────────────────────
+
+    @Test
+    fun `an existing piece's photographs arrive as stored, in display order`() =
+        runTest(dispatcher) {
+            products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+
+            val images = editViewModel().uiState.value.form.images
+
+            assertEquals(
+                listOf(FormPhoto.Stored(STORED_ONE.storagePath, STORED_ONE.url), FormPhoto.Stored(STORED_TWO.storagePath, STORED_TWO.url)),
+                images,
+            )
+        }
+
+    @Test
+    fun `saving an unchanged piece re-sends no photograph`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+        val viewModel = editViewModel()
+
+        viewModel.save()
+
+        assertEquals("they are already in the bucket", emptyList<String>(), images.uploads)
+        assertEquals(
+            listOf("products/p/one.webp", "products/p/two.webp"),
+            images.written.sortedBy { it.displayOrder }.map { it.storagePath },
+        )
+    }
+
+    @Test
+    fun `reordering existing photographs rewrites display order, not the objects`() =
+        runTest(dispatcher) {
+            products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+            val viewModel = editViewModel()
+
+            viewModel.onMoveImageEarlier(1)
+            viewModel.save()
+
+            // The gallery order on the website is display_order, so this
+            // is the whole of M8.3's Done when.
+            assertEquals(
+                listOf("products/p/two.webp", "products/p/one.webp"),
+                images.written.sortedBy { it.displayOrder }.map { it.storagePath },
+            )
+            assertEquals(listOf(0, 1), images.written.map { it.displayOrder }.sorted())
+            assertEquals(emptyList<String>(), images.uploads)
+        }
+
+    @Test
+    fun `removing an existing photograph deletes its object and drops its row`() =
+        runTest(dispatcher) {
+            products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+            val viewModel = editViewModel()
+
+            viewModel.onRemoveImage(0)
+            viewModel.save()
+
+            assertEquals(listOf("products/p/one.webp"), images.removed)
+            assertEquals(
+                listOf("products/p/two.webp"),
+                images.written.map { it.storagePath },
+            )
+        }
+
+    @Test
+    fun `removing an existing photograph does not delete it until Save`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+        val viewModel = editViewModel()
+
+        viewModel.onRemoveImage(0)
+
+        // Nothing on this form is committed until Save. Backing out must
+        // not have destroyed a photograph, which cannot be recovered.
+        assertEquals(emptyList<String>(), images.removed)
+    }
+
+    @Test
+    fun `a new photograph on an existing piece is uploaded and the old ones are not`() =
+        runTest(dispatcher) {
+            products.existing = stored(photos = listOf(STORED_ONE))
+            val viewModel = editViewModel()
+            viewModel.onGallerySelection(listOf("staged-0"))
+
+            viewModel.save()
+
+            assertEquals(listOf("staged-0"), images.uploads)
+            assertEquals(
+                listOf("products/p/one.webp", "path/staged-0"),
+                images.written.sortedBy { it.displayOrder }.map { it.storagePath },
+            )
+        }
+
+    @Test
+    fun `a new photograph promoted above an existing one keeps the on-screen order`() =
+        runTest(dispatcher) {
+            products.existing = stored(photos = listOf(STORED_ONE))
+            val viewModel = editViewModel()
+            viewModel.onGallerySelection(listOf("staged-0"))
+            viewModel.onMoveImageEarlier(1)
+
+            viewModel.save()
+
+            // The new photograph is now the primary image, even though it
+            // was uploaded after the one it displaced.
+            assertEquals(
+                listOf("path/staged-0", "products/p/one.webp"),
+                images.written.sortedBy { it.displayOrder }.map { it.storagePath },
+            )
+        }
+
+    @Test
+    fun `an edit uploads nothing twice when it is retried`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_ONE))
+        val viewModel = editViewModel()
+        viewModel.onGallerySelection(listOf("staged-0"))
+        images.failFrom = 0
+        viewModel.save()
+
+        images.failFrom = null
+        viewModel.save()
+
+        assertEquals("the retry must not send it a second time", listOf("staged-0"), images.uploads)
+        assertEquals("and the row is written once it gets that far", 1, products.updates.size)
+    }
+
+    @Test
+    fun `an interruption while editing says the piece is already public`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_ONE))
+        val viewModel = editViewModel()
+        viewModel.onGallerySelection(listOf("staged-0"))
+        images.failFrom = 0
+
+        viewModel.save()
+
+        // Unlike a new piece, an edited one IS in the catalogue — telling
+        // the owner "nothing was added" would be a lie.
+        val state = viewModel.uiState.value.saveState as SaveState.Interrupted
+        assertTrue(state.inCatalogue)
+    }
+
+    @Test
+    fun `the photographs survive the app being reclaimed mid-edit`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_ONE))
+        val viewModel = editViewModel()
+        viewModel.onGallerySelection(listOf("staged-0"))
+
+        val reopened = AddProductViewModel(
+            catalogueRepository = FakeCatalogueRepository(),
+            productRepository = products,
+            productImageRepository = images,
+            stagedImages = FakeStagedImages(),
+            savedState = handle,
+        )
+
+        // The mixture has to round-trip through the handle's JSON, which
+        // is why these are a sealed type rather than parallel lists.
+        assertEquals(
+            listOf<FormPhoto>(
+                FormPhoto.Stored(STORED_ONE.storagePath, STORED_ONE.url),
+                FormPhoto.Staged("staged-0"),
+            ),
+            reopened.uiState.value.form.images,
+        )
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────
 
     private fun editViewModel(): AddProductViewModel {
@@ -523,7 +690,10 @@ class AddProductSaveTest {
         )
     }
 
-    private fun stored(weight: Double? = 48.6) = EditableProduct(
+    private fun stored(
+        weight: Double? = 48.6,
+        photos: List<StoredPhoto> = listOf(STORED_ONE),
+    ) = EditableProduct(
         id = PRODUCT_ID,
         slug = "temple-necklace",
         draft = ProductDraft(
@@ -534,7 +704,7 @@ class AddProductSaveTest {
             tags = listOf("bridal", "temple"),
             featured = true,
         ),
-        imageUrls = listOf("https://example.test/one.webp"),
+        photos = photos,
     )
 
 
@@ -543,7 +713,9 @@ class AddProductSaveTest {
             mapOf(
                 "name" to "Kundan Choker",
                 "category_id" to CATEGORY_ID,
-                "images" to ArrayList((0 until photos).map { "staged-$it" }),
+                "images" to Json.encodeToString(
+                    (0 until photos).map<Int, FormPhoto> { FormPhoto.Staged("staged-$it") },
+                ),
             ),
         )
         return reopen()
@@ -677,6 +849,8 @@ class AddProductSaveTest {
     private companion object {
         const val CATEGORY_ID = "11111111-1111-1111-1111-111111111111"
         const val PRODUCT_ID = "22222222-2222-2222-2222-222222222222"
+        val STORED_ONE = StoredPhoto("products/p/one.webp", "https://example.test/one.webp")
+        val STORED_TWO = StoredPhoto("products/p/two.webp", "https://example.test/two.webp")
         const val BYTES = 1024L
         val OFFLINE = RequestFailure(offline = true)
     }

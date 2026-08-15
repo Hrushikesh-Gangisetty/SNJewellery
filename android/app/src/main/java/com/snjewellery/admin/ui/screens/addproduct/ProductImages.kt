@@ -66,7 +66,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
  */
 @Composable
 internal fun ProductImages(
-    images: List<String>,
+    images: List<FormPhoto>,
     photoProblem: PhotoProblem?,
     addingPhotos: Boolean,
     modifier: Modifier = Modifier,
@@ -103,13 +103,18 @@ internal fun ProductImages(
             // height to measure against. A piece has a handful of
             // photographs, so there is nothing to virtualise anyway.
             Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
-                images.forEachIndexed { index, uri ->
-                    key(uri) {
+                images.forEachIndexed { index, photo ->
+                    // Keyed by the photograph's own identity, not its
+                    // position: a reorder must move the row rather than
+                    // redraw a different photograph into it.
+                    key(photo.key) {
                         ProductImageRow(
-                            uri = uri,
+                            // A staged file or a public URL — Coil takes
+                            // either, so nothing here has to ask which.
+                            model = photo.displayModel,
                             index = index,
                             total = images.size,
-                            progress = uploadProgress[uri],
+                            progress = uploadProgress[photo.key],
                             // Reordering or removing a photograph while
                             // its bytes are going up would change an
                             // order that is already being written.
@@ -186,7 +191,7 @@ internal fun ProductImages(
  */
 @Composable
 private fun ProductImageRow(
-    uri: String,
+    model: String,
     index: Int,
     total: Int,
     progress: Float?,
@@ -203,7 +208,7 @@ private fun ProductImageRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = uri,
+            model = model,
             // The photograph itself carries no description anyone could
             // write, so what is announced is where it sits — which is
             // exactly what the buttons beside it change.
@@ -489,7 +494,13 @@ private fun ProductImagesAddingPreview() {
 private fun ProductImagesOrderedPreview() {
     SnTheme {
         ProductImages(
-            images = listOf("content://preview/1", "content://preview/2", "content://preview/3"),
+            // One already in Storage and two staged — the mixture M8.3b
+            // exists for, which the owner sees no difference between.
+            images = listOf(
+                FormPhoto.Stored("products/p/one.webp", "https://example.test/one.webp"),
+                FormPhoto.Staged("content://preview/2"),
+                FormPhoto.Staged("content://preview/3"),
+            ),
             photoProblem = null,
             addingPhotos = false,
         )

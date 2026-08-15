@@ -1206,11 +1206,27 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Verified by test:** 10 new cases — the form filling itself, a whole-number weight coming back as `48` rather than `48.0`, a null weight coming back blank rather than zero, the update writing and creating nothing, an edit uploading nothing, slug stability, deleted-while-editing, a missing piece, a retryable load failure, and the reclaimed-form guard. **78 tests in the project, all passing**; lint 0 errors, 8 warnings, none new; both variants assemble. Two mutations confirmed the two subtlest tests bite and nothing else does.
 
-- **`M8.3b` Edit Product — the photographs** — `M`
+- **`M8.3b` Edit Product — the photographs** — `M` — ◐ **built and tested; the website's gallery needs M5 to look at**
   Add, remove and reorder a piece's photographs, mixing ones already in Storage with newly staged ones.
   *Done when:* editing images updates `display_order` and the website gallery order matches.
 
-  The work: `ProductForm.images` becomes a list of a sealed type (staged file vs. stored object) persisted as JSON on the handle; `uploadRemaining` skips the stored ones; removed stored objects are deleted from the bucket; `replaceImages` writes the merged order. `ProductImages.kt` needs no change for display — Coil renders a local URI and a remote URL alike.
+  **`FormPhoto` is the whole design.** A photograph on the form is either `Staged` (a compressed file on the device) or `Stored` (already in the bucket). They are **identical to the owner** — same thumbnail, same arrows, same remove button — and completely different at save time: one has to be uploaded, the other must not be sent again but must be *deleted* if removed. Both expose a `displayModel`, so the screen never asks which it is; Coil takes a local URI and a public URL alike.
+
+  **One photographs section, not two.** M8.3a's read-only strip is gone — editing and adding now use the same component, which is what makes this a reuse rather than a parallel implementation. Its two strings were deleted with it, caught by lint's `UnusedResources` rather than left to rot.
+
+  **`display_order` is still the index on screen**, assigned when the rows are written rather than when anything is uploaded. That is what lets a newly-taken photograph be promoted above one uploaded months ago and still land at position 0 — there is a test for exactly that, because it is the case where any "order of upload" shortcut would break.
+
+  **A removed photograph is not deleted when the button is tapped.** Nothing on this form is committed until Save, and destroying a photograph the owner then backs out of removing is unrecoverable. Removals are recorded and handed to `clearAbandoned` at save time, which already knows how to retry a delete that failed (M7.9). There is a test that the object survives until Save.
+
+  **One pipeline, one branch.** Editing runs the same `runSave` as adding — clear abandoned, upload what is new, write the row, write the image rows in the on-screen order — and differs at exactly one step: `update` instead of `create`. M8.3a had a separate `saveEdit`; folding it in removed the second copy before the two could start disagreeing. An interrupted edit correctly reports `inCatalogue = true`, because unlike a new piece it **is** already public.
+
+  **The mixture round-trips through process death**, which is why `ProductForm.images` is now persisted as JSON rather than an `ArrayList<String>` — a `Bundle` cannot hold a list of records, and parallel lists are how the fourth ends up a different length from the others.
+
+  **Verified by test:** 10 new cases — stored photographs arriving in `display_order`, an unchanged save re-sending nothing, reordering rewriting only `display_order`, removal deleting the object *and* dropping the row, removal deferred until Save, a new photograph uploaded while old ones are not, a new photograph promoted above an old one, a retry not double-uploading, an interrupted edit saying the piece is public, and the mixture surviving reclamation. **88 tests in the project, all passing**; lint 0 errors and 8 warnings, none new; both variants assemble.
+
+  Two mutations confirmed they bite: not skipping `Stored` on upload, and deleting a removed object immediately. Between them **9 tests fail**, which is the coverage this change needed given it touches the M7.9 pipeline.
+
+  **Not verified: the website's gallery order**, which is the literal *Done when*. It needs an admin session to reorder and a deployed site to look at — M5. The `display_order` values written are asserted directly instead.
 
 - **`M8.4` Delete Product** — `S` — ◐ **built and tested; the bucket inspection needs a signed-in app**
   Confirmation step, then remove both database rows and storage objects.

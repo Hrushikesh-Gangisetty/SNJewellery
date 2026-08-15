@@ -282,15 +282,11 @@
     <!-- ── Edit Product (M8.3a) ──────────────────────────────────────
       The same form as Add Product, so only the words that must differ do.
 
-      The photographs are shown but not editable yet: on a screen reached
-      from a list of two hundred pieces they are how the owner confirms
-      they have the right one, and a strip of thumbnails with no controls
-      and no explanation reads as a bug. M8.3b makes them editable.
+      The photographs use the same editable section as Add Product —
+      M8.3b — so nothing here describes them.
     -->
     <string name="edit_product_title">Edit Product</string>
     <string name="edit_product_save">Save changes</string>
-    <string name="edit_product_photos_readonly">Photos cannot be changed here yet.</string>
-    <string name="edit_product_no_photos">This piece has no photographs.</string>
     <!-- Deleted from another device. Retrying cannot bring it back, so the
          only thing offered is the way out. -->
     <string name="edit_product_missing">This piece is no longer in the catalogue — it looks like it was deleted somewhere else.</string>

@@ -341,21 +341,18 @@ internal fun AddProductScreen(
 
             // After Featured and before Save, which is the PRD's own
             // order for this form.
-            when (val mode = uiState.mode) {
-                is FormMode.Editing -> ExistingPhotographs(mode.imageUrls)
-                is FormMode.Adding -> ProductImages(
-                    images = uiState.form.images,
-                    photoProblem = uiState.photoProblem,
-                    addingPhotos = uiState.addingPhotos,
-                    uploadProgress = uiState.uploadProgress,
-                    onTakePhoto = onTakePhoto,
-                    onChoosePhotos = onChoosePhotos,
-                    onOpenSettings = onOpenCameraSettings,
-                    onMoveEarlier = onMoveImageEarlier,
-                    onMoveLater = onMoveImageLater,
-                    onRemove = onRemoveImage,
-                )
-            }
+            ProductImages(
+                images = uiState.form.images,
+                photoProblem = uiState.photoProblem,
+                addingPhotos = uiState.addingPhotos,
+                uploadProgress = uiState.uploadProgress,
+                onTakePhoto = onTakePhoto,
+                onChoosePhotos = onChoosePhotos,
+                onOpenSettings = onOpenCameraSettings,
+                onMoveEarlier = onMoveImageEarlier,
+                onMoveLater = onMoveImageLater,
+                onRemove = onRemoveImage,
+            )
 
             Button(
                 onClick = {
@@ -503,70 +500,6 @@ private fun SaveError(saveState: SaveState, onDiscard: () -> Unit) {
         }
     }
 }
-
-/**
- * The piece's photographs as they already are — shown, not editable.
- *
- * Editing them is M8.3b, and it is genuinely a separate job: the list
- * becomes a mixture of objects already in Storage and files staged on the
- * device, which changes every stage of the M7.9 save pipeline. Shown
- * anyway rather than hidden, because on a screen reached from a list of
- * two hundred pieces the photographs are how the owner confirms they are
- * editing the right one.
- *
- * The note says so plainly. A strip of thumbnails with no controls and no
- * explanation reads as a bug.
- */
-@Composable
-private fun ExistingPhotographs(imageUrls: List<String>) {
-    Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
-        Text(
-            text = stringResource(R.string.add_product_images),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-
-        if (imageUrls.isEmpty()) {
-            Text(
-                text = stringResource(R.string.edit_product_no_photos),
-                style = MaterialTheme.snTextStyles.label,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@Column
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
-        ) {
-            imageUrls.forEachIndexed { index, url ->
-                AsyncImage(
-                    model = url,
-                    // Position, not a description of the photograph: the
-                    // rule ProductImages.kt follows, and here the first
-                    // one being the primary image is the useful fact.
-                    contentDescription = stringResource(
-                        R.string.add_product_image_position,
-                        index + 1,
-                        imageUrls.size,
-                    ),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(EXISTING_THUMBNAIL)
-                        .clip(MaterialTheme.shapes.small),
-                )
-            }
-        }
-
-        Text(
-            text = stringResource(R.string.edit_product_photos_readonly),
-            style = MaterialTheme.snTextStyles.label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-private val EXISTING_THUMBNAIL = 96.dp
 
 @Composable
 private fun ErrorText(message: String) = Text(

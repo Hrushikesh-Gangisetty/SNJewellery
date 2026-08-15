@@ -105,16 +105,27 @@ sealed interface UpdateStatusResult {
 }
 
 /**
+ * One photograph already in Storage, as the edit form needs it back.
+ *
+ * **Both** the path and the URL, because they answer different questions:
+ * the URL is what the screen renders, and the path is what a removal has
+ * to delete and what the row points at. ADR-0005 §4 stores both for
+ * exactly this reason, and dropping either here would mean deriving it
+ * again somewhere else.
+ */
+data class StoredPhoto(val storagePath: String, val url: String)
+
+/**
  * An existing piece, as the edit form needs it back.
  *
  * [slug] is carried but **never editable**: see [ProductRepository.update].
- * [imageUrls] are in `display_order`, so the first is the primary image.
+ * [photos] are in `display_order`, so the first is the primary image.
  */
 data class EditableProduct(
     val id: String,
     val slug: String,
     val draft: ProductDraft,
-    val imageUrls: List<String>,
+    val photos: List<StoredPhoto>,
 )
 
 sealed interface LoadProductResult {
