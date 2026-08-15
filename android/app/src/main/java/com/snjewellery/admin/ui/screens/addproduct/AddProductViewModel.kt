@@ -12,12 +12,14 @@ import com.snjewellery.admin.domain.media.StagedImages
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.DeleteProductResult
 import com.snjewellery.admin.domain.product.FieldProblem
+import com.snjewellery.admin.domain.product.LoadProductResult
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductFormRules
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.UploadImageResult
+import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UploadedImage
 import com.snjewellery.admin.domain.product.WriteImagesResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,6 +32,39 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
+
+/**
+ * Whether this form is entering a new piece or changing an existing one.
+ *
+ * One screen serves both — CLAUDE.md §11's reuse rule, and the PRD asks
+ * for the same eight fields either way. What differs is only the wording,
+ * and what Save does.
+ */
+sealed interface FormMode {
+    data object Adding : FormMode
+
+    /**
+     * [slug] is carried for the confirmation's link and is **not**
+     * re-derived from an edited name — see `ProductRepository.update`.
+     * [imageUrls] are read-only in M8.3a; M8.3b makes them editable.
+     */
+    data class Editing(
+        val productId: String,
+        val slug: String,
+        val imageUrls: List<String>,
+    ) : FormMode
+}
+
+/** How the existing piece's load went. Only ever anything but Loaded in edit mode. */
+sealed interface LoadState {
+    data object Ready : LoadState
+    data object Loading : LoadState
+
+    /** The piece is gone — deleted elsewhere while the list was stale. */
+    data object Missing : LoadState
+
+    data class Failed(val failure: RequestFailure) : LoadState
+}
 
 /** Where the category and purity lists are in their loading. */
 sealed interface OptionsState {
@@ -269,6 +304,10 @@ data class AddProductUiState(
      * which a single overall bar cannot give.
      */
     val uploadProgress: Map<String, Float> = emptyMap(),
+    /** Adding, or changing an existing piece. */
+    val mode: FormMode = FormMode.Adding,
+    /** How reading that existing piece went. Always Ready when adding. */
+    val loadState: LoadState = LoadState.Ready,
 )
 
 /**
@@ -299,6 +338,16 @@ class AddProductViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AddProductUiState(form = restoreForm()))
     val uiState: StateFlow<AddProductUiState> = _uiState.asStateFlow()
 
+    /**
+     * The piece being edited, from the navigation route — null when this
+     * is a new one.
+     *
+     * Read from the handle rather than passed in: type-safe routes put
+     * their arguments there, and taking it as a constructor parameter
+     * would mean two ways of building this view model.
+     */
+    private val editingId: String? = savedState[KEY_PRODUCT_ID]
+
     private var progressBacking: SaveProgress? = restoreProgress()
 
     /**
@@ -318,6 +367,8 @@ class AddProductViewModel @Inject constructor(
         }
 
     init {
+        if (editingId != null) loadExisting(editingId)
+
         // An attempt that outlived its own coroutine. The upload stopped
         // when the process did, so the screen must say so and offer the
         // same two ways out as any other interruption — coming back to a
@@ -339,6 +390,53 @@ class AddProductViewModel @Inject constructor(
         }
 
         loadOptions()
+    }
+
+    /**
+     * Fills the form from the piece being edited.
+     *
+     * Only when the form is otherwise untouched. A `SavedStateHandle` that
+     * already holds a name is a form the owner was in the middle of — the
+     * app was reclaimed and has just come back — and re-reading the server
+     * over it would throw away their edits at exactly the moment M7.2's
+     * whole design exists to preserve them.
+     */
+    fun loadExisting(productId: String) {
+        _uiState.update { it.copy(loadState = LoadState.Loading) }
+
+        viewModelScope.launch {
+            when (val result = productRepository.byId(productId)) {
+                is LoadProductResult.Loaded -> {
+                    val product = result.product
+                    val mode = FormMode.Editing(
+                        productId = product.id,
+                        slug = product.slug,
+                        imageUrls = product.imageUrls,
+                    )
+                    val restored = savedState.get<String>(KEY_NAME) != null
+
+                    _uiState.update {
+                        it.copy(
+                            mode = mode,
+                            loadState = LoadState.Ready,
+                            form = if (restored) it.form else product.draft.toForm(),
+                        )
+                    }
+                    if (!restored) persist(_uiState.value.form)
+                }
+
+                is LoadProductResult.Missing ->
+                    _uiState.update { it.copy(loadState = LoadState.Missing) }
+
+                is LoadProductResult.Failed ->
+                    _uiState.update { it.copy(loadState = LoadState.Failed(result.failure)) }
+            }
+        }
+    }
+
+    /** Re-reads the piece after a failure. No-op when adding. */
+    fun retryLoad() {
+        editingId?.let { loadExisting(it) }
     }
 
     fun loadOptions() {
@@ -576,6 +674,17 @@ class AddProductViewModel @Inject constructor(
         // than asserted, because CLAUDE.md forbids `!!` and a null here
         // would be a crash on the owner's only Save button.
         val categoryId = current.form.categoryId ?: return
+
+        // Editing is a different job from creating and shares only the
+        // validation above it. Nothing is uploaded, no id is chosen, no
+        // slug is claimed — the row exists and its address is a promise
+        // already made to the website.
+        val mode = current.mode
+        if (mode is FormMode.Editing) {
+            _uiState.update { it.copy(problems = problems, saveState = SaveState.Saving) }
+            viewModelScope.launch { saveEdit(mode, categoryId) }
+            return
+        }
 
         val attempt = progress
             ?: SaveProgress(productId = UUID.randomUUID().toString()).also { progress = it }
@@ -828,6 +937,42 @@ class AddProductViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Writes the changed fields. One request, and no rollback to design.
+     *
+     * The whole reason M7.9 needed an ordering is that creating a piece
+     * spans Storage and two tables. Changing its details touches one row
+     * and one statement, so it either happens or it does not.
+     */
+    private suspend fun saveEdit(mode: FormMode.Editing, categoryId: String) {
+        val form = _uiState.value.form
+
+        when (val result = productRepository.update(mode.productId, form.toDraft(categoryId))) {
+            is UpdateProductResult.Updated -> _uiState.update {
+                // The slug is the one it already had: editing a name does
+                // not move the piece's address on the website.
+                it.copy(saveState = SaveState.Saved(form.name.trim(), mode.slug))
+            }
+
+            // Deleted from another device between opening the form and
+            // saving it. Not a failure to retry — there is nothing left to
+            // write to, and the form's contents are the only copy.
+            is UpdateProductResult.Missing ->
+                _uiState.update { it.copy(loadState = LoadState.Missing) }
+
+            is UpdateProductResult.Failed -> _uiState.update {
+                it.copy(
+                    saveState = SaveState.Interrupted(
+                        uploaded = 0,
+                        total = 0,
+                        inCatalogue = false,
+                        failure = result.failure,
+                    ),
+                )
+            }
+        }
+    }
+
     /** Stops the save where it is, in terms the screen can act on. */
     private fun interrupt(failure: RequestFailure) {
         val attempt = progress
@@ -939,6 +1084,9 @@ class AddProductViewModel @Inject constructor(
         const val KEY_IMAGES = "images"
         const val KEY_PENDING_CAPTURE = "pending_capture"
         const val KEY_PROGRESS = "save_progress"
+
+        /** The navigation route's argument name. See ui/navigation/Destinations.kt. */
+        const val KEY_PRODUCT_ID = "productId"
     }
 }
 
@@ -949,6 +1097,31 @@ class AddProductViewModel @Inject constructor(
  * phone keyboard without a chip editor to fight. Blank entries are
  * dropped and each is trimmed, so `"bridal, temple,"` is two tags.
  */
+/**
+ * A stored piece back into form text — the inverse of [toDraft].
+ *
+ * Tags rejoin with ", " rather than "," because that is what the field's
+ * hint asks for and what the owner would have typed; splitting trims, so
+ * the round trip is stable.
+ *
+ * A null weight becomes blank, not "null" or "0.0": the field's own rule
+ * is that empty means "not weighed", and a zero would fail the positive
+ * constraint M7.2 mirrors.
+ */
+internal fun ProductDraft.toForm() = ProductForm(
+    name = name,
+    categoryId = categoryId,
+    purityId = purityId,
+    // `toString` on a Double gives "48.6" but also "48.0" for a whole
+    // number. Trimming the tail keeps what the owner typed recognisable.
+    weight = weightGrams?.let { grams ->
+        if (grams == grams.toLong().toDouble()) grams.toLong().toString() else grams.toString()
+    } ?: "",
+    description = description.orEmpty(),
+    tags = tags.joinToString(", "),
+    featured = featured,
+)
+
 internal fun ProductForm.toDraft(categoryId: String) = ProductDraft(
     name = name.trim(),
     categoryId = categoryId,

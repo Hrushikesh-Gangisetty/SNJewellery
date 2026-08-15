@@ -9,12 +9,15 @@ import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.media.StagedImages
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.DeleteProductResult
+import com.snjewellery.admin.domain.product.EditableProduct
+import com.snjewellery.admin.domain.product.LoadProductResult
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.StoragePathsResult
+import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UpdateStatusResult
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
@@ -375,7 +378,165 @@ class AddProductSaveTest {
         assertEquals(SaveState.Idle, reopened.uiState.value.saveState)
     }
 
+    // ── Editing an existing piece (M8.3a) ────────────────────────────
+
+    @Test
+    fun `the form fills itself from the stored piece`() = runTest(dispatcher) {
+        products.existing = stored()
+
+        val state = editViewModel().uiState.value
+
+        assertEquals("Temple Necklace", state.form.name)
+        assertEquals(CATEGORY_ID, state.form.categoryId)
+        assertEquals("48.6", state.form.weight)
+        assertEquals("A fine piece", state.form.description)
+        assertEquals("bridal, temple", state.form.tags)
+        assertTrue(state.form.featured)
+        assertEquals(LoadState.Ready, state.loadState)
+    }
+
+    @Test
+    fun `a whole-number weight comes back without a decimal tail`() = runTest(dispatcher) {
+        // `48.0.toString()` is "48.0", which is not what the owner typed.
+        products.existing = stored(weight = 48.0)
+
+        assertEquals("48", editViewModel().uiState.value.form.weight)
+    }
+
+    @Test
+    fun `a piece with no weight comes back blank, not zero`() = runTest(dispatcher) {
+        // Zero would fail the positive constraint M7.2 mirrors, and blank
+        // is what "not weighed" means on this form.
+        products.existing = stored(weight = null)
+
+        assertEquals("", editViewModel().uiState.value.form.weight)
+    }
+
+    @Test
+    fun `saving an edit updates the row and creates nothing`() = runTest(dispatcher) {
+        products.existing = stored()
+        val viewModel = editViewModel()
+        viewModel.onNameChange("Temple Necklace, Antique")
+
+        viewModel.save()
+
+        assertEquals("no new piece may appear", emptyList<String>(), products.created)
+        val (id, draft) = products.updates.single()
+        assertEquals(PRODUCT_ID, id)
+        assertEquals("Temple Necklace, Antique", draft.name)
+    }
+
+    @Test
+    fun `an edit uploads nothing`() = runTest(dispatcher) {
+        products.existing = stored()
+        val viewModel = editViewModel()
+
+        viewModel.save()
+
+        // M8.3a does not touch photographs at all; M8.3b is where that
+        // changes, and this is the guard that says so.
+        assertEquals(emptyList<String>(), images.uploads)
+    }
+
+    @Test
+    fun `editing the name keeps the piece's address on the website`() = runTest(dispatcher) {
+        products.existing = stored()
+        val viewModel = editViewModel()
+        viewModel.onNameChange("Something Else Entirely")
+
+        viewModel.save()
+
+        // A slug is a promise: re-deriving it breaks every shared link and
+        // the canonical URL, for what is usually a typo fix.
+        val saved = viewModel.uiState.value.saveState as SaveState.Saved
+        assertEquals("temple-necklace", saved.slug)
+    }
+
+    @Test
+    fun `a piece deleted while the form was open is not reported as a save failure`() =
+        runTest(dispatcher) {
+            products.existing = stored()
+            val viewModel = editViewModel()
+            products.updateMissing = true
+
+            viewModel.save()
+
+            // Retrying has nothing to write to. The form's contents are the
+            // only copy left, so it must not look like a transient error.
+            assertEquals(LoadState.Missing, viewModel.uiState.value.loadState)
+        }
+
+    @Test
+    fun `a piece that no longer exists says so instead of opening blank`() = runTest(dispatcher) {
+        products.existing = null
+
+        assertEquals(LoadState.Missing, editViewModel().uiState.value.loadState)
+    }
+
+    @Test
+    fun `a failed load is retryable`() = runTest(dispatcher) {
+        products.loadFailure = true
+        val viewModel = editViewModel()
+        assertTrue(viewModel.uiState.value.loadState is LoadState.Failed)
+
+        products.loadFailure = false
+        products.existing = stored()
+        viewModel.retryLoad()
+
+        assertEquals(LoadState.Ready, viewModel.uiState.value.loadState)
+        assertEquals("Temple Necklace", viewModel.uiState.value.form.name)
+    }
+
+    @Test
+    fun `a form the app was reclaimed on keeps the edits, not the stored values`() =
+        runTest(dispatcher) {
+            products.existing = stored()
+            val viewModel = editViewModel()
+            viewModel.onNameChange("Half-typed correction")
+
+            // Process death, then the same handle comes back.
+            val reopened = AddProductViewModel(
+                catalogueRepository = FakeCatalogueRepository(),
+                productRepository = products,
+                productImageRepository = images,
+                stagedImages = FakeStagedImages(),
+                savedState = handle,
+            )
+
+            assertEquals(
+                "re-reading the server over a half-typed edit throws it away",
+                "Half-typed correction",
+                reopened.uiState.value.form.name,
+            )
+        }
+
     // ── Fixtures ─────────────────────────────────────────────────────
+
+    private fun editViewModel(): AddProductViewModel {
+        handle = SavedStateHandle(mapOf("productId" to PRODUCT_ID))
+        return AddProductViewModel(
+            catalogueRepository = FakeCatalogueRepository(),
+            productRepository = products,
+            productImageRepository = images,
+            stagedImages = FakeStagedImages(),
+            savedState = handle,
+        )
+    }
+
+    private fun stored(weight: Double? = 48.6) = EditableProduct(
+        id = PRODUCT_ID,
+        slug = "temple-necklace",
+        draft = ProductDraft(
+            name = "Temple Necklace",
+            categoryId = CATEGORY_ID,
+            weightGrams = weight,
+            description = "A fine piece",
+            tags = listOf("bridal", "temple"),
+            featured = true,
+        ),
+        imageUrls = listOf("https://example.test/one.webp"),
+    )
+
 
     private fun viewModel(photos: Int): AddProductViewModel {
         handle = SavedStateHandle(
@@ -432,6 +593,24 @@ class AddProductSaveTest {
         // pipeline never touches them.
         override suspend fun setStatus(id: String, status: ProductStatus, value: Boolean) =
             UpdateStatusResult.Updated
+
+        /** What the edit form loaded, and what it wrote back. */
+        var existing: EditableProduct? = null
+        var loadFailure = false
+        val updates = mutableListOf<Pair<String, ProductDraft>>()
+        var updateMissing = false
+
+        override suspend fun byId(id: String): LoadProductResult = when {
+            loadFailure -> LoadProductResult.Failed(OFFLINE)
+            existing == null -> LoadProductResult.Missing
+            else -> LoadProductResult.Loaded(requireNotNull(existing))
+        }
+
+        override suspend fun update(id: String, draft: ProductDraft): UpdateProductResult {
+            if (updateMissing) return UpdateProductResult.Missing
+            updates += id to draft
+            return UpdateProductResult.Updated
+        }
     }
 
     private class FakeProductImageRepository : ProductImageRepository {
@@ -497,6 +676,7 @@ class AddProductSaveTest {
 
     private companion object {
         const val CATEGORY_ID = "11111111-1111-1111-1111-111111111111"
+        const val PRODUCT_ID = "22222222-2222-2222-2222-222222222222"
         const val BYTES = 1024L
         val OFFLINE = RequestFailure(offline = true)
     }

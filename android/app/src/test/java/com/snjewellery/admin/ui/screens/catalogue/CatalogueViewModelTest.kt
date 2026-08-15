@@ -14,12 +14,14 @@ import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.catalogue.StatusFilter
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.DeleteProductResult
+import com.snjewellery.admin.domain.product.LoadProductResult
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.StoragePathsResult
+import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UpdateStatusResult
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
@@ -709,6 +711,13 @@ class CatalogueViewModelTest {
             deleted += id
             return DeleteProductResult.Deleted
         }
+
+        // The edit form is exercised in AddProductSaveTest; the catalogue
+        // only navigates to it.
+        override suspend fun byId(id: String) = LoadProductResult.Missing
+
+        override suspend fun update(id: String, draft: ProductDraft) =
+            UpdateProductResult.Updated
 
         override suspend fun setStatus(
             id: String,

@@ -57,6 +57,7 @@ internal fun ProductActionsSheet(
     onDeleteCancelled: () -> Unit,
     onDeleteConfirmed: () -> Unit,
     onRefresh: () -> Unit,
+    onEdit: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -87,6 +88,17 @@ internal fun ProductActionsSheet(
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // First, and a filled button: correcting a detail is the
+            // commonest reason to open a piece, and the toggles below are
+            // the occasional ones.
+            Button(
+                onClick = onEdit,
+                enabled = !working,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Tokens.Layout.touchTarget),
+            ) {
+                Text(stringResource(R.string.actions_edit))
+            }
 
             ProductStatus.entries.forEach { status ->
                 StatusToggle(

@@ -4,10 +4,13 @@ import com.snjewellery.admin.data.remote.RequestFailureClassifier
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.DeleteProductResult
+import com.snjewellery.admin.domain.product.EditableProduct
+import com.snjewellery.admin.domain.product.LoadProductResult
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductRepository
 import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.Slugs
+import com.snjewellery.admin.domain.product.UpdateProductResult
 import com.snjewellery.admin.domain.product.UpdateStatusResult
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
@@ -174,6 +177,89 @@ class SupabaseProductRepository @Inject constructor(
         ProductStatus.Archived -> "archived"
     }
 
+    @Serializable
+    private data class EditableRow(
+        @SerialName("id") val id: String,
+        @SerialName("slug") val slug: String,
+        @SerialName("name") val name: String,
+        @SerialName("description") val description: String? = null,
+        @SerialName("category_id") val categoryId: String,
+        @SerialName("purity_id") val purityId: String? = null,
+        @SerialName("weight_grams") val weightGrams: Double? = null,
+        @SerialName("tags") val tags: List<String> = emptyList(),
+        @SerialName("featured") val featured: Boolean = false,
+        @SerialName("product_images") val images: List<ImageRow> = emptyList(),
+    )
+
+    @Serializable
+    private data class ImageRow(
+        @SerialName("url") val url: String,
+        @SerialName("display_order") val displayOrder: Int,
+    )
+
+    override suspend fun byId(id: String): LoadProductResult = try {
+        val row = client.postgrest.from(TABLE_PRODUCTS)
+            .select(EDITABLE_COLUMNS) { filter { eq("id", id) } }
+            .decodeSingleOrNull<EditableRow>()
+
+        if (row == null) {
+            LoadProductResult.Missing
+        } else {
+            LoadProductResult.Loaded(
+                EditableProduct(
+                    id = row.id,
+                    slug = row.slug,
+                    draft = ProductDraft(
+                        name = row.name,
+                        categoryId = row.categoryId,
+                        purityId = row.purityId,
+                        weightGrams = row.weightGrams,
+                        description = row.description,
+                        tags = row.tags,
+                        featured = row.featured,
+                    ),
+                    // Sorted here rather than trusted from the response:
+                    // PostgREST returns embedded rows in no guaranteed
+                    // order, and position 0 being the primary image is a
+                    // promise M7.5 made to the owner.
+                    imageUrls = row.images.sortedBy { it.displayOrder }.map { it.url },
+                ),
+            )
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        LoadProductResult.Failed(failures.classify(e))
+    }
+
+    override suspend fun update(id: String, draft: ProductDraft): UpdateProductResult = try {
+        // `select()` for the reason setStatus does it: PostgREST answers
+        // 204 whether one row matched or none. See android-app.md §2.6d.
+        val changed = client.postgrest.from(TABLE_PRODUCTS)
+            .update(
+                {
+                    set("name", draft.name.trim())
+                    set("description", draft.description?.trim()?.ifBlank { null })
+                    set("category_id", draft.categoryId)
+                    set("purity_id", draft.purityId)
+                    set("weight_grams", draft.weightGrams)
+                    set("tags", draft.tags)
+                    set("featured", draft.featured)
+                    // `slug` is deliberately absent — see ProductRepository.
+                },
+            ) {
+                select()
+                filter { eq("id", id) }
+            }
+            .decodeList<CreatedRow>()
+
+        if (changed.isEmpty()) UpdateProductResult.Missing else UpdateProductResult.Updated
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        UpdateProductResult.Failed(failures.classify(e))
+    }
+
     /** What the database says about a row with this id. */
     private sealed interface ExistingRow {
         data class Found(val slug: String) : ExistingRow
@@ -221,5 +307,11 @@ class SupabaseProductRepository @Inject constructor(
         const val UNIQUE_VIOLATION = "23505"
 
         const val FALLBACK_SLUG_LENGTH = 12
+
+        /** Everything the edit form fills itself from, in one request. */
+        val EDITABLE_COLUMNS = Columns.raw(
+            "id,slug,name,description,category_id,purity_id,weight_grams,tags,featured," +
+                "product_images(url,display_order)",
+        )
     }
 }

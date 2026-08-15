@@ -1184,9 +1184,33 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Still unverified: the admin row set**, for the reason M8.1 gives — the anon key cannot see archived pieces, so `All` and `Archived` returning what they did is not yet proof.
 
-- **`M8.3` Edit Product** — `M`
-  Reuse the M7.1 form: load existing values, add and remove images, reorder images, save changes.
+- **`M8.3` Edit Product** — `M` — **split**, because it is two jobs and only one of them is the form.
+
+  The fields are a straightforward reuse of M7.1. The photographs are not: editing makes the list a **mixture** of objects already in Storage and files staged on the device, which changes every stage of the M7.9 save pipeline — what gets uploaded, what gets deleted, what `display_order` means. Doing both at once would have produced a large diff tangled with the riskiest code in the app, which CLAUDE.md §1.1 exists to prevent.
+
+- **`M8.3a` Edit Product — the fields** — `S` — ◐ **built and tested; not driven on a device**
+  Reuse the M7.1 form: load existing values, save changes.
+  *Done when:* opening a piece fills the form with its stored values, and saving writes them back without creating a second piece.
+
+  **One screen, two modes** — CLAUDE.md §11's reuse rule. `EditProduct(productId)` is a second route onto the same composable and view model; the view model reads the id off its `SavedStateHandle`, which is where type-safe routes put their arguments. What differs is the title, the button, and what Save does.
+
+  **The slug does not change when the name does.** The obvious behaviour is to re-derive it and it is wrong: the slug is the piece's address on the website, so re-deriving breaks every shared link, every bookmark and M11's canonical URL — for what this screen is most often used for, which is fixing a typo. A URL is a promise; a display name is not. There is a test, and it fails if the slug is re-derived.
+
+  **A reclaimed form keeps the owner's edits, not the stored values.** The load only fills a form that is otherwise untouched. A handle that already holds a name is a form the owner was in the middle of when Android reclaimed the app — re-reading the server over it would throw their edits away at exactly the moment M7.2's whole design exists to preserve them. Also tested, also fails without the guard.
+
+  **`status` is not in the update, and neither is anything else the form does not own.** The M8.5 toggles write one flag at a time on purpose; sending all of them back from a form the owner may have had open for a minute would let a stale value overwrite a change made elsewhere.
+
+  **Deleted-while-editing is not a save failure.** `update` reuses M8.5's `Missing` (android-app.md §2.6d — PostgREST answers 204 for zero rows), and it becomes *"no longer in the catalogue"* with a way back to the list, because retrying has nothing to write to and the form's contents are the only copy left.
+
+  **The photographs are shown, read-only, and say so.** On a screen reached from a list of two hundred pieces they are how the owner confirms they have the right one; a strip of thumbnails with no controls and no explanation reads as a bug.
+
+  **Verified by test:** 10 new cases — the form filling itself, a whole-number weight coming back as `48` rather than `48.0`, a null weight coming back blank rather than zero, the update writing and creating nothing, an edit uploading nothing, slug stability, deleted-while-editing, a missing piece, a retryable load failure, and the reclaimed-form guard. **78 tests in the project, all passing**; lint 0 errors, 8 warnings, none new; both variants assemble. Two mutations confirmed the two subtlest tests bite and nothing else does.
+
+- **`M8.3b` Edit Product — the photographs** — `M`
+  Add, remove and reorder a piece's photographs, mixing ones already in Storage with newly staged ones.
   *Done when:* editing images updates `display_order` and the website gallery order matches.
+
+  The work: `ProductForm.images` becomes a list of a sealed type (staged file vs. stored object) persisted as JSON on the handle; `uploadRemaining` skips the stored ones; removed stored objects are deleted from the bucket; `replaceImages` writes the merged order. `ProductImages.kt` needs no change for display — Coil renders a local URI and a remote URL alike.
 
 - **`M8.4` Delete Product** — `S` — ◐ **built and tested; the bucket inspection needs a signed-in app**
   Confirmation step, then remove both database rows and storage objects.

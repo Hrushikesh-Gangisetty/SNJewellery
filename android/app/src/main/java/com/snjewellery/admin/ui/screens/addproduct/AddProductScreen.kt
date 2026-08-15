@@ -1,6 +1,12 @@
 package com.snjewellery.admin.ui.screens.addproduct
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -102,6 +108,7 @@ fun AddProductScreen(
         onSave = viewModel::save,
         onDiscard = viewModel::discard,
         onRetryOptions = viewModel::loadOptions,
+        onRetryLoad = viewModel::retryLoad,
         onTakePhoto = photos.takePhoto,
         onChoosePhotos = photos.choosePhotos,
         onOpenCameraSettings = photos.openSettings,
@@ -131,6 +138,7 @@ internal fun AddProductScreen(
     onSave: () -> Unit = {},
     onDiscard: () -> Unit = {},
     onRetryOptions: () -> Unit = {},
+    onRetryLoad: () -> Unit = {},
     onTakePhoto: () -> Unit = {},
     onChoosePhotos: () -> Unit = {},
     onOpenCameraSettings: () -> Unit = {},
@@ -153,7 +161,13 @@ internal fun AddProductScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = stringResource(R.string.add_product_title),
+                        text = stringResource(
+                            if (uiState.mode is FormMode.Editing) {
+                                R.string.edit_product_title
+                            } else {
+                                R.string.add_product_title
+                            },
+                        ),
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
@@ -172,7 +186,58 @@ internal fun AddProductScreen(
             )
         },
     ) { innerPadding ->
-        Column(
+        when (val load = uiState.loadState) {
+            // Editing only. Adding is Ready from the first frame.
+            is LoadState.Loading -> Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+
+            // Deleted from another device. Retrying cannot fix it, so the
+            // only offer is back to the list.
+            is LoadState.Missing -> Column(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(Tokens.Space.s4),
+                verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+            ) {
+                Text(
+                    text = stringResource(R.string.edit_product_missing),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+                ) {
+                    Text(stringResource(R.string.edit_product_back_to_list))
+                }
+            }
+
+            is LoadState.Failed -> Column(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(Tokens.Space.s4),
+                verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+            ) {
+                ErrorText(
+                    if (load.failure.offline) {
+                        stringResource(R.string.edit_product_offline)
+                    } else {
+                        stringResource(
+                            R.string.edit_product_load_error,
+                            load.failure.detail
+                                ?: stringResource(R.string.add_product_error_no_detail),
+                        )
+                    },
+                )
+                Button(
+                    onClick = onRetryLoad,
+                    modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+                ) {
+                    Text(stringResource(R.string.add_product_options_retry))
+                }
+            }
+
+            is LoadState.Ready -> Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -276,18 +341,21 @@ internal fun AddProductScreen(
 
             // After Featured and before Save, which is the PRD's own
             // order for this form.
-            ProductImages(
-                images = uiState.form.images,
-                photoProblem = uiState.photoProblem,
-                addingPhotos = uiState.addingPhotos,
-                uploadProgress = uiState.uploadProgress,
-                onTakePhoto = onTakePhoto,
-                onChoosePhotos = onChoosePhotos,
-                onOpenSettings = onOpenCameraSettings,
-                onMoveEarlier = onMoveImageEarlier,
-                onMoveLater = onMoveImageLater,
-                onRemove = onRemoveImage,
-            )
+            when (val mode = uiState.mode) {
+                is FormMode.Editing -> ExistingPhotographs(mode.imageUrls)
+                is FormMode.Adding -> ProductImages(
+                    images = uiState.form.images,
+                    photoProblem = uiState.photoProblem,
+                    addingPhotos = uiState.addingPhotos,
+                    uploadProgress = uiState.uploadProgress,
+                    onTakePhoto = onTakePhoto,
+                    onChoosePhotos = onChoosePhotos,
+                    onOpenSettings = onOpenCameraSettings,
+                    onMoveEarlier = onMoveImageEarlier,
+                    onMoveLater = onMoveImageLater,
+                    onRemove = onRemoveImage,
+                )
+            }
 
             Button(
                 onClick = {
@@ -334,11 +402,20 @@ internal fun AddProductScreen(
                         ),
                     )
 
-                    else -> Text(stringResource(R.string.add_product_save))
+                    else -> Text(
+                        stringResource(
+                            if (uiState.mode is FormMode.Editing) {
+                                R.string.edit_product_save
+                            } else {
+                                R.string.add_product_save
+                            },
+                        ),
+                    )
                 }
             }
 
             SaveError(saveState, onDiscard = onDiscard)
+            }
         }
     }
 }
@@ -426,6 +503,70 @@ private fun SaveError(saveState: SaveState, onDiscard: () -> Unit) {
         }
     }
 }
+
+/**
+ * The piece's photographs as they already are — shown, not editable.
+ *
+ * Editing them is M8.3b, and it is genuinely a separate job: the list
+ * becomes a mixture of objects already in Storage and files staged on the
+ * device, which changes every stage of the M7.9 save pipeline. Shown
+ * anyway rather than hidden, because on a screen reached from a list of
+ * two hundred pieces the photographs are how the owner confirms they are
+ * editing the right one.
+ *
+ * The note says so plainly. A strip of thumbnails with no controls and no
+ * explanation reads as a bug.
+ */
+@Composable
+private fun ExistingPhotographs(imageUrls: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2)) {
+        Text(
+            text = stringResource(R.string.add_product_images),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        if (imageUrls.isEmpty()) {
+            Text(
+                text = stringResource(R.string.edit_product_no_photos),
+                style = MaterialTheme.snTextStyles.label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Column
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+        ) {
+            imageUrls.forEachIndexed { index, url ->
+                AsyncImage(
+                    model = url,
+                    // Position, not a description of the photograph: the
+                    // rule ProductImages.kt follows, and here the first
+                    // one being the primary image is the useful fact.
+                    contentDescription = stringResource(
+                        R.string.add_product_image_position,
+                        index + 1,
+                        imageUrls.size,
+                    ),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(EXISTING_THUMBNAIL)
+                        .clip(MaterialTheme.shapes.small),
+                )
+            }
+        }
+
+        Text(
+            text = stringResource(R.string.edit_product_photos_readonly),
+            style = MaterialTheme.snTextStyles.label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private val EXISTING_THUMBNAIL = 96.dp
 
 @Composable
 private fun ErrorText(message: String) = Text(

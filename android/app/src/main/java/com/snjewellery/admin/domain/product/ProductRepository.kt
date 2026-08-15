@@ -104,6 +104,37 @@ sealed interface UpdateStatusResult {
     data class Failed(val failure: RequestFailure) : UpdateStatusResult
 }
 
+/**
+ * An existing piece, as the edit form needs it back.
+ *
+ * [slug] is carried but **never editable**: see [ProductRepository.update].
+ * [imageUrls] are in `display_order`, so the first is the primary image.
+ */
+data class EditableProduct(
+    val id: String,
+    val slug: String,
+    val draft: ProductDraft,
+    val imageUrls: List<String>,
+)
+
+sealed interface LoadProductResult {
+    data class Loaded(val product: EditableProduct) : LoadProductResult
+
+    /** No such piece — deleted from another device while the list was stale. */
+    data object Missing : LoadProductResult
+
+    data class Failed(val failure: RequestFailure) : LoadProductResult
+}
+
+sealed interface UpdateProductResult {
+    data object Updated : UpdateProductResult
+
+    /** Nothing matched. See [UpdateStatusResult.Missing] for why this is its own case. */
+    data object Missing : UpdateProductResult
+
+    data class Failed(val failure: RequestFailure) : UpdateProductResult
+}
+
 interface ProductRepository {
     /**
      * Creates the `products` row with the given [id], and returns the slug
@@ -150,4 +181,25 @@ interface ProductRepository {
         status: ProductStatus,
         value: Boolean,
     ): UpdateStatusResult
+
+    /** Reads one piece back, for the edit form to fill itself from. */
+    suspend fun byId(id: String): LoadProductResult
+
+    /**
+     * Saves changes to an existing piece.
+     *
+     * ── The slug does not change, even when the name does ────────────
+     * The obvious behaviour is to re-derive it, and it is wrong. The slug
+     * is the piece's address on the website: re-deriving it breaks every
+     * link anyone has shared, every bookmark, and the canonical URL M11
+     * builds on — and it does so for something as small as fixing a typo,
+     * which is exactly what this screen is most used for. A URL is a
+     * promise; a display name is not.
+     *
+     * `status` is not here either. The toggles (M8.5) write one flag at a
+     * time on purpose, and sending all of them back from a form the owner
+     * may have had open for a minute would let a stale value overwrite a
+     * change made elsewhere.
+     */
+    suspend fun update(id: String, draft: ProductDraft): UpdateProductResult
 }

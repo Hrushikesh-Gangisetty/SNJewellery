@@ -46,7 +46,23 @@ fun AdminNavHost(
         }
 
         composable<Catalogue> {
-            CatalogueScreen(onBack = { navController.popBackStack() })
+            CatalogueScreen(
+                onBack = { navController.popBackStack() },
+                onEdit = { productId -> navController.navigate(EditProduct(productId)) },
+            )
+        }
+
+        // The same screen as AddProduct. Its view model reads the id off
+        // the route and fills the form; everything else is identical,
+        // which is the point of not having written a second form.
+        composable<EditProduct> {
+            AddProductScreen(
+                // Editing writes no new row, so there is no confirmation
+                // to show — the list the owner came from is where the
+                // change is visible, and it reloads on resume.
+                onSaved = { _, _ -> navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable<AddProduct> {

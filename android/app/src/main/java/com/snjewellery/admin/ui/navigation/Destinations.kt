@@ -26,6 +26,16 @@ data object Dashboard
 @Serializable
 data object AddProduct
 
+/**
+ * The same form as [AddProduct], filled from an existing piece (M8.3).
+ *
+ * The property name is the argument key the view model reads off its
+ * `SavedStateHandle` — see `AddProductViewModel.KEY_PRODUCT_ID`. Renaming
+ * it here without renaming that is a form that silently opens blank.
+ */
+@Serializable
+data class EditProduct(val productId: String)
+
 /** The owner's whole catalogue, newest first (M8.1). */
 @Serializable
 data object Catalogue

@@ -89,6 +89,7 @@ import kotlinx.coroutines.flow.filter
 @Composable
 fun CatalogueScreen(
     onBack: () -> Unit,
+    onEdit: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CatalogueViewModel = hiltViewModel(),
 ) {
@@ -116,6 +117,7 @@ fun CatalogueScreen(
         onDeleteConfirmed = viewModel::onDeleteConfirmed,
         onDismissSheet = viewModel::onDismissSheet,
         onOrphanNoticeDismissed = viewModel::onOrphanNoticeDismissed,
+        onEdit = onEdit,
         onBack = onBack,
         modifier = modifier,
     )
@@ -141,6 +143,7 @@ internal fun CatalogueScreen(
     onDeleteConfirmed: () -> Unit = {},
     onDismissSheet: () -> Unit = {},
     onOrphanNoticeDismissed: () -> Unit = {},
+    onEdit: (String) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     Scaffold(
@@ -222,6 +225,7 @@ internal fun CatalogueScreen(
             onDeleteCancelled = onDeleteCancelled,
             onDeleteConfirmed = onDeleteConfirmed,
             onRefresh = onRetry,
+            onEdit = { onEdit(entry.id) },
             onDismiss = onDismissSheet,
         )
     }
