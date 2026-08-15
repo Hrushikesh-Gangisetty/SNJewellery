@@ -12,6 +12,13 @@ import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.StatusFilter
+import com.snjewellery.admin.domain.product.DeleteProductResult
+import com.snjewellery.admin.domain.product.ProductImageRepository
+import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.ProductStatus
+import com.snjewellery.admin.domain.product.RemoveImagesResult
+import com.snjewellery.admin.domain.product.StoragePathsResult
+import com.snjewellery.admin.domain.product.UpdateStatusResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -53,6 +60,16 @@ data class CatalogueUiState(
     val query: CatalogueQuery = CatalogueQuery(),
     /** The owner's categories, for the category filter. Empty until loaded. */
     val categories: List<Category> = emptyList(),
+    /** The piece whose actions are open. Null when the sheet is closed. */
+    val selected: CatalogueEntry? = null,
+    /** What that sheet is doing. Null when it is just sitting there. */
+    val action: ActionState? = null,
+    /**
+     * A piece was deleted but its photographs could not be. Its own flag
+     * rather than a failure, because the deletion **succeeded** — telling
+     * the owner it failed would have them retry something that is gone.
+     */
+    val orphanedImages: Boolean = false,
 ) {
     /**
      * Nothing uploaded yet — the empty state, not an error. Only true once
@@ -70,6 +87,37 @@ data class CatalogueUiState(
     val isNoMatch: Boolean get() = isEmpty && query.isFiltered
 }
 
+/** What the open action sheet is doing. */
+sealed interface ActionState {
+    /** A request is out. Every control on the sheet is inert until it lands. */
+    data object Working : ActionState
+
+    /** Delete asked for, not yet confirmed. The only irreversible action. */
+    data object Confirming : ActionState
+
+    /**
+     * The piece is no longer in the catalogue — someone deleted it
+     * elsewhere. Not a [Failed], because retrying cannot fix it and the
+     * thing that does is a refresh.
+     */
+    data object Vanished : ActionState
+
+    data class Failed(val failure: RequestFailure) : ActionState
+}
+
+/** Reading and writing one status flag, without three branches at each site. */
+internal fun CatalogueEntry.has(status: ProductStatus): Boolean = when (status) {
+    ProductStatus.Featured -> featured
+    ProductStatus.Sold -> sold
+    ProductStatus.Archived -> archived
+}
+
+internal fun CatalogueEntry.withStatus(status: ProductStatus, value: Boolean) = when (status) {
+    ProductStatus.Featured -> copy(featured = value)
+    ProductStatus.Sold -> copy(sold = value)
+    ProductStatus.Archived -> copy(archived = value)
+}
+
 /**
  * The owner's catalogue, newest first, a page at a time.
  *
@@ -84,6 +132,8 @@ data class CatalogueUiState(
 class CatalogueViewModel @Inject constructor(
     private val repository: CatalogueListRepository,
     private val catalogueRepository: CatalogueRepository,
+    private val productRepository: ProductRepository,
+    private val productImageRepository: ProductImageRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CatalogueUiState())
@@ -148,6 +198,9 @@ class CatalogueViewModel @Inject constructor(
 
         nextCursor = null
         committedText = query.text
+        // The sheet is deliberately not carried across: a refresh may
+        // find the selected piece changed or gone, and a sheet acting on
+        // a stale row is how a toggle lands on the wrong piece.
         _uiState.value = CatalogueUiState(loading = true, query = query, categories = categories)
 
         loadJob?.cancel()
@@ -260,6 +313,129 @@ class CatalogueViewModel @Inject constructor(
     fun retryMore() {
         _uiState.update { it.copy(moreFailure = null) }
         loadMore()
+    }
+
+    // ── Per-piece actions (M8.4, M8.5) ───────────────────────────────
+
+    fun onSelect(entry: CatalogueEntry) =
+        _uiState.update { it.copy(selected = entry, action = null) }
+
+    fun onDismissSheet() = _uiState.update { it.copy(selected = null, action = null) }
+
+    /** Opens the confirmation. Deleting is the one action that cannot be undone. */
+    fun onDeleteRequested() = _uiState.update { it.copy(action = ActionState.Confirming) }
+
+    fun onDeleteCancelled() = _uiState.update { it.copy(action = null) }
+
+    /**
+     * Flips one flag, on screen first and on the server after.
+     *
+     * **Optimistic, with a rollback that restores the true value rather
+     * than the opposite one.** The naive undo is another flip, which is
+     * wrong the moment two toggles overlap — the second failure would undo
+     * the first's success. So the row as it was is captured and put back.
+     */
+    fun onToggle(status: ProductStatus) {
+        val entry = _uiState.value.selected ?: return
+        if (_uiState.value.action is ActionState.Working) return
+
+        val before = entry
+        val next = entry.withStatus(status, !entry.has(status))
+        replaceEntry(next)
+        _uiState.update { it.copy(action = ActionState.Working) }
+
+        viewModelScope.launch {
+            when (val result = productRepository.setStatus(entry.id, status, next.has(status))) {
+                is UpdateStatusResult.Updated ->
+                    _uiState.update { it.copy(action = null) }
+
+                is UpdateStatusResult.Failed -> {
+                    replaceEntry(before)
+                    _uiState.update { it.copy(action = ActionState.Failed(result.failure)) }
+                }
+
+                // The piece is gone — deleted from another device. The
+                // optimistic value still has to come off: nothing was
+                // written, so showing the new one would be exactly the
+                // stale state the rollback exists to prevent. The row is
+                // not removed here either, because "no row matched" is the
+                // server's answer about one id, and the list is what says
+                // what exists — hence a refresh rather than a retry.
+                is UpdateStatusResult.Missing -> {
+                    replaceEntry(before)
+                    _uiState.update { it.copy(action = ActionState.Vanished) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Removes the piece and its photographs.
+     *
+     * ── The order, and why it is this way round ──────────────────────
+     * 1. Read the storage paths. The M3.3 cascade takes the
+     *    `product_images` rows with the product, and those rows are the
+     *    only record of where the objects are — read them after and the
+     *    photographs become bytes nobody can name.
+     * 2. Delete the **row**. This is what a customer can see.
+     * 3. Delete the **objects**.
+     *
+     * Objects last is deliberate. The other order risks a product page on
+     * the live website with broken images, which is worse than orphaned
+     * bytes: one is visible to a customer, the other costs money quietly.
+     * If step 3 fails the piece is still gone and the owner is told the
+     * photographs were left behind, rather than the deletion being
+     * reported as a failure it was not.
+     */
+    fun onDeleteConfirmed() {
+        val entry = _uiState.value.selected ?: return
+        _uiState.update { it.copy(action = ActionState.Working) }
+
+        viewModelScope.launch {
+            val paths = when (val found = productImageRepository.storagePathsFor(entry.id)) {
+                is StoragePathsResult.Found -> found.paths
+                is StoragePathsResult.Failed -> {
+                    // Nothing has been deleted, so this is an ordinary
+                    // failure the owner can simply retry.
+                    _uiState.update { it.copy(action = ActionState.Failed(found.failure)) }
+                    return@launch
+                }
+            }
+
+            when (val deleted = productRepository.delete(entry.id)) {
+                is DeleteProductResult.Failed -> {
+                    _uiState.update { it.copy(action = ActionState.Failed(deleted.failure)) }
+                    return@launch
+                }
+
+                is DeleteProductResult.Deleted -> Unit
+            }
+
+            val orphaned = productImageRepository.remove(paths) is RemoveImagesResult.Failed
+
+            _uiState.update {
+                it.copy(
+                    entries = it.entries.filterNot { row -> row.id == entry.id },
+                    selected = null,
+                    action = null,
+                    // Reported as its own thing, not as a failed delete:
+                    // the piece IS gone, and saying otherwise would have
+                    // the owner try again on something that no longer
+                    // exists.
+                    orphanedImages = orphaned,
+                )
+            }
+        }
+    }
+
+    /** Dismisses the "photographs were left behind" notice. */
+    fun onOrphanNoticeDismissed() = _uiState.update { it.copy(orphanedImages = false) }
+
+    private fun replaceEntry(entry: CatalogueEntry) = _uiState.update { state ->
+        state.copy(
+            entries = state.entries.map { if (it.id == entry.id) entry else it },
+            selected = entry,
+        )
     }
 
     private companion object {

@@ -5,11 +5,13 @@ import com.snjewellery.admin.data.remote.RequestFailureClassifier
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.StoragePaths
+import com.snjewellery.admin.domain.product.StoragePathsResult
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
 import com.snjewellery.admin.domain.product.WriteImagesResult
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.UploadStatus
 import io.github.jan.supabase.storage.storage
 import io.github.jan.supabase.storage.uploadAsFlow
@@ -121,6 +123,21 @@ class SupabaseProductImageRepository @Inject constructor(
             RemoveImagesResult.Failed(failures.classify(e))
         }
     }
+
+    override suspend fun storagePathsFor(productId: String): StoragePathsResult = try {
+        val rows = client.postgrest.from(TABLE_PRODUCT_IMAGES)
+            .select(Columns.list("storage_path")) { filter { eq("product_id", productId) } }
+            .decodeList<StoragePathRow>()
+
+        StoragePathsResult.Found(rows.map { it.storagePath })
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        StoragePathsResult.Failed(failures.classify(e))
+    }
+
+    @Serializable
+    private data class StoragePathRow(@SerialName("storage_path") val storagePath: String)
 
     /**
      * The insert payload.

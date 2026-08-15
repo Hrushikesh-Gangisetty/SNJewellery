@@ -47,6 +47,12 @@ sealed interface RemoveImagesResult {
     data class Failed(val failure: RequestFailure) : RemoveImagesResult
 }
 
+/** Where a product's photographs are, in Storage. */
+sealed interface StoragePathsResult {
+    data class Found(val paths: List<String>) : StoragePathsResult
+    data class Failed(val failure: RequestFailure) : StoragePathsResult
+}
+
 /**
  * Puts a product's photographs in Storage.
  *
@@ -118,4 +124,14 @@ interface ProductImageRepository {
      * how absent they already were.
      */
     suspend fun remove(storagePaths: List<String>): RemoveImagesResult
+
+    /**
+     * Every object belonging to [productId].
+     *
+     * Read **before** the product row is deleted, because the M3.3 cascade
+     * takes the `product_images` rows with it — and those rows are the only
+     * record of where the objects are. Delete the product first and the
+     * photographs become bytes nobody can name, paid for indefinitely.
+     */
+    suspend fun storagePathsFor(productId: String): StoragePathsResult
 }

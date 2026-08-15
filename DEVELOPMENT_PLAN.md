@@ -1188,9 +1188,40 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
   Reuse the M7.1 form: load existing values, add and remove images, reorder images, save changes.
   *Done when:* editing images updates `display_order` and the website gallery order matches.
 
-- **`M8.4` Delete Product** — `S`
+- **`M8.4` Delete Product** — `S` — ◐ **built and tested; the bucket inspection needs a signed-in app**
   Confirmation step, then remove both database rows and storage objects.
   *Done when:* inspecting the bucket afterwards shows no orphaned images.
+
+  **The order is the whole task, and it is counter-intuitive:**
+  1. **Read the storage paths.** The M3.3 cascade takes the `product_images` rows with the product, and those rows are the *only* record of where the objects are. Read them afterwards and the photographs become bytes nobody can name — paid for indefinitely, which is the cost ADR-0005 warns accumulates silently.
+  2. **Delete the row.** This is what a customer can see.
+  3. **Delete the objects.**
+
+  Objects **last**, not first. The other order risks a live product page with broken images if step 2 fails — visible to a customer, where orphaned bytes are merely expensive. And if step 3 fails the piece is still gone, so that is reported as *"Piece deleted — its photographs could not be removed"* rather than as a failure, which would have the owner retry something that no longer exists.
+
+  **The confirmation names the piece**, because "are you sure?" over a list asks a question the owner has no way to check — and it offers **Archive** as the alternative, since that is what most owners actually want and this is the moment they learn the two differ.
+
+  **Verified by test** (8 cases): the lookup-then-delete-then-remove order; a failed lookup deleting nothing at all; a failed row delete leaving the objects alone; objects-left-behind reported as a deletion rather than a failure; a piece with no photographs; and asking before deleting.
+
+  **Not verified: the bucket itself.** Storage writes need an admin session, and `curl` with the anon key cannot make one. **Two `M7-Verification-Piece` rows are still in the dev database** (flagged since M7.1, one of them featured) — deleting them through this screen is the natural first check.
+
+- **`M8.5` Status toggles** — `M` — ◐ **built and tested; website effect needs a signed-in app**
+  Featured, Sold, and Archive as the three distinct actions the PRD names, with optimistic UI and rollback on failure. Document what each means for website visibility.
+  *Done when:* each toggle is reflected on the website per the documented rules — **sold stays visible with a badge, archived disappears from the site but remains in the app** — and a failed toggle rolls the UI back to the true state.
+
+  **The rules are documented under the switches**, which is where a shop owner will actually read them, rather than only in a file they will not open: *"Shown on the website's home page" / "Stays on the website, marked as sold" / "Removed from the website. Kept here, and you can put it back."* Sold and Archived are the pair that would otherwise be confused, and the difference is the entire reason the PRD names both.
+
+  **Three independent flags, not one state machine.** A featured piece that has sold is a real state, and there is a test that one toggle does not clear another.
+
+  **Rollback restores the previous value, it does not flip back.** The naive undo is another flip, which is right only while nothing else has changed — and wrong the moment two toggles overlap, where the second failure would undo the first's success. There is a test using an already-featured piece, which a flip-based undo would get backwards.
+
+  **A real defect found by checking the database rather than by reasoning.** PostgREST answers **`204 No Content` for an `UPDATE` that matched zero rows exactly as for one that matched** — confirmed by issuing an anonymous `PATCH` against the live project, which returned 204 and changed nothing. So the original implementation, which treated "no exception" as success, gave **an optimistic toggle that could never roll back**: the owner would be looking at a state the catalogue does not have, with no way to discover it. Fixed by asking for the changed rows back (`select()` on the update) and treating an empty result as its own outcome, `Missing` — worded as *"no longer in the catalogue"* with a **Refresh**, not a retry, because retrying cannot bring back a piece deleted elsewhere. Recorded as [android-app.md §2.6d](docs/architecture/android-app.md), since it applies to every write this app makes.
+
+  The test for it failed on its first run for a second reason: the `Missing` branch set the state but left the optimistic value on screen — exactly the staleness the rollback exists to prevent.
+
+  **RLS was checked while I was there**, and is intact: an anonymous `PATCH` and `DELETE` against a real product both changed nothing, the row survived with its flags unaltered, and the row count was unchanged. The 204s are PostgREST reporting zero affected rows, not writes succeeding.
+
+  **Not verified: the website end.** "Reflected on the website per the documented rules" needs an admin session to flip a real flag and a deployed site to see it — M5 has not run. The RLS policies that implement the rules were verified adversarially in M3.7.
 
 - **`M8.5` Status toggles** — `M`
   Featured, Sold, and Archive as the three distinct actions the PRD names, with optimistic UI and rollback on failure. Document what each means for website visibility.

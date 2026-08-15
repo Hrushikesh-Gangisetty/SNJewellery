@@ -12,6 +12,18 @@ import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.catalogue.StatusFilter
+import com.snjewellery.admin.domain.product.CreateProductResult
+import com.snjewellery.admin.domain.product.DeleteProductResult
+import com.snjewellery.admin.domain.product.ProductDraft
+import com.snjewellery.admin.domain.product.ProductImageRepository
+import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.ProductStatus
+import com.snjewellery.admin.domain.product.RemoveImagesResult
+import com.snjewellery.admin.domain.product.StoragePathsResult
+import com.snjewellery.admin.domain.product.UpdateStatusResult
+import com.snjewellery.admin.domain.product.UploadImageResult
+import com.snjewellery.admin.domain.product.UploadedImage
+import com.snjewellery.admin.domain.product.WriteImagesResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,11 +53,15 @@ class CatalogueViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var repository: FakeCatalogueListRepository
+    private lateinit var products: FakeProductRepository
+    private lateinit var images: FakeImageRepository
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         repository = FakeCatalogueListRepository()
+        products = FakeProductRepository()
+        images = FakeImageRepository()
     }
 
     @After
@@ -351,9 +367,199 @@ class CatalogueViewModelTest {
         assertEquals(listOf("Necklaces"), viewModel().uiState.value.categories.map { it.name })
     }
 
+    // ── Status toggles (M8.5) ────────────────────────────────────────
+
+    @Test
+    fun `a toggle shows immediately and writes the new value`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+
+        viewModel.onToggle(ProductStatus.Featured)
+
+        assertEquals(
+            listOf(Triple("a", ProductStatus.Featured, true)),
+            products.statusWrites,
+        )
+        assertTrue("the row must show it", viewModel.uiState.value.entries.single().featured)
+        assertTrue("and so must the open sheet", viewModel.uiState.value.selected!!.featured)
+    }
+
+    @Test
+    fun `a failed toggle rolls the row back to the true value`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        products.failStatus = true
+
+        viewModel.onToggle(ProductStatus.Sold)
+
+        val state = viewModel.uiState.value
+        assertTrue("a stale optimistic value is worse than none", !state.entries.single().sold)
+        assertTrue(!state.selected!!.sold)
+        assertTrue("and the owner is told", state.action is ActionState.Failed)
+    }
+
+    @Test
+    fun `rollback restores the value, it does not flip it back`() = runTest(dispatcher) {
+        // A piece that is already featured. The naive undo is another
+        // flip, which is only right when nothing else has changed.
+        repository.pages = listOf(CataloguePage(listOf(entry("a").copy(featured = true)), null))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        products.failStatus = true
+
+        viewModel.onToggle(ProductStatus.Featured)
+
+        assertTrue(
+            "it was featured before the failed attempt, so it is featured after",
+            viewModel.uiState.value.entries.single().featured,
+        )
+    }
+
+    @Test
+    fun `the three flags are independent`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+
+        viewModel.onToggle(ProductStatus.Featured)
+        viewModel.onToggle(ProductStatus.Sold)
+
+        // A featured piece that has sold is a real state; one must not
+        // clear the other.
+        val row = viewModel.uiState.value.entries.single()
+        assertTrue(row.featured && row.sold)
+        assertTrue(!row.archived)
+    }
+
+    @Test
+    fun `a toggle that changed nothing is not reported as done`() = runTest(dispatcher) {
+        // PostgREST answers 204 for an update matching zero rows exactly
+        // as for one that matched — confirmed against the live project —
+        // so "no exception" is not "it worked".
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        products.statusMissing = true
+
+        viewModel.onToggle(ProductStatus.Archived)
+
+        val state = viewModel.uiState.value
+        assertEquals(
+            "retrying cannot bring back a deleted piece; refreshing resolves it",
+            ActionState.Vanished,
+            state.action,
+        )
+        assertTrue("and the optimistic value must not stick", !state.entries.single().archived)
+    }
+
+    // ── Delete (M8.4) ────────────────────────────────────────────────
+
+    @Test
+    fun `delete asks first`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+
+        viewModel.onDeleteRequested()
+
+        assertEquals(ActionState.Confirming, viewModel.uiState.value.action)
+        assertEquals("nothing is deleted by asking", emptyList<String>(), products.deleted)
+    }
+
+    @Test
+    fun `delete reads the storage paths before the row, not after`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+
+        viewModel.onDeleteConfirmed()
+
+        // The cascade takes the product_images rows with the product, and
+        // those rows are the only record of where the objects are. Read
+        // them after and the photographs become bytes nobody can name.
+        assertEquals(
+            listOf("lookup", "remove:products/p/one.webp,products/p/two.webp"),
+            images.calls,
+        )
+        assertEquals(listOf("a"), products.deleted)
+        assertTrue(viewModel.uiState.value.entries.isEmpty())
+    }
+
+    @Test
+    fun `a failed path lookup deletes nothing at all`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        images.failLookup = true
+
+        viewModel.onDeleteConfirmed()
+
+        assertEquals("the row must survive a failure before it", emptyList<String>(), products.deleted)
+        assertTrue(viewModel.uiState.value.action is ActionState.Failed)
+        assertEquals(1, viewModel.uiState.value.entries.size)
+    }
+
+    @Test
+    fun `a failed row delete leaves the objects alone`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        products.failDelete = true
+
+        viewModel.onDeleteConfirmed()
+
+        // Removing the photographs of a product that still exists is a
+        // live page with broken images — the one outcome worse than
+        // orphaned bytes.
+        assertEquals(listOf("lookup"), images.calls)
+        assertEquals(1, viewModel.uiState.value.entries.size)
+    }
+
+    @Test
+    fun `objects left behind is reported as a deletion, not a failure`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        images.failRemove = true
+
+        viewModel.onDeleteConfirmed()
+
+        val state = viewModel.uiState.value
+        assertEquals("the piece is gone", emptyList<String>(), state.entries.map { it.id })
+        assertNull("so it is not a failure the owner should retry", state.action)
+        assertTrue("but they are told", state.orphanedImages)
+    }
+
+    @Test
+    fun `a piece with no photographs deletes cleanly`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+        images.paths = emptyList()
+
+        viewModel.onDeleteConfirmed()
+
+        assertEquals(listOf("a"), products.deleted)
+        assertTrue(!viewModel.uiState.value.orphanedImages)
+    }
+
+    @Test
+    fun `refreshing closes the sheet rather than acting on a stale row`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+        val viewModel = viewModel()
+        viewModel.onSelect(viewModel.uiState.value.entries.single())
+
+        viewModel.refresh()
+
+        assertNull(viewModel.uiState.value.selected)
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────
 
-    private fun viewModel() = CatalogueViewModel(repository, FakeCategoriesRepository())
+    private fun viewModel() =
+        CatalogueViewModel(repository, FakeCategoriesRepository(), products, images)
 
     private class FakeCategoriesRepository : CatalogueRepository {
         override suspend fun categories() =
@@ -424,6 +630,68 @@ class CatalogueViewModelTest {
             return CataloguePageResult.Loaded(
                 if (isLast) page.copy(nextCursor = null) else page,
             )
+        }
+    }
+
+    private class FakeProductRepository : ProductRepository {
+        /** Every status write, in order: (id, flag, value). */
+        val statusWrites = mutableListOf<Triple<String, ProductStatus, Boolean>>()
+        val deleted = mutableListOf<String>()
+        var failStatus = false
+        var failDelete = false
+
+        /** The update reaches the database and matches no row. */
+        var statusMissing = false
+
+        override suspend fun create(id: String, draft: ProductDraft) =
+            CreateProductResult.Created(slug = "unused")
+
+        override suspend fun delete(id: String): DeleteProductResult {
+            if (failDelete) return DeleteProductResult.Failed(OFFLINE)
+            deleted += id
+            return DeleteProductResult.Deleted
+        }
+
+        override suspend fun setStatus(
+            id: String,
+            status: ProductStatus,
+            value: Boolean,
+        ): UpdateStatusResult {
+            if (failStatus) return UpdateStatusResult.Failed(OFFLINE)
+            if (statusMissing) return UpdateStatusResult.Missing
+            statusWrites += Triple(id, status, value)
+            return UpdateStatusResult.Updated
+        }
+    }
+
+    private class FakeImageRepository : ProductImageRepository {
+        /** What each call did, in order — the order is what M8.4 is about. */
+        val calls = mutableListOf<String>()
+        var paths = listOf("products/p/one.webp", "products/p/two.webp")
+        var failRemove = false
+        var failLookup = false
+
+        override suspend fun upload(
+            productId: String,
+            localUri: String,
+            onProgress: (Long, Long) -> Unit,
+        ) = UploadImageResult.Failed(OFFLINE)
+
+        override suspend fun replaceImages(productId: String, images: List<UploadedImage>) =
+            WriteImagesResult.Written
+
+        override suspend fun remove(storagePaths: List<String>): RemoveImagesResult {
+            calls += "remove:" + storagePaths.joinToString(",")
+            return if (failRemove) RemoveImagesResult.Failed(OFFLINE) else RemoveImagesResult.Removed
+        }
+
+        override suspend fun storagePathsFor(productId: String): StoragePathsResult {
+            calls += "lookup"
+            return if (failLookup) {
+                StoragePathsResult.Failed(OFFLINE)
+            } else {
+                StoragePathsResult.Found(paths)
+            }
         }
     }
 

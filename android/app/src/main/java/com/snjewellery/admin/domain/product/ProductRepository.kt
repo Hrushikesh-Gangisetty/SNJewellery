@@ -53,6 +53,57 @@ sealed interface DeleteProductResult {
     data class Failed(val failure: RequestFailure) : DeleteProductResult
 }
 
+/**
+ * The three status actions the PRD names, and what each means to a
+ * customer.
+ *
+ * They are **not** one state machine. A piece can be featured and sold at
+ * once, and the difference between Sold and Archived is the whole point of
+ * having both — so they are three independent flags, and this enum only
+ * says which column an action writes.
+ */
+enum class ProductStatus {
+    /** Promoted on the website's home page. Invisible if archived. */
+    Featured,
+
+    /**
+     * Sold, and **still on the website** with a badge. The PRD is explicit
+     * that this is not a withdrawal: a sold piece is what persuades the
+     * next customer that pieces like it exist.
+     */
+    Sold,
+
+    /**
+     * Withdrawn from the website, kept in the app. The only one of the
+     * three that removes a piece from what a customer can reach, and it is
+     * reversible — which is why the catalogue list still shows archived
+     * pieces (M8.1).
+     */
+    Archived,
+}
+
+sealed interface UpdateStatusResult {
+    data object Updated : UpdateStatusResult
+
+    /**
+     * The update reached the database and **changed nothing**, because no
+     * row with that id was visible to it.
+     *
+     * Its own case rather than a success, and this is not a theoretical
+     * one: PostgREST answers `204 No Content` for an `UPDATE` that matched
+     * zero rows exactly as it does for one that matched — verified against
+     * the live project. Treating the response code alone as success gives
+     * an optimistic toggle that never rolls back, showing the owner a
+     * state the catalogue does not have.
+     *
+     * In practice it means the piece was deleted from another device, so
+     * the answer is to refresh rather than to retry.
+     */
+    data object Missing : UpdateStatusResult
+
+    data class Failed(val failure: RequestFailure) : UpdateStatusResult
+}
+
 interface ProductRepository {
     /**
      * Creates the `products` row with the given [id], and returns the slug
@@ -86,4 +137,17 @@ interface ProductRepository {
      * report a failure for the state it was trying to reach.
      */
     suspend fun delete(id: String): DeleteProductResult
+
+    /**
+     * Sets one status flag on one piece.
+     *
+     * One flag per call rather than a whole product: the screen's actions
+     * are individual toggles, and sending the other two back would let a
+     * stale value on this device overwrite a change made on another.
+     */
+    suspend fun setStatus(
+        id: String,
+        status: ProductStatus,
+        value: Boolean,
+    ): UpdateStatusResult
 }

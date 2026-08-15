@@ -6,7 +6,9 @@ import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.DeleteProductResult
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.Slugs
+import com.snjewellery.admin.domain.product.UpdateStatusResult
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.postgrest
@@ -141,6 +143,35 @@ class SupabaseProductRepository @Inject constructor(
         throw e
     } catch (e: Exception) {
         DeleteProductResult.Failed(failures.classify(e))
+    }
+
+    override suspend fun setStatus(
+        id: String,
+        status: ProductStatus,
+        value: Boolean,
+    ): UpdateStatusResult = try {
+        // `select()` so the response carries the rows that changed. Without
+        // it PostgREST answers 204 whether one row matched or none, and an
+        // update that quietly changed nothing would be reported as done —
+        // which is an optimistic toggle that never rolls back.
+        val changed = client.postgrest.from(TABLE_PRODUCTS)
+            .update({ set(status.column(), value) }) {
+                select()
+                filter { eq("id", id) }
+            }
+            .decodeList<CreatedRow>()
+
+        if (changed.isEmpty()) UpdateStatusResult.Missing else UpdateStatusResult.Updated
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        UpdateStatusResult.Failed(failures.classify(e))
+    }
+
+    private fun ProductStatus.column(): String = when (this) {
+        ProductStatus.Featured -> "featured"
+        ProductStatus.Sold -> "sold"
+        ProductStatus.Archived -> "archived"
     }
 
     /** What the database says about a row with this id. */

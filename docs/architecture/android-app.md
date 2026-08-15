@@ -201,6 +201,33 @@ products` is unchanged, and the objects under `products/{id}/` are
 removed by Discard. Force-stopped mid-upload, the screen reopens saying
 what got as far as the bucket.
 
+### 2.6d A write that changed nothing is not a write that worked
+
+**PostgREST answers `204 No Content` for an `UPDATE` or `DELETE` that
+matched zero rows, exactly as it does for one that matched.** Verified
+against the live project: an anonymous `PATCH` on a product returns 204
+and changes nothing, and `Prefer: return=representation` is what reveals
+the empty result.
+
+So `try { … } catch` around a write is **not** enough to know it
+happened. Any write whose success the UI acts on asks for the changed
+rows back — `select()` on the update — and treats an empty result as its
+own outcome, distinct from both success and a transport failure.
+
+It matters most where the UI is optimistic. M8.5's toggles show the new
+value before the server has agreed, and roll back if it refuses; a 204
+over zero rows would be read as agreement, leaving the owner looking at
+a state the catalogue does not have and no way to find out.
+
+The distinction is not the same for every verb. For a **delete**, zero
+rows means the row is already absent, which is the state the caller
+wanted — so it succeeds. For an **update**, zero rows means the change
+did not happen.
+
+*Check:* toggling a status on a piece deleted from another device shows
+"no longer in the catalogue" with a refresh, not a switch that stays
+flipped.
+
 ### 2.7 No screen declares a visual value
 
 Colour, size, radius, duration: all from `MaterialTheme` or `Tokens`,

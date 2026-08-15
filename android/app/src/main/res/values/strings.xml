@@ -327,6 +327,44 @@
     <string name="catalogue_no_matches">No pieces match what you are looking for.</string>
     <string name="catalogue_clear_filters">Clear filters</string>
 
+    <!-- ── Per-piece actions (M8.4, M8.5) ────────────────────────────
+      Each toggle says what it does to what a CUSTOMER sees. M8.5 asks for
+      the visibility rules to be documented, and under the switch is where
+      a shop owner will actually read them.
+
+      Sold and Archived are the pair that would otherwise be confused, and
+      the difference is the whole reason the PRD names both: a sold piece
+      stays on the website with a badge, because it persuades the next
+      customer that pieces like it exist. Archived leaves.
+    -->
+    <string name="actions_featured_effect">Shown on the website\'s home page.</string>
+    <string name="actions_sold_effect">Stays on the website, marked as sold.</string>
+    <string name="actions_archived_effect">Removed from the website. Kept here, and you can put it back.</string>
+
+    <string name="actions_delete">Delete this piece</string>
+    <!-- Names the piece: "are you sure?" over a list is asking a question
+         the owner has no way to check. -->
+    <string name="actions_delete_confirm">Delete %1$s, and its photographs, for good?</string>
+    <string name="actions_delete_or_archive">This cannot be undone. If you only want it off the website, archive it instead.</string>
+    <string name="actions_delete_confirm_button">Delete</string>
+    <string name="actions_cancel">Cancel</string>
+
+    <!-- Not "try again": retrying cannot bring back a piece someone
+         deleted on another device, and a refresh is what resolves it.
+         Reachable because PostgREST answers 204 for an update that
+         matched zero rows exactly as for one that matched. -->
+    <string name="actions_vanished">This piece is no longer in the catalogue — it looks like it was deleted somewhere else.</string>
+    <string name="actions_vanished_refresh">Refresh the list</string>
+
+    <string name="actions_offline">No connection, so nothing was changed. Check your signal and try again.</string>
+    <string name="actions_error">That could not be changed (%1$s). Please try again.</string>
+
+    <!-- The piece IS gone — this is not a failed delete, and saying so
+         would have the owner retry something that no longer exists. -->
+    <string name="actions_orphaned_title">Piece deleted</string>
+    <string name="actions_orphaned_body">The piece is gone from the catalogue, but its photographs could not be removed from storage. Nothing is broken and no customer will see them. Mention it to whoever looks after the site.</string>
+    <string name="actions_orphaned_dismiss">OK</string>
+
     <string name="dashboard_view_catalogue">View catalogue</string>
     <!-- M6.11 left the dashboard's empty state without a next step because
          the one it wanted had nowhere to go. M7 built the destination. -->

@@ -1,6 +1,9 @@
 package com.snjewellery.admin.ui.screens.catalogue
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import com.snjewellery.admin.domain.product.ProductStatus
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -104,6 +107,13 @@ fun CatalogueScreen(
         onStatusChange = viewModel::onStatusChange,
         onCategoryChange = viewModel::onCategoryChange,
         onClearFilters = viewModel::onClearFilters,
+        onSelect = viewModel::onSelect,
+        onToggle = viewModel::onToggle,
+        onDeleteRequested = viewModel::onDeleteRequested,
+        onDeleteCancelled = viewModel::onDeleteCancelled,
+        onDeleteConfirmed = viewModel::onDeleteConfirmed,
+        onDismissSheet = viewModel::onDismissSheet,
+        onOrphanNoticeDismissed = viewModel::onOrphanNoticeDismissed,
         onBack = onBack,
         modifier = modifier,
     )
@@ -121,6 +131,13 @@ internal fun CatalogueScreen(
     onStatusChange: (StatusFilter) -> Unit = {},
     onCategoryChange: (String?) -> Unit = {},
     onClearFilters: () -> Unit = {},
+    onSelect: (CatalogueEntry) -> Unit = {},
+    onToggle: (ProductStatus) -> Unit = {},
+    onDeleteRequested: () -> Unit = {},
+    onDeleteCancelled: () -> Unit = {},
+    onDeleteConfirmed: () -> Unit = {},
+    onDismissSheet: () -> Unit = {},
+    onOrphanNoticeDismissed: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     Scaffold(
@@ -179,10 +196,40 @@ internal fun CatalogueScreen(
                         uiState = uiState,
                         onLoadMore = onLoadMore,
                         onRetryMore = onRetryMore,
+                        onSelect = onSelect,
                     )
                 }
             }
         }
+    }
+
+    uiState.selected?.let { entry ->
+        ProductActionsSheet(
+            entry = entry,
+            action = uiState.action,
+            onToggle = onToggle,
+            onDeleteRequested = onDeleteRequested,
+            onDeleteCancelled = onDeleteCancelled,
+            onDeleteConfirmed = onDeleteConfirmed,
+            onRefresh = onRetry,
+            onDismiss = onDismissSheet,
+        )
+    }
+
+    // The piece is gone; only its photographs were left behind. A dialog
+    // rather than an inline line, because the sheet it would have sat in
+    // has already closed.
+    if (uiState.orphanedImages) {
+        AlertDialog(
+            onDismissRequest = onOrphanNoticeDismissed,
+            title = { Text(stringResource(R.string.actions_orphaned_title)) },
+            text = { Text(stringResource(R.string.actions_orphaned_body)) },
+            confirmButton = {
+                TextButton(onClick = onOrphanNoticeDismissed) {
+                    Text(stringResource(R.string.actions_orphaned_dismiss))
+                }
+            },
+        )
     }
 }
 
@@ -344,6 +391,7 @@ private fun CatalogueList(
     uiState: CatalogueUiState,
     onLoadMore: () -> Unit,
     onRetryMore: () -> Unit,
+    onSelect: (CatalogueEntry) -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -367,7 +415,7 @@ private fun CatalogueList(
         // arriving — and a refresh that reorders the list moves rows rather
         // than redrawing every one of them.
         items(uiState.entries, key = { it.id }) { entry ->
-            CatalogueRow(entry)
+            CatalogueRow(entry, onClick = { onSelect(entry) })
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
 
@@ -412,10 +460,11 @@ private fun CatalogueList(
 }
 
 @Composable
-private fun CatalogueRow(entry: CatalogueEntry) {
+private fun CatalogueRow(entry: CatalogueEntry, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .heightIn(min = ROW_HEIGHT)
             .padding(horizontal = Tokens.Space.s4, vertical = Tokens.Space.s2),
         horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3),

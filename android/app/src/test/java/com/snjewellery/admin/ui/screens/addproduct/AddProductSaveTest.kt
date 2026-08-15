@@ -12,7 +12,10 @@ import com.snjewellery.admin.domain.product.DeleteProductResult
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.ProductStatus
 import com.snjewellery.admin.domain.product.RemoveImagesResult
+import com.snjewellery.admin.domain.product.StoragePathsResult
+import com.snjewellery.admin.domain.product.UpdateStatusResult
 import com.snjewellery.admin.domain.product.UploadImageResult
 import com.snjewellery.admin.domain.product.UploadedImage
 import com.snjewellery.admin.domain.product.WriteImagesResult
@@ -424,6 +427,11 @@ class AddProductSaveTest {
             deleted += id
             return DeleteProductResult.Deleted
         }
+
+        // M8.5's toggles are exercised in CatalogueViewModelTest; the save
+        // pipeline never touches them.
+        override suspend fun setStatus(id: String, status: ProductStatus, value: Boolean) =
+            UpdateStatusResult.Updated
     }
 
     private class FakeProductImageRepository : ProductImageRepository {
@@ -480,6 +488,11 @@ class AddProductSaveTest {
             removed += storagePaths
             return RemoveImagesResult.Removed
         }
+
+        // Only M8.4's delete reads these back; the save pipeline knows
+        // its own paths from the attempt record.
+        override suspend fun storagePathsFor(productId: String): StoragePathsResult =
+            StoragePathsResult.Found(uploadedPaths)
     }
 
     private companion object {
