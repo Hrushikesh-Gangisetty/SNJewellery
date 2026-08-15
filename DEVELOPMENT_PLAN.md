@@ -1139,7 +1139,12 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Not verified: the *Done when* itself**, and it is doubly blocked. It needs a physical device *and* several hundred products, and neither exists — see the finding on the dev project below.
 
-  **The query shape is unverified against a real database.** M6.11 checked its queries out of band with `curl` and the anon key; that is impossible now (same finding). The embedded-resource select and the disjunction cursor compile and are reasoned about, but **they have not returned a row**. First thing to check when the backend is reachable.
+  **The query shapes are now verified against the live database** (2026-08-16, once the project was resumed), with the anon key:
+  - The **embedded select** returns the category name and the image rows in one request, and — the case it exists for — **a piece with zero photographs still appears** in the list.
+  - The **cursor** returns exactly the next three rows after a given one, with no repeat and no skip.
+  - The **tie branch** was forced by using a cursor with a real timestamp and a deliberately larger id: the `created_at.lt` half excludes that row and the `and(created_at.eq, id.lt)` half puts it back, which is the branch that would otherwise silently lose every piece sharing a timestamp.
+
+  **Still unverified: anything needing an admin session.** `curl` with the anon key cannot see archived rows or hidden categories, so the `All` and `Archived` filters returned the same set as `Live` only because RLS hides those from that key — not proof the filters work for an admin. Needs the signed-in app.
 
 - **`M8.2` In-app search and status filters** — `S` — ◐ **built and tested; "returns correct matches" needs the database**
   Search by name, category, and tags; filter by status.
@@ -1163,7 +1168,21 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Verified by test:** `CatalogueViewModelTest` is now **22 tests**, adding the debounce, the immediate filter tap, the default, a filter change restarting from page one, a later page carrying the filters (dropping them shows non-matching pieces, a bug that only appears once someone scrolls), the two empty states, clearing, and re-selecting an unchanged filter not re-requesting. Project total: **43 local tests, all passing**; lint 0 errors, 8 warnings, none new; both variants assemble.
 
-  **Not verified: the *Done when* itself.** "Returns correct matches" is a statement about a database, and the dev project is unreachable — Open Question 22. The `ilike`/`contains` disjunction and the status columns compile and are reasoned about; they have not matched a row.
+  **Verified against the live database** (2026-08-16), against the real seeded catalogue:
+
+  | Search | Result |
+  |---|---|
+  | `bangle` | both bangles — one by name, one by tag |
+  | `payal` | the Silver Anklet Pair — a **tag-only** hit, no name contains it |
+  | `daily wear` | both pieces carrying that multi-word tag |
+  | `BRIDAL` | the Bridal Necklace by name; **not** the Kundan Choker, whose match is a tag |
+  | `bang` | nothing — a partial tag does not match |
+
+  The last two are the documented limits, confirmed rather than assumed: name matching is case-insensitive, tag matching is whole-tag and case-sensitive. Every status filter and the category filter return the right rows, and a status combined with a search narrows correctly (Featured + `diamond` → the two diamond pieces).
+
+  **The check found a real bug that the tests could not have.** The name and tag conditions are combined in a PostgREST logic tree, which is **comma-delimited** — so a comma inside the term ends the first condition early and the request returns `PGRST100`. **Typing `gold, silver` in the search box showed "The catalogue could not be loaded".** Reachable by an ordinary owner on an ordinary search. Fixed in `CatalogueQuery.term`, which now turns PostgREST's structural punctuation into spaces, so a strange query returns *no matches* — a true answer — where it previously returned an error. `CatalogueQueryTest` (9 tests) covers it, including that a punctuation-only search is no search rather than an empty one that would match everything.
+
+  **Still unverified: the admin row set**, for the reason M8.1 gives — the anon key cannot see archived pieces, so `All` and `Archived` returning what they did is not yet proof.
 
 - **`M8.3` Edit Product** — `M`
   Reuse the M7.1 form: load existing values, add and remove images, reorder images, save changes.
@@ -1648,7 +1667,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | 18 | **Social links and a Maps location.** Partly answered 2026-07-27: **there is no map**, so the embed was removed and M4.10's map criterion is superseded. Social handles remain pending, and no coordinates have been supplied. | M11.3 | Social links hide cleanly per ADR-0010, so nothing is blocked. Two things still ride on a location, and neither is the embed: **Get Directions** (M4.12, a PRD-required conversion action) renders nothing without `geo` or `mapsUrl`, and M11.3's `LocalBusiness` structured data wants real coordinates. A plain Google Maps share link into `mapsUrl` satisfies the first; coordinates satisfy both. |
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
 | 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
-| 22 | **The development Supabase project appears to be gone.** Its hostname no longer resolves in DNS, from a machine where general DNS and HTTPS both work, and where M6.11 was querying that same project successfully with `curl` on 2026-08-02. A free-tier project that has been paused or removed is by far the likeliest explanation. **Needs the owner to check the Supabase dashboard.** | **verification of M7.6–M7.12, M8.1, and everything after** | This reframes what the last several tasks recorded as "no credentials to hand". If the project is gone, the blocker is not a password: there is no backend to sign in to, which also explains the emulator session that "no longer refreshes". Nothing is lost — the schema is entirely in `supabase/migrations/` and the seed in `supabase/seed.sql`, so a new project is `db push` plus `seed`, then a new URL and anon key in `web/.env.local` and `android/local.properties`, and a new admin account (M3.8). But **every *Done when* that requires a live database is blocked until it exists**, and the code written since is reasoned-about rather than exercised. |
+| 22 | ~~**The development Supabase project appears to be gone.**~~ **Resolved 2026-08-16.** The project was *paused* by Supabase after a stretch of no development, which removes its DNS record — hence the hostname not resolving. The owner resumed it; `GET /rest/v1/products` returns 200 with real rows again. | — | Closed. Worth knowing for next time: a free-tier pause looks exactly like a deleted project from the outside, and the tell is that it comes back untouched. The read-path query shapes written while it was down have now been checked against it (M8.1, M8.2); the **admin-session** paths — archived rows, hidden categories, every write — still need a signed-in app, because `curl` with the anon key cannot exercise them. |
 | 21 | **Nobody can set a metal rate until M7.** `metal_rates` ships with both rows unpublished and the website hides the panel, which is correct — but the rate stays invisible until the Android app has a screen for it. | M7 | The panel is dead on the live site until then. If rates are wanted sooner, the interim is a direct SQL update by the owner, which needs a documented runbook. |
 
 ---

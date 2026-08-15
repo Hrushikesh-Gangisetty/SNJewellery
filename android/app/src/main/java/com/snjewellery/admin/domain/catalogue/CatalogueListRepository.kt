@@ -116,11 +116,39 @@ data class CatalogueQuery(
     /** Null means every category. */
     val categoryId: String? = null,
 ) {
-    val term: String? get() = text.trim().ifBlank { null }
+    /**
+     * The text as a filter value, with PostgREST's own punctuation removed.
+     *
+     * ── Why this is not just `trim()` ─────────────────────────────────
+     * The name and tag conditions are combined in a PostgREST logic tree,
+     * `or=(name.ilike.*x*,tags.cs.{x})`, which is **comma-delimited**. A
+     * comma inside the term therefore ends the first condition early and
+     * the whole request comes back `PGRST100`, so the owner typing
+     * `gold, silver` in the search box saw *"The catalogue could not be
+     * loaded"*. Confirmed against the live database, not deduced.
+     *
+     * The structural characters become spaces rather than being deleted,
+     * so `bangle,kada` reads as two words rather than the single word
+     * `banglekada` — it matches nothing either way, but "nothing matched"
+     * is a true answer where an error was not.
+     */
+    val term: String?
+        get() = text.replace(FILTER_SYNTAX, " ").trim().ifBlank { null }
 
     /** Whether anything is narrowing the list. Drives the "clear" affordance. */
     val isFiltered: Boolean
         get() = term != null || categoryId != null || status != StatusFilter.Live
+
+    private companion object {
+        /**
+         * Characters that mean something to PostgREST's filter grammar:
+         * the logic tree's delimiter and brackets, the array literal's
+         * braces, and the quoting pair. Parentheses do not in fact break
+         * a term — checked — but they are removed anyway rather than left
+         * as the one exception someone has to remember.
+         */
+        val FILTER_SYNTAX = Regex("""[,()\\"{}]""")
+    }
 }
 
 /**
