@@ -637,9 +637,17 @@ Put the customer website in production on a real domain, backed by the productio
   Every route, every conversion button, mobile and desktop, console clean, no placeholder content.
   *Done when:* the checklist is completed and committed with its results.
 
-- **`M5.8` Baseline measurement and deployment docs** — `S`
+- **`M5.8` Baseline measurement and deployment docs** — `S` — ◐ **the runbook is written; the baseline needs a deployment**
   Record a baseline Lighthouse run (performance, accessibility, SEO) as the reference M11 and M12 improve against, and write `docs/deployment/`.
   *Done when:* baseline scores are committed to the repository and the deployment runbook covers deploy, rollback, and environment variable changes.
+
+  **Written:** [environments.md](docs/deployment/environments.md) (which credential belongs where, the service-role check, and why rotating a `NEXT_PUBLIC_*` key does nothing until a rebuild), [website.md](docs/deployment/website.md) (Vercel setup with the one setting that is wrong by default — Root Directory `web` — plus deploy, rollback and the domain), and [database.md](docs/deployment/database.md) (production project, migrations, and reverting).
+
+  **Rollback is documented as two steps, on purpose.** Vercel's instant rollback re-points the domain at an existing build in seconds and **does not revert the repository** — `main` still holds the bad commit and the next push redeploys it. Documenting only the fast half is how a rollback gets undone by the following morning's work. The runbook also names what a rollback *cannot* undo: a migration, uploaded photographs, and a rotated key.
+
+  **The free tier's backup story is stated where it will be read**, not discovered: point-in-time recovery is a paid feature, so on the free tier a migration that overwrites rows has a daily backup as its entire safety net.
+
+  **Outstanding:** the Lighthouse baseline itself, which needs a deployed URL. `launch-checklist.md` is M5.7's and is deliberately not written yet — a checklist committed before anyone can run it is a document that gets ticked from memory.
 
 ### Dependencies
 
