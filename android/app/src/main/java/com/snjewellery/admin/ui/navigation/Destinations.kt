@@ -36,9 +36,20 @@ data object AddProduct
 @Serializable
 data class EditProduct(val productId: String)
 
-/** The owner's whole catalogue, newest first (M8.1). */
+/**
+ * The owner's whole catalogue, newest first (M8.1).
+ *
+ * [categoryId] opens it already filtered — the way out of M8.8's refusal
+ * to delete a category with pieces in it, which is otherwise a dead end
+ * with nothing to act on. Null is the ordinary "show me everything" entry
+ * from the dashboard.
+ *
+ * The property name is the argument key `CatalogueViewModel` reads off
+ * its `SavedStateHandle`. Renaming it here without renaming that is a
+ * screen that silently opens unfiltered.
+ */
 @Serializable
-data object Catalogue
+data class Catalogue(val categoryId: String? = null)
 
 /** The categories every piece is filed under (M8.6). */
 @Serializable

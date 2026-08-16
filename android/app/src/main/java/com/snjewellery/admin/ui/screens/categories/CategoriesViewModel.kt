@@ -109,8 +109,14 @@ sealed interface CategoryEditorError {
     /** Deleted from another device. A refresh resolves it, not a retry. */
     data object Missing : CategoryEditorError
 
-    /** Pieces are filed under it, so the database refused the delete. */
-    data object InUse : CategoryEditorError
+    /**
+     * Pieces are filed under it, so the database refused the delete.
+     *
+     * [pieces] is how many, or null when the count could not be read —
+     * the refusal is still correct either way. Blocking rather than
+     * reassigning is ADR-0011.
+     */
+    data class InUse(val pieces: Int?) : CategoryEditorError
 
     data class Failed(val failure: RequestFailure) : CategoryEditorError
 }
@@ -249,7 +255,8 @@ class CategoriesViewModel @Inject constructor(
                     )
                 }
 
-                is DeleteCategoryResult.InUse -> failEditor(CategoryEditorError.InUse)
+                is DeleteCategoryResult.InUse ->
+                    failEditor(CategoryEditorError.InUse(result.pieces))
 
                 is DeleteCategoryResult.Failed ->
                     failEditor(CategoryEditorError.Failed(result.failure))

@@ -64,7 +64,11 @@ Seeded with the launch set: 22K Gold, 18K Gold, Silver.
 
 **`ON DELETE RESTRICT` on `category_id` is deliberate.** Deleting a category that
 still holds products fails loudly rather than silently destroying the catalogue.
-M8.8 handles the case in the admin UI.
+The admin app surfaces the refusal — it counts the pieces and says so, rather
+than reassigning them — decided in
+[ADR-0011](../adr/0011-category-deletion-with-products.md). **This constraint is
+what makes an orphaned product impossible**, not a check in either client, so no
+client can bypass it and none has to remember to try.
 
 ### `product_images`
 

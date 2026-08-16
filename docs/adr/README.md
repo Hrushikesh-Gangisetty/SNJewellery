@@ -17,6 +17,8 @@ Use [0000-adr-template.md](0000-adr-template.md) for new records.
 | [0007](0007-android-architecture.md) | Android architecture, DI, and HTTP client | 🟡 **Proposed** | M6, M7, M8 |
 | [0008](0008-design-tokens-single-source.md) | Design tokens as a shared single source of truth | 🟡 **Proposed** | M1.6, M2.4, M6.2 |
 | [0009](0009-website-first-with-mock-data-adapter.md) | Website-first build order with a fixture-backed data layer | ✅ Accepted | M2, M3, M4 |
+| [0010](0010-configurable-site-content.md) | Where configurable brand and site content lives | ✅ Accepted | M1, M3.2, M4.9–M4.11 |
+| [0011](0011-category-deletion-with-products.md) | Deleting a category that still has pieces in it | ✅ Accepted | M8.6, M8.8 |
 
 ## Decisions still needing input
 

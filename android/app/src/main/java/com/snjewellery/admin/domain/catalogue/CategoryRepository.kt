@@ -42,11 +42,15 @@ sealed interface DeleteCategoryResult {
      * RESTRICT` — so the database refused rather than orphaning them.
      *
      * Reported as its own outcome because it is not a fault and retrying
-     * will never work: the answer is to move the pieces or keep the
-     * category. Whether the app should offer to reassign them instead of
-     * simply refusing is M8.8's decision.
+     * will never work: the answer is to refile the pieces. **The app
+     * blocks rather than reassigning them**, decided and reasoned in
+     * `docs/adr/0011-category-deletion-with-products.md`.
+     *
+     * [pieces] is how many are filed under it, or null when the count
+     * itself could not be read — the refusal is still correct, it just
+     * cannot say how many.
      */
-    data object InUse : DeleteCategoryResult
+    data class InUse(val pieces: Int?) : DeleteCategoryResult
 
     data class Failed(val failure: RequestFailure) : DeleteCategoryResult
 }

@@ -259,7 +259,9 @@ class CategoriesViewModelTest {
     }
 
     @Test
-    fun `a category with pieces in it is kept, and says why`() = runTest(dispatcher) {
+    fun `a category with pieces in it is kept, and says how many`() = runTest(dispatcher) {
+        // ADR-0011: blocked, not reassigned — and the count is what makes
+        // the refusal actionable rather than a bare no.
         categories.inUse = true
         val viewModel = viewModel()
         viewModel.onEditRequested(viewModel.uiState.value.categories.first())
@@ -268,7 +270,7 @@ class CategoriesViewModelTest {
         viewModel.onDeleteConfirmed()
 
         val editor = viewModel.uiState.value.editor
-        assertEquals(CategoryEditorError.InUse, editor?.error)
+        assertEquals(CategoryEditorError.InUse(pieces = 12), editor?.error)
         assertTrue("the confirmation is over — retrying it would fail again", editor?.confirmingDelete == false)
         assertEquals(
             "and nothing left the list",
@@ -288,6 +290,24 @@ class CategoriesViewModelTest {
 
         assertEquals(
             CategoryEditorError.Failed(OFFLINE),
+            viewModel.uiState.value.editor?.error,
+        )
+        assertEquals(2, viewModel.uiState.value.categories.size)
+    }
+
+    @Test
+    fun `a refusal whose count could not be read still refuses`() = runTest(dispatcher) {
+        // The count is a second request and may fail on its own. The
+        // delete was still refused, and saying "try again" would be a
+        // button that fails identically every time.
+        categories.inUse = true
+        categories.inUsePieces = null
+        val viewModel = viewModel()
+        viewModel.onEditRequested(viewModel.uiState.value.categories.first())
+        viewModel.onDeleteConfirmed()
+
+        assertEquals(
+            CategoryEditorError.InUse(pieces = null),
             viewModel.uiState.value.editor?.error,
         )
         assertEquals(2, viewModel.uiState.value.categories.size)
@@ -443,7 +463,12 @@ class CategoriesViewModelTest {
 
         var slugExhausted = false
         var renameMissing = false
+
+        /** The delete is refused because pieces are filed under it. */
         var inUse = false
+
+        /** How many it can say — null when the count itself failed. */
+        var inUsePieces: Int? = 12
         var visibilityMissing = false
         var reorderMissing = false
         var failure: RequestFailure? = null
@@ -485,7 +510,7 @@ class CategoriesViewModelTest {
 
         override suspend fun delete(id: String): DeleteCategoryResult {
             failure?.let { return DeleteCategoryResult.Failed(it) }
-            if (inUse) return DeleteCategoryResult.InUse
+            if (inUse) return DeleteCategoryResult.InUse(pieces = inUsePieces)
             deleted += id
             return DeleteCategoryResult.Deleted
         }

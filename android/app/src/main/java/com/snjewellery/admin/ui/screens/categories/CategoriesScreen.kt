@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -69,6 +70,7 @@ import com.snjewellery.admin.ui.theme.snTextStyles
 @Composable
 fun CategoriesScreen(
     onBack: () -> Unit,
+    onShowPieces: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CategoriesViewModel = hiltViewModel(),
 ) {
@@ -77,6 +79,7 @@ fun CategoriesScreen(
     CategoriesScreen(
         uiState = uiState,
         onBack = onBack,
+        onShowPieces = onShowPieces,
         onRetry = viewModel::load,
         onAddRequested = viewModel::onAddRequested,
         onEditRequested = viewModel::onEditRequested,
@@ -101,6 +104,7 @@ internal fun CategoriesScreen(
     uiState: CategoriesUiState,
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
+    onShowPieces: (String) -> Unit = {},
     onRetry: () -> Unit = {},
     onAddRequested: () -> Unit = {},
     onEditRequested: (Category) -> Unit = {},
@@ -173,6 +177,7 @@ internal fun CategoriesScreen(
             editor = editor,
             onNameChange = onNameChange,
             onVisibilityChange = onVisibilityChange,
+            onShowPieces = { editor.category?.let { onShowPieces(it.id) } },
             onSave = onSave,
             onDeleteRequested = onDeleteRequested,
             onDeleteCancelled = onDeleteCancelled,
@@ -330,6 +335,7 @@ private fun CategoryDialog(
     editor: CategoryEditor,
     onNameChange: (String) -> Unit,
     onVisibilityChange: (Boolean) -> Unit,
+    onShowPieces: () -> Unit,
     onSave: () -> Unit,
     onDeleteRequested: () -> Unit,
     onDeleteCancelled: () -> Unit,
@@ -418,6 +424,18 @@ private fun CategoryDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
+
+                    // A refusal with nothing to do about it is a dead
+                    // end. Refiling the pieces is the only way to a
+                    // deletable category, and this is the way to them.
+                    if (error is CategoryEditorError.InUse) {
+                        TextButton(
+                            onClick = onShowPieces,
+                            modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+                        ) {
+                            Text(stringResource(R.string.categories_show_pieces))
+                        }
+                    }
                 }
             }
         },
@@ -503,7 +521,12 @@ private fun CategoryEditorError.message(): String = when (this) {
         stringResource(R.string.categories_error_name_exhausted)
 
     is CategoryEditorError.Missing -> stringResource(R.string.categories_missing)
-    is CategoryEditorError.InUse -> stringResource(R.string.categories_error_in_use)
+    // The count is what makes this actionable rather than a bare no. It
+    // is absent only when the count itself could not be read, and the
+    // refusal is still correct then.
+    is CategoryEditorError.InUse -> pieces?.let {
+        pluralStringResource(R.plurals.categories_error_in_use_count, it, it)
+    } ?: stringResource(R.string.categories_error_in_use)
     is CategoryEditorError.Failed -> if (failure.offline) {
         stringResource(R.string.categories_error_offline)
     } else {
@@ -620,7 +643,7 @@ private fun CategoryDialogPreview() {
                 editor = CategoryEditor(
                     category = Category("1", "Necklaces", isVisible = true, displayOrder = 1),
                     name = "Necklaces",
-                    error = CategoryEditorError.InUse,
+                    error = CategoryEditorError.InUse(pieces = 12),
                 ),
             ),
         )

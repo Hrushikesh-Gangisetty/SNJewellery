@@ -15,6 +15,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Count
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
@@ -189,14 +190,45 @@ class SupabaseCategoryRepository @Inject constructor(
     } catch (e: PostgrestRestException) {
         // `products.category_id` is ON DELETE RESTRICT, so this is the
         // database refusing to orphan the pieces filed under it — a
-        // sentence the owner can act on, not a fault.
+        // sentence the owner can act on, not a fault. The count is read
+        // only now, after the refusal: asking first would be a request on
+        // every delete to answer a question that is nearly always "none".
         if (e.code == FOREIGN_KEY_VIOLATION) {
-            DeleteCategoryResult.InUse
+            DeleteCategoryResult.InUse(pieces = pieceCount(id))
         } else {
             DeleteCategoryResult.Failed(failures.classify(e))
         }
     } catch (e: Exception) {
         DeleteCategoryResult.Failed(failures.classify(e))
+    }
+
+    /**
+     * How many pieces are filed under the category, or null if the count
+     * could not be read.
+     *
+     * **Archived pieces are counted.** The dashboard's figures exclude
+     * them because they answer "how big is my catalogue"; this answers
+     * "what is holding the foreign key", and an archived piece holds it
+     * exactly as a live one does. Excluding them would produce the one
+     * genuinely confusing message available here — *"0 pieces are filed
+     * under this category, so it cannot be deleted"*.
+     */
+    private suspend fun pieceCount(categoryId: String): Int? = try {
+        client.postgrest.from(TABLE_PRODUCTS)
+            .select(Columns.list("id")) {
+                head = true
+                count(Count.EXACT)
+                filter { eq("category_id", categoryId) }
+            }
+            .countOrNull()
+            ?.toInt()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        // The refusal is still correct and still final; it just cannot
+        // say how many. Turning this into a failure would replace a true
+        // explanation with a retry that would refuse again.
+        null
     }
 
     /** Where the owner's order currently ends. */
@@ -230,6 +262,7 @@ class SupabaseCategoryRepository @Inject constructor(
 
     private companion object {
         const val TABLE_CATEGORIES = "categories"
+        const val TABLE_PRODUCTS = "products"
         const val COLUMN_DISPLAY_ORDER = "display_order"
         const val COLUMN_IS_VISIBLE = "is_visible"
 

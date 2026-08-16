@@ -452,9 +452,24 @@
          picker and on the website. -->
     <string name="categories_error_name_taken">You already have a category with this name.</string>
     <string name="categories_error_name_exhausted">There are already too many categories with names like this one. Please choose a slightly different name.</string>
-    <!-- Not a fault, and retrying will never work: the pieces have to go
-         somewhere first. -->
+    <!-- ── Deletion with pieces in it (M8.8) ─────────────────────────
+      Blocked, not reassigned — ADR-0011. Not a fault, and retrying will
+      never work: the pieces have to be refiled first, so the message
+      says how many there are and offers the way to them.
+
+      Archived pieces are counted. They hold the foreign key exactly as a
+      live piece does, and excluding them would produce the one genuinely
+      confusing sentence available here: "0 pieces are filed under this
+      category, so it cannot be deleted."
+    -->
+    <plurals name="categories_error_in_use_count">
+        <item quantity="one">One piece is filed under this category, so it cannot be deleted. Move it to another category first.</item>
+        <item quantity="other">%1$d pieces are filed under this category, so it cannot be deleted. Move them to another category first.</item>
+    </plurals>
+    <!-- When the count itself could not be read. The refusal is still
+         correct; it just cannot say how many. -->
     <string name="categories_error_in_use">There are pieces filed under this category, so it cannot be deleted. Move them to another category first.</string>
+    <string name="categories_show_pieces">Show these pieces</string>
     <string name="categories_error_offline">No connection, so nothing was changed. Check your signal and try again.</string>
     <string name="categories_error_server">That could not be saved (%1$s). Please try again.</string>
 

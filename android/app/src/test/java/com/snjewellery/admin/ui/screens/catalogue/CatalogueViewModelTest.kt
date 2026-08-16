@@ -1,5 +1,6 @@
 package com.snjewellery.admin.ui.screens.catalogue
 
+import androidx.lifecycle.SavedStateHandle
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.catalogue.CatalogueCursor
 import com.snjewellery.admin.domain.catalogue.CatalogueEntry
@@ -369,6 +370,30 @@ class CatalogueViewModelTest {
         assertEquals(listOf("Necklaces"), viewModel().uiState.value.categories.map { it.name })
     }
 
+    // ── Opening on a category (M8.8) ─────────────────────────────────
+
+    @Test
+    fun `arriving from a blocked category delete opens filtered to it`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+
+        val viewModel = viewModel(openingCategoryId = CATEGORY_ID)
+
+        val query = repository.queries.single()
+        assertEquals(CATEGORY_ID, query.categoryId)
+        // `All`, not the usual `Live`: the pieces holding the foreign key
+        // include archived ones, so filtering them out would show fewer
+        // pieces than the refusal just said were there.
+        assertEquals(StatusFilter.All, query.status)
+        assertTrue(viewModel.uiState.value.query.isFiltered)
+    }
+
+    @Test
+    fun `the ordinary entry is unfiltered`() = runTest(dispatcher) {
+        repository.pages = listOf(page("a"))
+
+        assertEquals(CatalogueQuery(), viewModel().uiState.value.query)
+    }
+
     // ── Status toggles (M8.5) ────────────────────────────────────────
 
     @Test
@@ -618,8 +643,15 @@ class CatalogueViewModelTest {
 
     // ── Fixtures ─────────────────────────────────────────────────────
 
-    private fun viewModel() =
-        CatalogueViewModel(repository, FakeCategoriesRepository(), products, images)
+    private fun viewModel(openingCategoryId: String? = null) = CatalogueViewModel(
+        // What the route carries. Null is the dashboard's entry; a value
+        // is M8.8's "show me the pieces blocking this delete".
+        SavedStateHandle(mapOf("categoryId" to openingCategoryId)),
+        repository,
+        FakeCategoriesRepository(),
+        products,
+        images,
+    )
 
     private class FakeCategoriesRepository : CatalogueRepository {
         override suspend fun categories() =

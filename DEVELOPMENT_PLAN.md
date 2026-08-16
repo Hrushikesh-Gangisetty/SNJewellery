@@ -1309,9 +1309,23 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Not verified: the website's rendered order.** Needs a deployed site — M5 has not run.
 
-- **`M8.8` Category deletion with products** — `S`
+- **`M8.8` Category deletion with products** — `S` — ✅ **done**
   Block deletion of a non-empty category with an explanation, or require reassignment. Decide and document.
   *Done when:* the behaviour is documented and no orphaned product can point at a missing category.
+
+  **Decided: block, with a count and a way to the pieces.** Recorded as [ADR-0011](docs/adr/0011-category-deletion-with-products.md) and referenced from [schema.md](docs/database/schema.md). The refusal now reads *"12 pieces are filed under this category, so it cannot be deleted. Move them to another category first"*, with **Show these pieces** beside it.
+
+  **Reassignment was rejected, and the reason is not effort.** A retiring category holds pieces that belong in *different* places — a mixed festival collection scatters into necklaces, bangles and rings. A bulk move has to send all of them to one category, so it converts one honest refusal into forty quietly mis-filed pieces, each then appearing under the wrong heading on the website. The owner does the per-piece work either way; reassignment only hides it. It is also an un-undoable bulk write on a phone used one-handed between customers. The full argument, and the three alternatives rejected with it, are in the ADR.
+
+  **The count includes archived pieces.** They hold the foreign key exactly as live ones do. The dashboard excludes archived pieces because it answers "how big is my catalogue"; this answers "what is holding the key", and excluding them would produce the one genuinely confusing sentence available here — *"0 pieces are filed under this category, so it cannot be deleted."*
+
+  **The count is read after the refusal, not before the delete.** Asking first would put a request on every deletion to answer a question that is nearly always "none". If the count itself fails the refusal still stands, worded without a number — turning it into a retryable failure would offer a button that fails identically every time.
+
+  **Show these pieces opens the catalogue on `All`, not `Live`.** Same reason: the pieces holding the key include archived ones, and the default filter would show fewer than the message just said were there, which reads as the app contradicting itself. `Catalogue` became a route with an optional `categoryId` to carry it.
+
+  **No orphan is possible, and not because the app checks.** `products.category_id` is `not null` with `on delete restrict`, so the database refuses — there is no client path around it, and neither client has to remember to look. **Verified by the RLS suite** (`npm run db:test-rls`, 30 passed) that no client can reach the categories table to try.
+
+  **Verified by test** (2 new, 24 on this screen, 114 in the project): the refusal carrying its count, a refusal whose count could not be read still refusing, and the catalogue opening filtered to the category on `All` while the ordinary entry stays unfiltered.
 
 - **`M8.9` Offline draft persistence** — `M`
   Local persistence (Room or DataStore) so a draft survives process death and is listed as pending.

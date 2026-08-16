@@ -42,13 +42,19 @@ fun AdminNavHost(
             DashboardScreen(
                 onSignOut = onSignOut,
                 onAddProduct = { navController.navigate(AddProduct) },
-                onViewCatalogue = { navController.navigate(Catalogue) },
+                onViewCatalogue = { navController.navigate(Catalogue()) },
                 onManageCategories = { navController.navigate(Categories) },
             )
         }
 
         composable<Categories> {
-            CategoriesScreen(onBack = { navController.popBackStack() })
+            CategoriesScreen(
+                onBack = { navController.popBackStack() },
+                // The pieces that are blocking a delete. Filtered, and
+                // stacked over the categories screen rather than
+                // replacing it — the owner is coming back to try again.
+                onShowPieces = { categoryId -> navController.navigate(Catalogue(categoryId)) },
+            )
         }
 
         composable<Catalogue> {

@@ -1,5 +1,6 @@
 package com.snjewellery.admin.ui.screens.catalogue
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.snjewellery.admin.domain.RequestFailure
@@ -140,13 +141,14 @@ internal fun CatalogueEntry.withStatus(status: ProductStatus, value: Boolean) = 
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class CatalogueViewModel @Inject constructor(
+    savedState: SavedStateHandle,
     private val repository: CatalogueListRepository,
     private val catalogueRepository: CatalogueRepository,
     private val productRepository: ProductRepository,
     private val productImageRepository: ProductImageRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CatalogueUiState())
+    private val _uiState = MutableStateFlow(CatalogueUiState(query = openingQuery(savedState)))
     val uiState: StateFlow<CatalogueUiState> = _uiState.asStateFlow()
 
     private var nextCursor: CatalogueCursor? = null
@@ -495,5 +497,24 @@ class CatalogueViewModel @Inject constructor(
          * like an answer rather than a wait.
          */
         const val SEARCH_DEBOUNCE_MS = 350L
+
+        /** The route argument. See `Destinations.Catalogue`. */
+        const val KEY_CATEGORY_ID = "categoryId"
+
+        /**
+         * What the screen opens showing.
+         *
+         * Arriving from M8.8's blocked delete, it opens filtered to that
+         * category **and to `All`** rather than to `Live`. The pieces
+         * holding the foreign key include archived ones, so the default
+         * filter would show fewer pieces than the message just said were
+         * there — which reads as the app contradicting itself.
+         */
+        fun openingQuery(savedState: SavedStateHandle): CatalogueQuery {
+            val categoryId = savedState.get<String>(KEY_CATEGORY_ID)
+                ?: return CatalogueQuery()
+
+            return CatalogueQuery(categoryId = categoryId, status = StatusFilter.All)
+        }
     }
 }
