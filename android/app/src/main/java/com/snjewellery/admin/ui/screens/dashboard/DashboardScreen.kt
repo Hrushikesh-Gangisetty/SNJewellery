@@ -28,8 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -39,6 +41,8 @@ import com.snjewellery.admin.R
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.dashboard.DashboardMetrics
 import com.snjewellery.admin.domain.dashboard.RecentProduct
+import com.snjewellery.admin.domain.draft.PendingDraft
+import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.ui.theme.SnTheme
 import com.snjewellery.admin.ui.theme.Tokens
 import com.snjewellery.admin.ui.theme.snTextStyles
@@ -152,6 +156,14 @@ internal fun DashboardScreen(
                 )
             }
 
+            // Above the metrics, and outside the `when`: a piece waiting
+            // on this phone is the one thing on this screen the owner has
+            // to act on, and it is most likely to exist exactly when the
+            // counts below it cannot be loaded.
+            if (uiState.pending.isNotEmpty()) {
+                PendingUploads(uiState.pending)
+            }
+
             when (val state = uiState.state) {
                 is DashboardState.Loading -> MetricsSkeleton()
 
@@ -194,6 +206,84 @@ internal fun DashboardScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Pieces entered on this phone that are not in the catalogue yet.
+ *
+ * ── Why this is not an error ─────────────────────────────────────────
+ * Nothing has gone wrong that the owner did. They photographed a ring
+ * somewhere with no signal, which is the case the whole feature exists
+ * for. So it states what is waiting and why, in the ordinary text colour
+ * — an error-red panel every time the shop's signal drops would teach
+ * them to ignore it.
+ *
+ * Each row says why that one is still waiting, because "no connection"
+ * and "the server refused it" call for different things: one resolves
+ * itself, the other will not.
+ */
+@Composable
+private fun PendingUploads(pending: List<PendingDraft>) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(Tokens.Space.s4),
+            verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
+        ) {
+            Text(
+                text = pluralStringResource(
+                    R.plurals.dashboard_pending_title,
+                    pending.size,
+                    pending.size,
+                ),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.dashboard_pending_body),
+                style = MaterialTheme.snTextStyles.label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            pending.forEach { draft ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Tokens.Layout.touchTarget)
+                        .padding(vertical = Tokens.Space.s1),
+                    verticalArrangement = Arrangement.spacedBy(Tokens.Space.s1),
+                ) {
+                    Text(
+                        text = draft.draft.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = draft.waitingReason(),
+                        style = MaterialTheme.snTextStyles.label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Photographs waiting, and why this one has not gone up. */
+@Composable
+private fun PendingDraft.waitingReason(): String {
+    val photos = pluralStringResource(
+        R.plurals.dashboard_pending_photos,
+        photoUris.size,
+        photoUris.size,
+    )
+
+    return when {
+        failure == null -> photos
+        failure.offline -> stringResource(R.string.dashboard_pending_offline, photos)
+        else -> stringResource(R.string.dashboard_pending_failed, photos)
     }
 }
 

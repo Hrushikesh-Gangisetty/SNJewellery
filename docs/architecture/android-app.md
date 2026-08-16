@@ -228,6 +228,32 @@ did not happen.
 "no longer in the catalogue" with a refresh, not a switch that stays
 flipped.
 
+### 2.6e The device is a data source, and only for drafts
+
+Every other repository in this app talks to Supabase and fails when the
+network does. `DraftRepository` is the one that does not: it is Room, on
+the phone, and it exists precisely for the minutes and days when nothing
+else here works.
+
+Two consequences that are easy to get wrong:
+
+**A draft's photographs must leave the cache.** Staging writes into
+`cache/staged/` deliberately — a photograph normally matters for the few
+minutes before it is uploaded, and the system reclaiming it afterwards
+costs nothing. A draft breaks that assumption: it may sit unsent for
+days, and the cache is exactly what Android empties when storage runs
+short. `StagedImages.retain` moves them to `files/drafts/`, which is this
+app's to keep **and** to delete.
+
+**Moving a file means moving every reference to it.** `SaveProgress`
+records which staged URI each uploaded object came from, and
+`clearAbandoned` treats an upload whose URI has left the form as
+abandoned. Renaming the files without rewriting that record deletes every
+photograph already in Storage and sends it again.
+
+*Check:* a save that fails on the second of two photographs, then
+succeeds on retry, uploads exactly one more object and removes none.
+
 ### 2.7 No screen declares a visual value
 
 Colour, size, radius, duration: all from `MaterialTheme` or `Tokens`,

@@ -6,6 +6,8 @@ import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
+import com.snjewellery.admin.domain.draft.DraftRepository
+import com.snjewellery.admin.domain.draft.PendingDraft
 import com.snjewellery.admin.domain.media.StagedImages
 import com.snjewellery.admin.domain.product.CreateProductResult
 import com.snjewellery.admin.domain.product.DeleteProductResult
@@ -26,6 +28,8 @@ import com.snjewellery.admin.domain.product.WriteImagesResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -72,6 +76,8 @@ class AddProductSaveTest {
 
     private lateinit var products: FakeProductRepository
     private lateinit var images: FakeProductImageRepository
+    private lateinit var staged: FakeStagedImages
+    private lateinit var drafts: FakeDraftRepository
 
     /**
      * The handle outlives the view model on purpose: it is what survives
@@ -87,6 +93,8 @@ class AddProductSaveTest {
         Dispatchers.setMain(dispatcher)
         products = FakeProductRepository()
         images = FakeProductImageRepository()
+        staged = FakeStagedImages()
+        drafts = FakeDraftRepository()
     }
 
     @After
@@ -159,9 +167,14 @@ class AddProductSaveTest {
         viewModel.save()
 
         assertEquals(listOf("staged-0", "staged-1"), afterFirstAttempt)
+        // The third is `kept-2` because the interruption wrote a draft,
+        // which moves every photograph out of the reclaimable cache
+        // (M8.9). The two that landed are still not sent a second time —
+        // which is what would happen if the rename had not been carried
+        // into the record of what has already been uploaded.
         assertEquals(
             "the two that landed must not be sent a second time",
-            listOf("staged-0", "staged-1", "staged-2"),
+            listOf("staged-0", "staged-1", "kept-2"),
             images.uploads,
         )
         assertTrue(
@@ -262,8 +275,12 @@ class AddProductSaveTest {
         images.failFrom = null
         viewModel.save()
 
+        // `kept-2` only because M8.9's draft moved the un-uploaded
+        // photograph; the first two keep the storage paths they were
+        // uploaded under, which is the point — a rename on the device
+        // must not disturb what is already in the bucket.
         assertEquals(
-            listOf("staged-1", "staged-0", "staged-2"),
+            listOf("staged-1", "staged-0", "kept-2"),
             images.written.sortedBy { it.displayOrder }.map { it.storagePath.substringAfter('/') },
         )
         assertEquals(listOf(0, 1, 2), images.written.map { it.displayOrder }.sorted())
@@ -351,7 +368,9 @@ class AddProductSaveTest {
         images.failFrom = null
         reopened.save()
 
-        assertEquals(listOf("staged-0", "staged-1", "staged-2"), images.uploads)
+        // `kept-2` for M8.9's reason — see the test above. The point
+        // here is that the reopened attempt sends only the third.
+        assertEquals(listOf("staged-0", "staged-1", "kept-2"), images.uploads)
         assertEquals(1, products.created.size)
         assertTrue("${reopened.uiState.value.saveState}", reopened.uiState.value.saveState is SaveState.Saved)
     }
@@ -501,7 +520,8 @@ class AddProductSaveTest {
                 catalogueRepository = FakeCatalogueRepository(),
                 productRepository = products,
                 productImageRepository = images,
-                stagedImages = FakeStagedImages(),
+                stagedImages = staged,
+                draftRepository = drafts,
                 savedState = handle,
             )
 
@@ -662,7 +682,8 @@ class AddProductSaveTest {
             catalogueRepository = FakeCatalogueRepository(),
             productRepository = products,
             productImageRepository = images,
-            stagedImages = FakeStagedImages(),
+            stagedImages = staged,
+            draftRepository = drafts,
             savedState = handle,
         )
 
@@ -677,6 +698,102 @@ class AddProductSaveTest {
         )
     }
 
+    // ── Offline drafts (M8.9) ────────────────────────────────────────
+
+    @Test
+    fun `a save that could not finish leaves the piece on the phone`() = runTest(dispatcher) {
+        images.failFrom = 0
+        val viewModel = viewModel(photos = 2)
+
+        viewModel.save()
+
+        val draft = drafts.saved.single()
+        assertEquals("Kundan Choker", draft.draft.name)
+        assertEquals(CATEGORY_ID, draft.draft.categoryId)
+        assertEquals(OFFLINE, draft.failure)
+    }
+
+    @Test
+    fun `a draft's photographs are moved out of the reclaimable cache`() = runTest(dispatcher) {
+        images.failFrom = 0
+        val viewModel = viewModel(photos = 2)
+
+        viewModel.save()
+
+        // The cache is exactly what Android empties when storage runs
+        // short, and a draft may wait days for a signal.
+        assertEquals(listOf("kept-0", "kept-1"), drafts.saved.single().photoUris)
+        assertEquals(
+            "the form must follow the files, or its thumbnails point at nothing",
+            listOf<FormPhoto>(FormPhoto.Staged("kept-0"), FormPhoto.Staged("kept-1")),
+            viewModel.uiState.value.form.images,
+        )
+    }
+
+    @Test
+    fun `moving the files does not re-upload the photographs already sent`() =
+        runTest(dispatcher) {
+            // One photograph lands, the second fails.
+            images.failFrom = 1
+            val viewModel = viewModel(photos = 2)
+            viewModel.save()
+            images.uploads.clear()
+            images.failFrom = null
+
+            viewModel.save()
+
+            // SaveProgress remembers uploads by their staged URI, and
+            // clearAbandoned deletes any upload whose URI has left the
+            // form. Renaming without remapping that record would delete
+            // the first photograph from Storage and send it again.
+            assertEquals(listOf("kept-1"), images.uploads)
+            assertEquals(emptyList<List<String>>(), images.removed)
+        }
+
+    @Test
+    fun `a piece that saves is not left waiting on the phone`() = runTest(dispatcher) {
+        images.failFrom = 0
+        val viewModel = viewModel(photos = 1)
+        viewModel.save()
+        images.failFrom = null
+
+        viewModel.save()
+
+        // The draft carried the id the attempt had already chosen, so
+        // finishing it wrote the row it was always going to write.
+        assertEquals(products.created, drafts.deleted)
+        // The retained files are this app's to delete — nothing else will
+        // ever reclaim `files/drafts/`.
+        assertEquals(listOf("kept-0"), staged.discarded)
+    }
+
+    @Test
+    fun `an edit is never a pending upload`() = runTest(dispatcher) {
+        products.existing = stored()
+        products.updateFails = true
+        val viewModel = editViewModel()
+
+        viewModel.save()
+
+        // The piece is already in the catalogue. A "waiting to upload"
+        // entry for it would be a second copy of something that exists.
+        assertEquals(emptyList<PendingDraft>(), drafts.saved)
+    }
+
+    @Test
+    fun `a draft is still written when the photographs could not be moved`() =
+        runTest(dispatcher) {
+            images.failFrom = 0
+            staged.retainFails = true
+            val viewModel = viewModel(photos = 1)
+
+            viewModel.save()
+
+            // A draft that might lose its photographs to an eviction is
+            // still better than losing the piece.
+            assertEquals(listOf("staged-0"), drafts.saved.single().photoUris)
+        }
+
     // ── Fixtures ─────────────────────────────────────────────────────
 
     private fun editViewModel(): AddProductViewModel {
@@ -685,7 +802,8 @@ class AddProductSaveTest {
             catalogueRepository = FakeCatalogueRepository(),
             productRepository = products,
             productImageRepository = images,
-            stagedImages = FakeStagedImages(),
+            stagedImages = staged,
+            draftRepository = drafts,
             savedState = handle,
         )
     }
@@ -726,7 +844,8 @@ class AddProductSaveTest {
         catalogueRepository = FakeCatalogueRepository(),
         productRepository = products,
         productImageRepository = images,
-        stagedImages = FakeStagedImages(),
+        stagedImages = staged,
+        draftRepository = drafts,
         savedState = handle,
     )
 
@@ -738,11 +857,50 @@ class AddProductSaveTest {
             CatalogueResult.Loaded(listOf(Purity("p1", "22K", "22K Gold")))
     }
 
+    /**
+     * Retaining renames `staged-0` to `kept-0`, so a test can see whether
+     * every reference to a photograph moved with the file — the bug that
+     * would otherwise re-upload every one of them.
+     */
     private class FakeStagedImages : StagedImages {
+        val discarded = mutableListOf<String>()
+        var retainFails = false
+
         override fun newCaptureTarget() = "staged-new"
         override suspend fun stage(sourceUri: String) = sourceUri
         override suspend fun isPortrait(uri: String) = false
-        override suspend fun discard(uri: String) = Unit
+
+        override suspend fun retain(uri: String): String? = when {
+            retainFails -> null
+            uri.startsWith(KEPT_PREFIX) -> uri
+            else -> KEPT_PREFIX + uri.removePrefix(STAGED_PREFIX)
+        }
+
+        override suspend fun discard(uri: String) {
+            discarded += uri
+        }
+    }
+
+    private class FakeDraftRepository : DraftRepository {
+        val saved = mutableListOf<PendingDraft>()
+        val deleted = mutableListOf<String>()
+
+        private val drafts = MutableStateFlow<List<PendingDraft>>(emptyList())
+
+        override fun pending(): Flow<List<PendingDraft>> = drafts
+
+        override suspend fun byId(productId: String) =
+            drafts.value.firstOrNull { it.productId == productId }
+
+        override suspend fun save(draft: PendingDraft) {
+            saved += draft
+            drafts.value = drafts.value.filterNot { it.productId == draft.productId } + draft
+        }
+
+        override suspend fun delete(productId: String) {
+            deleted += productId
+            drafts.value = drafts.value.filterNot { it.productId == productId }
+        }
     }
 
     private class FakeProductRepository : ProductRepository {
@@ -771,6 +929,7 @@ class AddProductSaveTest {
         var loadFailure = false
         val updates = mutableListOf<Pair<String, ProductDraft>>()
         var updateMissing = false
+        var updateFails = false
 
         override suspend fun byId(id: String): LoadProductResult = when {
             loadFailure -> LoadProductResult.Failed(OFFLINE)
@@ -780,6 +939,7 @@ class AddProductSaveTest {
 
         override suspend fun update(id: String, draft: ProductDraft): UpdateProductResult {
             if (updateMissing) return UpdateProductResult.Missing
+            if (updateFails) return UpdateProductResult.Failed(OFFLINE)
             updates += id to draft
             return UpdateProductResult.Updated
         }
@@ -853,5 +1013,9 @@ class AddProductSaveTest {
         val STORED_TWO = StoredPhoto("products/p/two.webp", "https://example.test/two.webp")
         const val BYTES = 1024L
         val OFFLINE = RequestFailure(offline = true)
+
+        /** What FakeStagedImages renames a photograph from, and to. */
+        const val STAGED_PREFIX = "staged-"
+        const val KEPT_PREFIX = "kept-"
     }
 }

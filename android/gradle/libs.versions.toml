@@ -56,6 +56,13 @@ junit = "4.13.2"
 androidxTestJunit = "1.2.1"
 androidxTestRunner = "1.6.2"
 
+# Offline drafts, M8.9. Room rather than DataStore, which the task offers
+# as the alternative: a draft is a record, there is a growing set of them,
+# and they are read, counted and deleted one at a time. DataStore holds a
+# single blob and would mean rewriting every draft to delete one — plus
+# hand-rolled serialisation of a list that only ever grows.
+room = "2.7.1"
+
 # Local JVM tests, added in M7.9. `runTest` and `Dispatchers.setMain` are
 # what let a view model's `viewModelScope` be driven to completion in a
 # test — without them the save pipeline's steps are unobservable.
@@ -103,6 +110,12 @@ coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref 
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+# Coroutine and Flow support for DAOs — a Flow of pending drafts is what
+# lets the dashboard show them without polling.
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }

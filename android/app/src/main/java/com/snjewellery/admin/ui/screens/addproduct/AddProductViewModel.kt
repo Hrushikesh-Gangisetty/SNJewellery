@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.catalogue.CatalogueRepository
+import com.snjewellery.admin.domain.draft.DraftRepository
+import com.snjewellery.admin.domain.draft.PendingDraft
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
 import com.snjewellery.admin.domain.catalogue.Purity
@@ -379,6 +381,7 @@ class AddProductViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val productImageRepository: ProductImageRepository,
     private val stagedImages: StagedImages,
+    private val draftRepository: DraftRepository,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -824,6 +827,12 @@ class AddProductViewModel @Inject constructor(
             // A fresh attempt gets a fresh product id. The form and the
             // staged photographs are untouched: discarding undoes what
             // reached the server, not what the owner typed.
+            //
+            // The draft row goes, because it is keyed by the id that has
+            // just been abandoned. Its photographs do **not** — they are
+            // still on the form, and the next interruption writes a fresh
+            // draft that retains the same files untouched.
+            draftRepository.delete(attempt.productId)
             progress = null
             _uiState.update { it.copy(saveState = SaveState.Idle, uploadProgress = emptyMap()) }
         }
@@ -1041,6 +1050,7 @@ class AddProductViewModel @Inject constructor(
         when (val written = productImageRepository.replaceImages(productId, images)) {
             is WriteImagesResult.Written -> {
                 progress = null
+                clearDraft(productId)
                 _uiState.update {
                     it.copy(saveState = SaveState.Saved(it.form.name.trim(), slug))
                 }
@@ -1097,6 +1107,118 @@ class AddProductViewModel @Inject constructor(
                 ),
             )
         }
+
+        keepDraft(failure)
+    }
+
+    /**
+     * Writes the piece to the device so leaving this screen cannot lose
+     * it (M8.9).
+     *
+     * ── Why an interruption is the trigger ───────────────────────────
+     * Not every keystroke: the `SavedStateHandle` already carries the
+     * form across process death *while the screen is alive*, and a draft
+     * row per keystroke would be a write per letter. What that handle
+     * cannot do is survive the owner walking away from the form — and the
+     * moment that matters is the one where a save has just failed, which
+     * is precisely when they are most likely to give up and close the
+     * app.
+     *
+     * ── Two cases deliberately excluded ──────────────────────────────
+     * **Editing.** The piece is already in the catalogue; there is
+     * nothing waiting to be uploaded, and a "pending" entry for it would
+     * be a second copy of something that exists.
+     *
+     * **A save whose row was written.** Same reason: it is public. Its
+     * photographs are what is unfinished, and the screen already says so
+     * and offers to carry on.
+     */
+    private fun keepDraft(failure: RequestFailure) {
+        val attempt = progress ?: return
+        if (attempt.slug != null) return
+        if (_uiState.value.mode !is FormMode.Adding) return
+
+        // validateCategory ran before the save started, so this holds —
+        // re-read rather than asserted, per CLAUDE.md's rule on `!!`.
+        val categoryId = _uiState.value.form.categoryId ?: return
+
+        viewModelScope.launch {
+            val photos = retainPhotos()
+
+            draftRepository.save(
+                PendingDraft(
+                    productId = attempt.productId,
+                    draft = _uiState.value.form.toDraft(categoryId),
+                    photoUris = photos,
+                    savedAt = System.currentTimeMillis(),
+                    failure = failure,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Moves the form's photographs out of the reclaimable cache and
+     * rewrites every reference to them.
+     *
+     * The rewrite is the part that is easy to miss. [SaveProgress]
+     * remembers which staged URI each uploaded object came from, and
+     * `clearAbandoned` treats an uploaded object whose URI is no longer
+     * on the form as abandoned — so moving the files without remapping
+     * that record would delete every photograph already in Storage and
+     * send it again.
+     */
+    private suspend fun retainPhotos(): List<String> {
+        val moved = buildMap {
+            _uiState.value.form.images.filterIsInstance<FormPhoto.Staged>().forEach { photo ->
+                val retained = stagedImages.retain(photo.localUri)
+                if (retained != null && retained != photo.localUri) put(photo.localUri, retained)
+            }
+        }
+
+        if (moved.isNotEmpty()) {
+            _uiState.update { state ->
+                val form = state.form.copy(
+                    images = state.form.images.map { photo ->
+                        when (photo) {
+                            is FormPhoto.Staged ->
+                                moved[photo.localUri]?.let { FormPhoto.Staged(it) } ?: photo
+
+                            is FormPhoto.Stored -> photo
+                        }
+                    },
+                )
+                persist(form)
+                state.copy(form = form)
+            }
+
+            progress = progress?.let { attempt ->
+                attempt.copy(
+                    uploaded = attempt.uploaded.map { upload ->
+                        moved[upload.localUri]
+                            ?.let { upload.copy(localUri = it) }
+                            ?: upload
+                    },
+                )
+            }
+        }
+
+        return _uiState.value.form.images
+            .filterIsInstance<FormPhoto.Staged>()
+            .map { it.localUri }
+    }
+
+    /**
+     * The piece is in the catalogue, so it is not waiting for anything.
+     *
+     * Its retained photographs go too: they are in Storage now, and files
+     * under `files/drafts/` are this app's to delete — unlike the cache,
+     * nothing else will ever reclaim them.
+     */
+    private suspend fun clearDraft(productId: String) {
+        val kept = draftRepository.byId(productId) ?: return
+        draftRepository.delete(productId)
+        kept.photoUris.forEach { stagedImages.discard(it) }
     }
 
     private fun record(upload: StagedUpload) {

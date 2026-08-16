@@ -178,6 +178,19 @@ android {
     }
 }
 
+/**
+ * Room writes the schema of each version here, and the files are
+ * committed.
+ *
+ * They are what a future migration is written and tested against: without
+ * them, changing the drafts table means guessing what the previous
+ * version looked like. The alternative — `exportSchema = false` — silences
+ * a warning by throwing away the only record of the shipped shape.
+ */
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -207,6 +220,11 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // Offline drafts (M8.9).
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // Tooling is debug-only: @Preview rendering must not ship in the APK.
     debugImplementation(libs.androidx.compose.ui.tooling)

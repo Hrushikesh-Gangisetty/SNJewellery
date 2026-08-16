@@ -66,6 +66,26 @@ interface StagedImages {
     suspend fun isPortrait(uri: String): Boolean
 
     /**
+     * Moves a staged photograph somewhere the system will not reclaim,
+     * returning its new URI.
+     *
+     * Staging deliberately writes into the cache, because a photograph
+     * normally matters for the minutes between choosing it and uploading
+     * it. **A draft breaks that assumption** (M8.9): it may sit on the
+     * phone for days with the radio off, and the cache is exactly what
+     * Android empties when storage runs short. A draft whose photographs
+     * had been evicted would upload a piece with none.
+     *
+     * Already-retained URIs are returned unchanged, so a draft written
+     * twice does not move its files twice.
+     *
+     * `null` when it could not be moved. The caller keeps the cache URI
+     * and the draft is written anyway — a draft that might lose its
+     * photographs is still better than losing the piece.
+     */
+    suspend fun retain(uri: String): String?
+
+    /**
      * Throws away a staged photograph the owner has removed.
      *
      * Nothing depends on it having worked — the photograph is already off

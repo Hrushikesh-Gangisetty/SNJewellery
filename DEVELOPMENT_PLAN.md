@@ -1327,9 +1327,31 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Verified by test** (2 new, 24 on this screen, 114 in the project): the refusal carrying its count, a refusal whose count could not be read still refusing, and the catalogue opening filtered to the category on `All` while the ordinary entry stays unfiltered.
 
-- **`M8.9` Offline draft persistence** — `M`
+- **`M8.9` Offline draft persistence** — `M` — ◐ **built and tested; the force-stop check needs a device**
   Local persistence (Room or DataStore) so a draft survives process death and is listed as pending.
   *Done when:* a draft created in airplane mode survives a force-stop and appears as pending on relaunch.
+
+  **Room, not DataStore.** The task offers both. A draft is a record, there is a growing set of them, and they are read, counted and deleted one at a time — DataStore holds a single blob, so deleting one draft means rewriting all of them, with hand-rolled serialisation of a list that only grows.
+
+  **An interruption is the trigger, not every keystroke.** The `SavedStateHandle` already carries the form through process death *while the screen is alive* (M7.2), and a draft row per letter typed would be a database write per letter. What the handle cannot survive is the owner walking away from the form — and the moment that happens is right after a save has failed, which is exactly when a draft is written.
+
+  **The draft keeps the attempt's own product id.** Not a key of its own: photographs from a part-finished attempt are already in Storage under `products/{id}/…`, and a new id would strand them. Finishing a draft later writes the row it was always going to write.
+
+  **A draft's photographs are moved out of the cache — the correctness point of this task.** Staging deliberately writes into `cache/staged/`, because a photograph normally matters for the few minutes before it is uploaded. A draft breaks that assumption: it may sit unsent for days, and the cache is precisely what Android empties when storage runs short. `StagedImages.retain` moves them to `files/drafts/` (a rename, not a copy — same volume), and `files/drafts/` is then this app's to delete, which it does when the piece finally saves.
+
+  **Moving the files means moving every reference to them.** `SaveProgress` records which staged URI each uploaded object came from, and `clearAbandoned` treats an upload whose URI has left the form as abandoned. Renaming without rewriting that record would **delete every photograph already in Storage and send it again** — the one genuinely dangerous bug in this task, and it has a test. Recorded as [android-app.md §2.6e](docs/architecture/android-app.md).
+
+  **Editing never produces a draft**, nor does a save whose row was written: the piece is already in the catalogue, and a "waiting to upload" entry for it would be a second copy of something that exists.
+
+  **Listed on the dashboard, above the metrics and outside their `when`.** A piece waiting on this phone is the one thing on that screen the owner has to act on, and it is most likely to exist exactly when the counts below it cannot be loaded. Worded as a statement, not an error — nothing has gone wrong that they did.
+
+  **Three existing tests changed their expected URIs**, not their assertions: after an interruption the photographs are `kept-*` rather than `staged-*`. Each still proves what it proved before, and the rename is what they now also demonstrate is safe.
+
+  **Verified by test** (6 new, 43 in this file, 120 in the project): a failed save leaving the piece on the phone; the photographs moved out of the cache and the form following them; a retry uploading only what did not land *and removing nothing*; a saved piece leaving neither draft nor retained files; an edit never becoming a draft; and a draft still written when the files could not be moved.
+
+  **Verified by build:** `assembleDebug` and `lintDebug` pass with Room's KSP processor; the exported schema for version 1 is committed under `android/app/schemas/`, so the first migration is written against a record rather than a guess.
+
+  **Not verified: airplane mode and force-stop on a device.** That is the *Done when*, and it needs a phone — the JVM tests prove the pipeline, not the platform. **Also outstanding:** a file under `files/drafts/` can be left with no draft row if the owner rolls back an interrupted save and then abandons the screen without saving. Bounded and small, but it is a leak; M8.10 sweeps it, since the sync coordinator is the natural owner of "files no draft refers to".
 
 - **`M8.10` Draft sync and failure surfacing** — `M`
   Automatic sync on reconnect, with visible sync status and surfaced failures.

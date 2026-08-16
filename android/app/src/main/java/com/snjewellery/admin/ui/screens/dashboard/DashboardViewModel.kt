@@ -8,6 +8,8 @@ import com.snjewellery.admin.domain.config.ConfigStatus
 import com.snjewellery.admin.domain.dashboard.DashboardMetrics
 import com.snjewellery.admin.domain.dashboard.DashboardRepository
 import com.snjewellery.admin.domain.dashboard.MetricsResult
+import com.snjewellery.admin.domain.draft.DraftRepository
+import com.snjewellery.admin.domain.draft.PendingDraft
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +42,16 @@ data class DashboardUiState(
     val configured: Boolean = true,
     /** Entries absent from local.properties. Empty when configured. */
     val missingConfig: List<String> = emptyList(),
+    /**
+     * Pieces entered on this phone that are not in the catalogue yet
+     * (M8.9).
+     *
+     * Beside the metrics rather than inside [DashboardState], because
+     * they are read from the device and are still true — and still worth
+     * showing — when the counts cannot be loaded at all. In fact that is
+     * exactly when there are likely to be some.
+     */
+    val pending: List<PendingDraft> = emptyList(),
 )
 
 /**
@@ -57,6 +69,7 @@ data class DashboardUiState(
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val dashboardRepository: DashboardRepository,
+    draftRepository: DraftRepository,
     configRepository: ConfigRepository,
 ) : ViewModel() {
 
@@ -71,6 +84,18 @@ class DashboardViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
+
+    init {
+        // Collected rather than loaded on resume like the metrics: this
+        // one is a local database that announces its own changes, so a
+        // draft written while the dashboard is open appears without the
+        // screen going back to ask.
+        viewModelScope.launch {
+            draftRepository.pending().collect { drafts ->
+                _uiState.update { it.copy(pending = drafts) }
+            }
+        }
+    }
 
     /**
      * Deliberately **not** called from `init`. The screen loads on

@@ -74,6 +74,46 @@ class CacheStagedImages @Inject constructor(
         bounds.outHeight > bounds.outWidth * PORTRAIT_THRESHOLD
     }
 
+    /**
+     * `cache/staged/x.webp` → `files/drafts/x.webp`, same filename.
+     *
+     * A rename, not a copy: both directories are inside this app's data
+     * directory, so it is a directory-entry move rather than several
+     * megabytes of I/O. The copy is only a fallback for the case where
+     * the two somehow are not on one volume, which on a phone they are.
+     *
+     * The filename is carried across so nothing else has to learn a
+     * second naming scheme, and so a URI already under `drafts/` is
+     * recognisable and returned untouched.
+     */
+    override suspend fun retain(uri: String): String? = withContext(Dispatchers.IO) {
+        val parsed = uri.toUri()
+        if (parsed.authority != AUTHORITY) return@withContext null
+
+        val segments = parsed.pathSegments
+        val root = segments.firstOrNull() ?: return@withContext null
+        val name = segments.lastOrNull() ?: return@withContext null
+
+        // Already retained. Writing a draft again must not move a file
+        // that has already been moved, and must not report failure.
+        if (root == DRAFT_DIRECTORY) return@withContext uri
+
+        val source = File(File(context.cacheDir, STAGING_DIRECTORY), name)
+        if (!source.isFile) return@withContext null
+
+        val directory = File(context.filesDir, DRAFT_DIRECTORY)
+        if (!directory.isDirectory && !directory.mkdirs()) return@withContext null
+
+        val target = File(directory, name)
+        val moved = source.renameTo(target) || runCatching {
+            source.copyTo(target, overwrite = true)
+            source.delete()
+            true
+        }.getOrDefault(false)
+
+        if (moved) uriFor(target) else null
+    }
+
     override suspend fun discard(uri: String): Unit = withContext(Dispatchers.IO) {
         val target = uri.toUri()
 
@@ -111,8 +151,14 @@ class CacheStagedImages @Inject constructor(
         FileProvider.getUriForFile(context, AUTHORITY, file).toString()
 
     private companion object {
-        /** Must match `path` in res/xml/file_paths.xml. */
+        /** Both must match a `path` in res/xml/file_paths.xml. */
         const val STAGING_DIRECTORY = "staged"
+
+        /**
+         * Under `files/`, not the cache: a draft's photographs have to
+         * outlive an eviction. See [retain].
+         */
+        const val DRAFT_DIRECTORY = "drafts"
 
         /**
          * Two prefixes because the directory holds two different things:

@@ -7,6 +7,7 @@ import com.snjewellery.admin.data.catalogue.SupabaseCatalogueRepository
 import com.snjewellery.admin.data.catalogue.SupabaseCategoryRepository
 import com.snjewellery.admin.data.config.BuildConfigRepository
 import com.snjewellery.admin.data.dashboard.SupabaseDashboardRepository
+import com.snjewellery.admin.data.local.RoomDraftRepository
 import com.snjewellery.admin.data.media.CacheStagedImages
 import com.snjewellery.admin.data.product.SupabaseProductImageRepository
 import com.snjewellery.admin.data.product.SupabaseProductRepository
@@ -17,6 +18,7 @@ import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CategoryRepository
 import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.dashboard.DashboardRepository
+import com.snjewellery.admin.domain.draft.DraftRepository
 import com.snjewellery.admin.domain.media.StagedImages
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
@@ -98,4 +100,8 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindStagedImages(impl: CacheStagedImages): StagedImages
+
+    @Binds
+    @Singleton
+    abstract fun bindDraftRepository(impl: RoomDraftRepository): DraftRepository
 }

@@ -52,6 +52,27 @@
     <string name="dashboard_sign_out">Sign out</string>
     <string name="dashboard_add_product">Add product</string>
 
+    <!-- ── Waiting to upload (M8.9) ──────────────────────────────────
+      Pieces entered on this phone that are not in the catalogue yet.
+
+      Not worded as an error. Nothing has gone wrong that the owner did —
+      they photographed a ring somewhere with no signal, which is the case
+      the whole feature exists for. Each row says why that one is still
+      waiting, because "no connection" and "the server refused it" call
+      for different things: one resolves itself, the other will not.
+    -->
+    <plurals name="dashboard_pending_title">
+        <item quantity="one">One piece waiting to upload</item>
+        <item quantity="other">%1$d pieces waiting to upload</item>
+    </plurals>
+    <string name="dashboard_pending_body">Saved on this phone. Nothing has been lost.</string>
+    <plurals name="dashboard_pending_photos">
+        <item quantity="one">1 photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
+    <string name="dashboard_pending_offline">%1$s · waiting for a connection</string>
+    <string name="dashboard_pending_failed">%1$s · the last attempt did not go through</string>
+
     <!-- ── Add Product (M7.1) ────────────────────────────────────────
       The PRD's Add Product section names eight fields and this uses its
       words for all of them, per CLAUDE.md §5.
