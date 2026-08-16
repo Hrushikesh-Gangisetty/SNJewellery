@@ -40,6 +40,10 @@ data class EditProduct(val productId: String)
 @Serializable
 data object Catalogue
 
+/** The categories every piece is filed under (M8.6). */
+@Serializable
+data object Categories
+
 /**
  * The confirmation after a piece is saved (M7.12).
  *

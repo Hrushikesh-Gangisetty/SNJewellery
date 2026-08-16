@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.snjewellery.admin.ui.screens.addproduct.AddProductScreen
 import com.snjewellery.admin.ui.screens.catalogue.CatalogueScreen
+import com.snjewellery.admin.ui.screens.categories.CategoriesScreen
 import com.snjewellery.admin.ui.screens.dashboard.DashboardScreen
 import com.snjewellery.admin.ui.screens.productsaved.ProductSavedScreen
 
@@ -42,7 +43,12 @@ fun AdminNavHost(
                 onSignOut = onSignOut,
                 onAddProduct = { navController.navigate(AddProduct) },
                 onViewCatalogue = { navController.navigate(Catalogue) },
+                onManageCategories = { navController.navigate(Categories) },
             )
+        }
+
+        composable<Categories> {
+            CategoriesScreen(onBack = { navController.popBackStack() })
         }
 
         composable<Catalogue> {

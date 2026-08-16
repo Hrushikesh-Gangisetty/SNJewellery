@@ -67,6 +67,7 @@ fun DashboardScreen(
     onSignOut: () -> Unit,
     onAddProduct: () -> Unit,
     onViewCatalogue: () -> Unit,
+    onManageCategories: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -82,6 +83,7 @@ fun DashboardScreen(
         onSignOut = onSignOut,
         onAddProduct = onAddProduct,
         onViewCatalogue = onViewCatalogue,
+        onManageCategories = onManageCategories,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -95,6 +97,7 @@ internal fun DashboardScreen(
     onSignOut: () -> Unit = {},
     onAddProduct: () -> Unit = {},
     onViewCatalogue: () -> Unit = {},
+    onManageCategories: () -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
     Scaffold(
@@ -161,18 +164,33 @@ internal fun DashboardScreen(
                     EmptyCatalogue(onAddProduct = onAddProduct)
                 } else {
                     Metrics(metrics = state.metrics)
+                }
+            }
 
-                    // In the body rather than a third top-bar action: the
-                    // bar already holds two, and a row of three short
-                    // words is where a top bar stops being readable.
-                    OutlinedButton(
-                        onClick = onViewCatalogue,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = Tokens.Layout.touchTarget),
-                    ) {
-                        Text(stringResource(R.string.dashboard_view_catalogue))
-                    }
+            // In the body rather than more top-bar actions: the bar
+            // already holds two, and a row of four short words is where a
+            // top bar stops being readable.
+            //
+            // Outside the `when`, so both survive an empty catalogue and a
+            // failed load. Setting the categories up is what an owner does
+            // BEFORE the first upload — exactly when there are no figures
+            // to draw — and neither screen needs the metrics to work.
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3)) {
+                OutlinedButton(
+                    onClick = onViewCatalogue,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = Tokens.Layout.touchTarget),
+                ) {
+                    Text(stringResource(R.string.dashboard_view_catalogue))
+                }
+                OutlinedButton(
+                    onClick = onManageCategories,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = Tokens.Layout.touchTarget),
+                ) {
+                    Text(stringResource(R.string.dashboard_categories))
                 }
             }
         }

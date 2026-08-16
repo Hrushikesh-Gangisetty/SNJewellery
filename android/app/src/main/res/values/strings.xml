@@ -381,7 +381,68 @@
     <string name="actions_orphaned_body">The piece is gone from the catalogue, but its photographs could not be removed from storage. Nothing is broken and no customer will see them. Mention it to whoever looks after the site.</string>
     <string name="actions_orphaned_dismiss">OK</string>
 
+    <!-- ── Categories (M8.6) ─────────────────────────────────────────
+      "Category" is the PRD's word and the schema's, so it is the screen's
+      word too (CLAUDE.md §5).
+
+      Every message here says what the owner can do next, and the two that
+      retrying cannot fix — a name with no free slug, and a category with
+      pieces in it — say so outright rather than offering a button that
+      would fail again.
+    -->
+    <string name="categories_title">Categories</string>
+    <string name="categories_back">Back</string>
+    <string name="categories_add">Add</string>
+    <!-- Marked, not withheld: a hidden category is still the owner's to
+         rename, and hiding one before a launch is what the flag is for. -->
+    <string name="categories_hidden">hidden</string>
+    <string name="categories_empty">No categories yet. Every piece is filed under one, so start with the kinds of jewellery you sell.</string>
+    <string name="categories_add_first">Add your first category</string>
+
+    <string name="categories_offline">No connection, so the categories could not be loaded. Check your signal and tap Try again.</string>
+    <string name="categories_error">The categories could not be loaded (%1$s). Please tap Try again.</string>
+    <string name="categories_no_detail">no details</string>
+    <string name="categories_retry">Try again</string>
+
+    <!-- One dialog for adding and renaming: the same field with the same
+         rules, differing only in what the button does. -->
+    <string name="categories_new_title">New category</string>
+    <string name="categories_edit_title">Edit category</string>
+    <string name="categories_name_label">Name</string>
+    <string name="categories_add_button">Add</string>
+    <string name="categories_save">Save</string>
+    <string name="categories_cancel">Cancel</string>
+
+    <!-- Names the category, for the reason the piece confirmation does:
+         "are you sure?" over a list asks something the owner cannot
+         check. The note says what stops a delete before they try it. -->
+    <string name="categories_delete">Delete this category</string>
+    <string name="categories_delete_confirm">Delete %1$s for good?</string>
+    <string name="categories_delete_note">This cannot be undone. A category with pieces filed under it cannot be deleted.</string>
+    <string name="categories_delete_button">Delete</string>
+
+    <string name="categories_error_name_blank">Give the category a name.</string>
+    <!-- The database allows it — only the slug is unique — but two
+         categories with one name are indistinguishable in the Add Product
+         picker and on the website. -->
+    <string name="categories_error_name_taken">You already have a category with this name.</string>
+    <string name="categories_error_name_exhausted">There are already too many categories with names like this one. Please choose a slightly different name.</string>
+    <!-- Not a fault, and retrying will never work: the pieces have to go
+         somewhere first. -->
+    <string name="categories_error_in_use">There are pieces filed under this category, so it cannot be deleted. Move them to another category first.</string>
+    <string name="categories_error_offline">No connection, so nothing was changed. Check your signal and try again.</string>
+    <string name="categories_error_server">That could not be saved (%1$s). Please try again.</string>
+
+    <!-- Deleted from another device. Nothing here can be saved to a row
+         that is gone, so a refresh is what resolves it, not a retry. -->
+    <string name="categories_missing">This category is no longer there — it looks like it was deleted somewhere else.</string>
+    <string name="categories_missing_refresh">Refresh the list</string>
+
     <string name="dashboard_view_catalogue">View catalogue</string>
+    <!-- Beside View catalogue, and shown whether or not there are pieces:
+         setting the categories up is what an owner does BEFORE the first
+         upload, which is exactly when the catalogue is empty. -->
+    <string name="dashboard_categories">Categories</string>
     <!-- M6.11 left the dashboard's empty state without a next step because
          the one it wanted had nowhere to go. M7 built the destination. -->
     <string name="dashboard_add_first_product">Add your first product</string>

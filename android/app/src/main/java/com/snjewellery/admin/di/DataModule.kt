@@ -4,6 +4,7 @@ import com.snjewellery.admin.data.auth.SupabaseAdminAccessRepository
 import com.snjewellery.admin.data.auth.SupabaseAuthRepository
 import com.snjewellery.admin.data.catalogue.SupabaseCatalogueListRepository
 import com.snjewellery.admin.data.catalogue.SupabaseCatalogueRepository
+import com.snjewellery.admin.data.catalogue.SupabaseCategoryRepository
 import com.snjewellery.admin.data.config.BuildConfigRepository
 import com.snjewellery.admin.data.dashboard.SupabaseDashboardRepository
 import com.snjewellery.admin.data.media.CacheStagedImages
@@ -13,6 +14,7 @@ import com.snjewellery.admin.domain.auth.AdminAccessRepository
 import com.snjewellery.admin.domain.auth.AuthRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueListRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueRepository
+import com.snjewellery.admin.domain.catalogue.CategoryRepository
 import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.dashboard.DashboardRepository
 import com.snjewellery.admin.domain.media.StagedImages
@@ -68,6 +70,12 @@ abstract class DataModule {
     abstract fun bindCatalogueRepository(
         impl: SupabaseCatalogueRepository,
     ): CatalogueRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCategoryRepository(
+        impl: SupabaseCategoryRepository,
+    ): CategoryRepository
 
     @Binds
     @Singleton

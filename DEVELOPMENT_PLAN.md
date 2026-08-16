@@ -1267,9 +1267,27 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
   Featured, Sold, and Archive as the three distinct actions the PRD names, with optimistic UI and rollback on failure. Document what each means for website visibility.
   *Done when:* each toggle is reflected on the website per the documented rules — **sold stays visible with a badge, archived disappears from the site but remains in the app** — and a failed toggle rolls the UI back to the true state.
 
-- **`M8.6` Category create, edit, delete** — `M`
+- **`M8.6` Category create, edit, delete** — `M` — ◐ **built and tested; the website end needs M5 deployed**
   Full CRUD on categories.
   *Done when:* a created category appears on the website's shortcuts after revalidation.
+
+  **Reads through the list that already exists.** `CatalogueRepository.categories()` is what the Add Product picker and the catalogue filter are built from, and the categories screen uses the same one — writes go through a new `CategoryRepository` beside it. That is the split `CatalogueListRepository` and `ProductRepository` already have, and it is what stops a second way of asking what categories exist.
+
+  **A rename does not re-derive the slug.** The obvious behaviour, and wrong for the same reason it is wrong for a product: the slug is the category's address on the website, and re-deriving it breaks every shared link for something as small as fixing a typo. A URL is a promise; a display name is not.
+
+  **A new category goes last, not to the column default.** `display_order` defaults to 0, which would tie every new category with every other one and leave the list to sort them arbitrarily — quietly discarding the arrangement M8.7 exists to let the owner make. So the last position is read and the new row goes after it, at the cost of one small request.
+
+  **A duplicate name is refused before a request goes out.** The database does not forbid it — only the slug is unique — but two categories called "Rings" are indistinguishable in the Add Product picker and on the website's shortcuts, which makes them a mistake rather than a choice. The blank-name check is client-side for the same reason: a round trip on mobile data to be told a field is empty.
+
+  **Deleting a non-empty category is the database's refusal, not a count taken first.** `products.category_id` is `ON DELETE RESTRICT`, so SQLSTATE **23503** is what says so — a count that comes back zero can still be beaten to the delete by a save on another device. It surfaces as its own outcome, `InUse`, worded as something to act on rather than a fault, because retrying will never work. **Whether the app should instead offer to reassign the pieces is M8.8's decision**; today it refuses and explains.
+
+  **The dashboard's navigation buttons moved out of the loaded branch.** Setting the categories up is what an owner does *before* the first upload — exactly when there are no figures to draw — so leaving Categories inside the branch that needs metrics would have hidden it precisely when it was needed.
+
+  **Verified by test** (16 cases, 104 in the project): the list's three states; a create appended without a second read; blank, duplicate and slug-exhausted names; a rename replacing one row and leaving the others; renaming a piece deleted elsewhere reported as `Missing` rather than as done; delete asking first; and a category with pieces in it kept, with the reason.
+
+  **RLS re-checked against the live project.** An anonymous `INSERT` into `categories` was refused with **42501** (*new row violates row-level security policy*), and an anonymous `DELETE` of `necklaces` answered 204 and changed nothing — the row and all eleven visible categories survived. The 204 is PostgREST reporting zero affected rows, which is why every write in this app asks for the changed rows back (§2.6d).
+
+  **Not verified: the website end, and the 23503 path.** "Appears on the website's shortcuts after revalidation" needs a deployed site and M9's revalidation, neither of which has run. The `InUse` branch needs an admin session to attempt a real blocked delete; the constraint it depends on is declared `on delete restrict` in `20260726000100_core_tables.sql`, and the mapping is covered by test rather than by the database.
 
 - **`M8.7` Category reorder and visibility** — `S`
   Drag-to-reorder writing `display_order`; hide and show.
@@ -1287,7 +1305,7 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
   Automatic sync on reconnect, with visible sync status and surfaced failures.
   *Done when:* a pending draft uploads intact with all images on reconnect, and a failed draft remains retryable rather than silently disappearing.
 
-- **`M8.11` Refresh and state consistency** — `S` — ◐ **done for the catalogue; the category screens (M8.6–M8.8) do not exist yet**
+- **`M8.11` Refresh and state consistency** — `S` — ◐ **done for the catalogue and for categories; M8.7–M8.8 have nothing of their own yet**
   Pull-to-refresh and consistent empty, loading, and error states per M1.10 throughout.
   *Done when:* every screen in the milestone handles all three states.
 
@@ -1297,7 +1315,7 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   The catalogue's five states are now: skeletons, full-screen error, *nothing matched* (with Clear filters), *nothing exists* (with Add product), and the list — plus the two page-level states beneath it. **Four new tests**, 68 in the project.
 
-  **Outstanding:** M8.6–M8.8's category screens, which is a *Done when* that cannot be met before they exist.
+  **Outstanding:** M8.6 brought the categories screen with its own skeleton, error, empty and loaded states, so the only thing left is whatever surface M8.7 and M8.8 add — a *Done when* that cannot be met before it exists. Pull-to-refresh is deliberately not on that screen: it is a short list read on entry, and the one case a refresh answers — a category changed on another device — already offers **Refresh the list** at the point the owner meets it, which is a rename that matched no row.
 
 ### Dependencies
 
