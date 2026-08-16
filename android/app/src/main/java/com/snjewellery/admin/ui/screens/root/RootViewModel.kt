@@ -49,19 +49,6 @@ class RootViewModel @Inject constructor(
     private val draftSync: DraftSync,
 ) : ViewModel() {
 
-    init {
-        // Started here because this is the one place that knows the
-        // session has been admitted, and every write the sync makes needs
-        // an admin session — RLS refuses otherwise. Starting it in the
-        // Application would mean a signed-out phone recording refusals
-        // against the owner's drafts. `start` is idempotent, because this
-        // state re-emits Admin whenever the app returns to the
-        // foreground.
-        viewModelScope.launch {
-            sessionState.collect { if (it is SessionState.Admin) draftSync.start() }
-        }
-    }
-
     /**
      * Bumped to re-run a check that could not be completed. A counter
      * rather than a signal, so each press is a distinct value and
@@ -120,6 +107,28 @@ class RootViewModel @Inject constructor(
                 started = SharingStarted.Lazily,
                 initialValue = SessionState.Restoring,
             )
+
+    /**
+     * **Must stay below [sessionState].** Kotlin runs initialisers in
+     * declaration order, and `viewModelScope` dispatches on
+     * `Main.immediate` — so a `launch` from an `init` block above this
+     * property runs its body synchronously, inside the constructor,
+     * while `sessionState` is still null. That is not a race that
+     * sometimes loses: the view model is always built on the main
+     * thread, so it crashed the app on every launch.
+     */
+    init {
+        // Started here because this is the one place that knows the
+        // session has been admitted, and every write the sync makes needs
+        // an admin session — RLS refuses otherwise. Starting it in the
+        // Application would mean a signed-out phone recording refusals
+        // against the owner's drafts. `start` is idempotent, because this
+        // state re-emits Admin whenever the app returns to the
+        // foreground.
+        viewModelScope.launch {
+            sessionState.collect { if (it is SessionState.Admin) draftSync.start() }
+        }
+    }
 
     /** Re-runs a check that could not be completed, or that has since been granted. */
     fun retryAccessCheck() = accessAttempt.update { it + 1 }
