@@ -595,21 +595,41 @@ Put the customer website in production on a real domain, backed by the productio
 
 ### Tasks
 
-- **`M5.1` Production Supabase project** — `S`
+- **`M5.1` Production Supabase project** — `S` — ◐ **schema and policies live; the read-visibility checks wait on real content**
   Provision it; apply all migrations and RLS policies; create the production admin account.
   *Done when:* the production database matches development schema-for-schema and the RLS checks from M3 pass against it.
 
-- **`M5.2` Vercel project and monorepo build** — `S`
+  **Project `vknetcfjyercyollrzeb`**, Mumbai (`ap-south-1`) — nearer the shop's customers than development's Tokyo. All **8 migrations applied**, `migration list` clean. The admin account was created by the owner in the dashboard; public sign-up stays disabled.
+
+  **The lookup data was split out of the seed.** `seed.sql` mixed two things with opposite lifetimes: the real purities and categories, and placeholder jewellery for developing M4. Only one may ever touch production, so the real half moved to [`supabase/seeds/lookups.sql`](supabase/seeds/lookups.sql) — idempotent (`on conflict do nothing`, so re-running never resets a category the owner has since renamed) and applied to production. It holds the PRD's eleven categories and three purities. The hidden `unreleased-collection` stayed behind in `seed.sql`: it exists to prove the RLS visibility rule and a fake collection has no business in the shop's catalogue. **Production has 11 categories, 3 purities, 0 products.**
+
+  **The RLS suite had a hazard that only appeared once a second project existed.** `--from-cli` resolved the ref by taking the first match in `projects list`, which is API order, not the CLI's link — so it would have attacked *development* while appearing to verify production, and the output never said which project it hit. Now it reads the **linked** project, refuses when that is ambiguous, and prints `Target: <ref>` on every run.
+
+  **A worse problem, found by running it: an empty catalogue makes the suite lie.** Against fresh production it reported **27 passed, 3 failed** — and the passes were the misleading part. "The archived product is invisible to anon" passes trivially when there is no archived product; "a featured product in a hidden category does not leak" passes when neither exists. Eleven of the thirty checks could not fail. A check that cannot fail is not evidence, and reporting it as a pass is worse than not running it, which is CLAUDE.md §9.4's point turned inside out. The suite now detects whether the fixtures are present and reports **SKIP**, loudly, rather than a vacuous pass.
+
+  **The honest result against production: 19 passed, 0 failed, 11 skipped.** Everything meaningful without fixtures did run — **all thirteen write-refusal checks** (anon cannot insert, update or delete a product, category, image or rate, and cannot grant itself a role), plus category visibility, purity reads and the metal-rate invariants. Development still reports **30 passed, 0 failed, 0 skipped**, so nothing was weakened to get a green run.
+
+  **Outstanding:** the eleven read-visibility checks become meaningful the moment production holds real products, so **re-run `SUPABASE_PROJECT_REF=vknetcfjyercyollrzeb npm run db:test-rls` after M5.6** and expect 30/0/0.
+
+- **`M5.2` Vercel project and monorepo build** — `S` — ◐ **the build is proved against production; the deployment itself is unconfirmed here**
   Create the project pointed at `web/`, with build settings correct for the monorepo root.
   *Done when:* a push to the default branch produces a successful deployment.
+
+  Project created by the owner with Root Directory `web`, production variables set in Vercel. `main` pushed, 53 commits.
+
+  **An empty production catalogue does not break the build** — worth establishing before blaming the configuration for anything. Built locally against `vknetcfjyercyollrzeb`: **11 routes, no product or category paths, no errors**, because `generateStaticParams` over an empty table yields nothing and every page handles it (M4.8).
+
+  **The first attempt at that check was wrong and looked right**, which is worth recording: it reported 33 routes including `m7-verification-piece` — *development* data — because Next's fetch cache in `.next/cache` replayed the previous build's responses. Deleting `.next` first is what makes a build-against-another-database mean anything.
 
 - **`M5.3` Environment variables and secret audit** — `S`
   Configure preview and production environments with production Supabase keys.
   *Done when:* no service-role key appears in the client bundle — verified by searching the built output — and no development key is present in production.
 
-- **`M5.4` Domain, HTTPS, and canonical host** — `S`
+- **`M5.4` Domain, HTTPS, and canonical host** — `S` — ⚠ **blocked on DNS**
   Custom domain with HTTPS; choose the canonical host and redirect the other.
   *Done when:* HTTP redirects to HTTPS and the non-canonical host redirects to the canonical one.
+
+  `snjewellery.in` purchased, canonical host chosen as the apex with `www` redirecting to it. **DNS still points at the registrar:** `https://snjewellery.in` currently returns Hostinger's parked-domain page, not the site. Nothing of ours is public, and nothing is indexable, until the records are changed at the registrar and the domain is added in Vercel — see [website.md §4](docs/deployment/website.md).
 
 - **`M5.5` Production error handling and robots** — `S` — ◐ **built and verified in the build output; the broken-route check needs a deployment**
   `error.tsx`, `not-found.tsx`, a global error boundary, and `robots.txt`. Preview deployments excluded from indexing.
@@ -1911,6 +1931,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
 | 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
 | 22 | ~~**The development Supabase project appears to be gone.**~~ **Resolved 2026-08-16.** The project was *paused* by Supabase after a stretch of no development, which removes its DNS record — hence the hostname not resolving. The owner resumed it; `GET /rest/v1/products` returns 200 with real rows again. | — | Closed. Worth knowing for next time: a free-tier pause looks exactly like a deleted project from the outside, and the tell is that it comes back untouched. The read-path query shapes written while it was down have now been checked against it (M8.1, M8.2); the **admin-session** paths — archived rows, hidden categories, every write — still need a signed-in app, because `curl` with the anon key cannot exercise them. |
+| 23 | **Nothing can add a purity.** `purities` is owner-managed data by the same reasoning as categories — schema.md says adding 14K or platinum "is one INSERT" — but no screen was ever built to manage it. The Add Product form only reads the list, so the three in `seeds/lookups.sql` are the only ones that will ever exist. | — | The same shape as the metal-rates gap (Open Question 21), found the same way: a lookup table designed to be owner-managed, with no client that can manage it. Not urgent — purity is optional on a piece, it is no longer shown to customers (M4.15), and three cover the shop's stock. It needs a decision rather than code: either a small screen beside the Options one, or an explicit note that purities change by migration after all. |
 | 21 | ~~**Nobody can set a metal rate until M7.**~~ **Resolved 2026-08-16 by M8.12.** The Options screen sets both rates. Worth recording *why* it stayed open so long: this question pointed at M7, but M7 was product upload and never included it, and M8 closed without it — so a PRD requirement sat unowned by any task for three milestones, invisible because the website behaves correctly when it is unmet. Found only by sequencing M5. | — | Closed. The lesson is that "blocks: M*n*" in this table is not the same as a task inside M*n*, and only the task list makes something get built. |
 
 ---

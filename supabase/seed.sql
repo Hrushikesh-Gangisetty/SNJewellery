@@ -4,10 +4,10 @@
 -- Run by `supabase db reset` against a LOCAL database. Never run against
 -- production — M5.6 enters the real catalogue there.
 --
--- Categories and purities are REAL and intended to persist. The owner will
--- supply a final category list before launch and can reorder, rename, hide
--- or add from the Android app without a migration (ADR-0010), so these are
--- a working starting point taken from the PRD's eleven.
+-- The real purities and categories are in seeds/lookups.sql, which runs
+-- before this file and is the one of the two that production also gets.
+-- What is left here is placeholder jewellery and the hidden category the
+-- RLS tests attack.
 --
 -- Products here are PLACEHOLDERS for developing M4, mirroring the fixture
 -- set in web/lib/data/fixtures.ts — including its deliberately awkward
@@ -19,36 +19,22 @@
 -- ═══════════════════════════════════════════════════════════════════════
 
 -- Idempotent: safe to re-run.
+--
+-- Products only. The purities and the eleven real categories moved to
+-- seeds/lookups.sql in M5.1, because they are real data that production
+-- also needs — and deleting them here would undo the file that runs
+-- before this one. config.toml applies lookups.sql first.
 truncate table public.product_images, public.products cascade;
-delete from public.categories;
-delete from public.purities;
 
 
--- ── Purities ──────────────────────────────────────────────────────────
--- The owner's launch set. Adding platinum or 14K later is one INSERT.
-insert into public.purities (code, label, display_order) values
-  ('22K',    '22K Gold', 1),
-  ('18K',    '18K Gold', 2),
-  ('Silver', 'Silver',   3);
-
-
--- ── Categories ────────────────────────────────────────────────────────
--- The PRD's eleven, plus one hidden category used to prove the RLS
--- visibility rule actually holds.
+-- ── The hidden category ───────────────────────────────────────────────
+-- Development only, and the reason it is here rather than in
+-- lookups.sql: it exists to prove the RLS visibility rule actually
+-- holds, and a fake collection has no business in the shop's real
+-- catalogue. supabase/tests/rls.mjs attacks it by name.
 insert into public.categories (slug, name, display_order, is_visible) values
-  ('gold-rings',         'Gold Rings',         1,  true),
-  ('earrings',           'Earrings',           2,  true),
-  ('chains',             'Chains',             3,  true),
-  ('necklaces',          'Necklaces',          4,  true),
-  ('pendants',           'Pendants',           5,  true),
-  ('bangles',            'Bangles',            6,  true),
-  ('bracelets',          'Bracelets',          7,  true),
-  ('bridal-jewellery',   'Bridal Jewellery',   8,  true),
-  ('diamond-jewellery',  'Diamond Jewellery',  9,  true),
-  ('silver-jewellery',   'Silver Jewellery',   10, true),
-  ('kids-collection',    'Kids Collection',    11, true),
-  -- Hidden. Its products must never reach a customer.
-  ('unreleased-collection', 'Unreleased Collection', 12, false);
+  ('unreleased-collection', 'Unreleased Collection', 12, false)
+on conflict (slug) do nothing;
 
 
 -- ── Products ──────────────────────────────────────────────────────────

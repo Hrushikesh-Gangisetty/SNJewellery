@@ -19,21 +19,46 @@
 
 import { execFileSync } from "node:child_process";
 
+/**
+ * The project the CLI is currently linked to.
+ *
+ * Was "the first ref in `projects list`", which was correct while there
+ * was one project and silently wrong the moment M5.1 created a second:
+ * the API's order is not the CLI's link, so `--from-cli` would have
+ * attacked development while appearing to verify production. Set
+ * SUPABASE_PROJECT_REF to override.
+ */
+function linkedRef() {
+  const projects = JSON.parse(
+    execFileSync("npx", ["supabase", "projects", "list", "-o", "json"], {
+      encoding: "utf8",
+      shell: true,
+    }),
+  ).projects;
+
+  const linked = projects.filter((p) => p.linked);
+  if (linked.length === 1) return linked[0].ref;
+
+  throw new Error(
+    linked.length === 0
+      ? "No project is linked. Run `npx supabase link --project-ref <ref>`, " +
+        "or set SUPABASE_PROJECT_REF."
+      : `${linked.length} projects report as linked. Set SUPABASE_PROJECT_REF.`,
+  );
+}
+
 // ── Credentials ───────────────────────────────────────────────────────
 let URL_ = process.env.SUPABASE_URL;
 let ANON = process.env.SUPABASE_ANON_KEY;
 
 if (process.argv.includes("--from-cli")) {
-  const ref =
-    process.env.SUPABASE_PROJECT_REF ??
-    execFileSync("npx", ["supabase", "projects", "list", "-o", "json"], {
-      encoding: "utf8",
-      shell: true,
-    })
-      .trim()
-      .match(/"(?:id|reference_id)":\s*"([a-z]{20})"/)?.[1];
+  const ref = process.env.SUPABASE_PROJECT_REF ?? linkedRef();
 
   if (!ref) throw new Error("Could not determine the project ref.");
+  // Printed, always. Once there is more than one project, a suite that
+  // does not say what it attacked is a suite you cannot trust: 30 passes
+  // against development look exactly like 30 passes against production.
+  console.log(`Target: ${ref}`);
   const keys = JSON.parse(
     execFileSync(
       "npx",
@@ -62,6 +87,33 @@ const headers = {
 // ── Harness ───────────────────────────────────────────────────────────
 let pass = 0;
 let fail = 0;
+let skipped = 0;
+
+/**
+ * Whether this project holds the seeded catalogue the attacks aim at.
+ *
+ * It matters because **an empty catalogue makes most of the checks below
+ * vacuously true**: "the archived product is invisible" passes trivially
+ * when there is no archived product. The first run against a fresh
+ * production project reported 27 passes that proved almost nothing. A
+ * check that cannot fail is not evidence, and reporting it as a pass is
+ * worse than not running it at all.
+ */
+let seeded = false;
+
+/**
+ * A check that needs a fixture to attack. Skipped, loudly, when there is
+ * none — never quietly passed.
+ */
+function fixtureOk(name, condition, detail = "") {
+  if (!seeded) {
+    skipped++;
+    console.log(`  SKIP  ${name}`);
+    console.log("          nothing here to attack — a pass would be vacuous");
+    return;
+  }
+  ok(name, condition, detail);
+}
 
 function ok(name, condition, detail = "") {
   if (condition) {
@@ -135,7 +187,9 @@ console.log(`\nRLS verification against ${URL_}\nUsing the ANON key.\n`);
 
 // Rule 1: the public CAN read the published catalogue.
 const products = await get("products?select=slug,name,sold,archived&limit=100");
-ok(
+// A fresh production project has none, and that is not a policy failure.
+seeded = Array.isArray(products.body) && products.body.length > 0;
+fixtureOk(
   "anon can read published products",
   products.status === 200 && Array.isArray(products.body) && products.body.length > 0,
   `status ${products.status} · ${JSON.stringify(products.body).slice(0, 160)}`,
@@ -146,12 +200,12 @@ const slugs = Array.isArray(products.body)
   : [];
 
 // Rule 2: archived never leaks.
-ok(
+fixtureOk(
   "archived product is invisible to anon",
   !slugs.includes("discontinued-pendant-design"),
   `saw: ${slugs.join(", ")}`,
 );
-ok(
+fixtureOk(
   "archived product is invisible when requested BY SLUG directly",
   (await get("products?slug=eq.discontinued-pendant-design&select=slug")).body
     ?.length === 0,
@@ -165,7 +219,7 @@ ok(
   cats.status === 200 && catSlugs.length > 0,
   `status ${cats.status}`,
 );
-ok(
+fixtureOk(
   "hidden category is invisible to anon",
   !catSlugs.includes("unreleased-collection"),
   `saw: ${catSlugs.join(", ")}`,
@@ -177,13 +231,13 @@ ok(
 
 // THE TRAP: featured AND in a hidden category. This is what leaks through
 // a home-page query that filters on `featured` but forgets visibility.
-ok(
+fixtureOk(
   "featured product inside a hidden category does NOT leak",
   !slugs.includes("unreleased-festival-collection-piece"),
   `saw: ${slugs.join(", ")}`,
 );
 const featured = await get("products?featured=eq.true&select=slug");
-ok(
+fixtureOk(
   "...nor when querying featured = true explicitly",
   Array.isArray(featured.body) &&
     !featured.body.some(
@@ -193,7 +247,7 @@ ok(
 );
 
 // Rule 4: sold products ARE visible. Hiding them would be a bug.
-ok(
+fixtureOk(
   "sold product IS visible to anon (stays in the catalogue with a badge)",
   slugs.includes("diamond-cut-jhumka-earrings"),
   `saw: ${slugs.join(", ")}`,
@@ -205,12 +259,12 @@ const allImages = await get("product_images?select=storage_path&limit=200");
 const paths = Array.isArray(allImages.body)
   ? allImages.body.map((i) => i.storage_path)
   : [];
-ok(
+fixtureOk(
   "archived product's images are NOT reachable via product_images directly",
   !paths.some((p) => p.includes("discontinued-pendant-design")),
   `leaked: ${paths.filter((p) => p.includes("discontinued")).join(", ")}`,
 );
-ok(
+fixtureOk(
   "hidden category product's images are NOT reachable via product_images",
   !paths.some((p) => p.includes("unreleased-festival")),
   `leaked: ${paths.filter((p) => p.includes("unreleased")).join(", ")}`,
@@ -347,7 +401,7 @@ for (const [name, run] of attempts) {
 const after = await get(
   "products?slug=eq.temple-design-bridal-necklace&select=name",
 );
-ok(
+fixtureOk(
   "the product survived every tamper attempt unchanged",
   after.body?.[0]?.name === "Temple Design Bridal Necklace",
   JSON.stringify(after.body),
@@ -355,10 +409,19 @@ ok(
 const stillHidden = await get(
   "categories?slug=eq.unreleased-collection&select=slug",
 );
-ok(
+fixtureOk(
   "the hidden category is still hidden after the un-hide attempt",
   stillHidden.body?.length === 0,
 );
 
-console.log(`\n${pass} passed, ${fail} failed`);
+console.log(`\n${pass} passed, ${fail} failed, ${skipped} skipped`);
+
+if (skipped > 0) {
+  console.log(
+    `\nNo seeded catalogue here, so ${skipped} checks had nothing to attack\n` +
+      "and were NOT run. The write-refusal checks above are complete and\n" +
+      "meaningful; the read-visibility ones are not verified against this\n" +
+      "project. Re-run once it holds real products.",
+  );
+}
 process.exit(fail === 0 ? 0 : 1);
