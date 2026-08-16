@@ -1432,6 +1432,24 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 - Deleting a category containing products behaves as documented, without leaving orphaned products pointing at a missing category.
 - A failed toggle rolls the UI back to the true state rather than showing a stale optimistic value.
 
+### Status — what is built, and what is left to check by hand
+
+Every task M8.1–M8.11 is implemented, tested and committed: **133 local tests**, `assembleDebug` and `lintDebug` clean, and `npm run db:test-rls` passing 30 of 30.
+
+What no JVM test can reach, in the order it is worth checking on a phone:
+
+| Criterion | What it needs |
+|---|---|
+| A draft created in airplane mode survives a force-stop and uploads on reconnect | A device with airplane mode. The pipeline it triggers is covered by test; `ConnectivityManager` is not. |
+| Deleting a product removes its **storage objects** | A signed-in app and the Supabase bucket open beside it. Also clears the two `M7-Verification-Piece` rows still in the dev database. |
+| Featured / Sold / Archive reflected on the website | An admin session **and** a deployed site — M5 has not run. The RLS rules behind them were verified adversarially in M3.7 and again here. |
+| Category order and hidden categories on the website | The same. Hiding is proved at the data layer by the RLS suite; the rendered order is not. |
+| Editing images updates `display_order`, gallery order matches | The same. |
+| Deleting a category with pieces in it refusing with **23503** | An admin session — the anonymous key cannot get far enough to be refused by the foreign key. |
+| The list scrolling smoothly over several hundred products | A device and a real catalogue. |
+
+Nothing here is a known defect; each is a check the machine this was built on cannot perform.
+
 ---
 
 # M9 · Live Sync & Content Freshness
