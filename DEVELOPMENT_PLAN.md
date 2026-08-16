@@ -611,7 +611,7 @@ Put the customer website in production on a real domain, backed by the productio
 
   **Outstanding:** the eleven read-visibility checks become meaningful the moment production holds real products, so **re-run `SUPABASE_PROJECT_REF=vknetcfjyercyollrzeb npm run db:test-rls` after M5.6** and expect 30/0/0.
 
-- **`M5.2` Vercel project and monorepo build** — `S` — ◐ **the build is proved against production; the deployment itself is unconfirmed here**
+- **`M5.2` Vercel project and monorepo build** — `S` — ✅ **complete** (deployment confirmed live 2026-08-16 on `snjewellery.in`)
   Create the project pointed at `web/`, with build settings correct for the monorepo root.
   *Done when:* a push to the default branch produces a successful deployment.
 
@@ -625,13 +625,19 @@ Put the customer website in production on a real domain, backed by the productio
   Configure preview and production environments with production Supabase keys.
   *Done when:* no service-role key appears in the client bundle — verified by searching the built output — and no development key is present in production.
 
-- **`M5.4` Domain, HTTPS, and canonical host** — `S` — ⚠ **blocked on DNS**
+- **`M5.4` Domain, HTTPS, and canonical host** — `S` — ✅ **complete**
   Custom domain with HTTPS; choose the canonical host and redirect the other.
   *Done when:* HTTP redirects to HTTPS and the non-canonical host redirects to the canonical one.
 
-  `snjewellery.in` purchased, canonical host chosen as the apex with `www` redirecting to it. **DNS still points at the registrar:** `https://snjewellery.in` currently returns Hostinger's parked-domain page, not the site. Nothing of ours is public, and nothing is indexable, until the records are changed at the registrar and the domain is added in Vercel — see [website.md §4](docs/deployment/website.md).
+  **DNS resolved 2026-08-16.** `snjewellery.in` is live on Vercel — apex `A` to `216.198.79.1`, `www` `CNAME` to the project's `vercel-dns-017.com` name. Let's Encrypt certificates on both hosts, valid to 2026-11-14, and HSTS at two years. HTTP answers `308` to HTTPS on both.
 
-- **`M5.5` Production error handling and robots** — `S` — ◐ **built and verified in the build output; the broken-route check needs a deployment**
+  **`www` was not redirecting, despite being configured.** Both hosts returned `200` with identical content, and no canonical tag existed anywhere — so the same catalogue was served on three indexable hosts, counting the `*.vercel.app` alias. **The redirect now lives in `next.config.ts`**, derived from `NEXT_PUBLIC_SITE_URL`: reviewable, testable in a local `next start`, survives the Vercel project being recreated, and free at runtime because a `has: host` rule compiles into the routing manifest rather than invoking a function. Verified path-preserving across five routes.
+
+  **The deployment alias is deliberately left alone.** Redirecting `*.vercel.app` would break the per-deployment URLs used to inspect a build before promoting it, so a per-route canonical tag points crawlers at the apex instead. That tag is `metadataBase` plus `alternates.canonical: "./"`, and `metadata` became `generateMetadata` so `publicEnv`'s lazy validation is not undone by a module-level read.
+
+  Results in [launch-checklist.md §2](docs/deployment/launch-checklist.md).
+
+- **`M5.5` Production error handling and robots** — `S` — ✅ **complete** (the deployment check found a soft 404 on both dynamic routes; fixed)
   `error.tsx`, `not-found.tsx`, a global error boundary, and `robots.txt`. Preview deployments excluded from indexing.
   *Done when:* a deliberately broken route renders the styled error page, and previews are non-indexable.
 
@@ -647,7 +653,9 @@ Put the customer website in production on a real domain, backed by the productio
 
   **A search of the built output found no `service_role`** anywhere in `.next/static` or `.next/server` — M5.3's criterion, checked early because it is cheap and the answer must never change.
 
-  **Not verified: a deliberately broken route on a deployment.** Needs the site deployed.
+  **Verified on the deployment, and it failed.** `/nope` returned `404` correctly, but **`/product/<unknown>` and `/category/<unknown>` returned `200`** with the styled *this page does not exist* screen. Identical in a browser; a soft 404 to a crawler, which keeps the URL indexed and reports it in Search Console.
+
+  **`loading.tsx` was the cause**, confirmed by rebuilding without it. It wraps its segment in a Suspense boundary, so Next flushed the skeleton — and the headers, and therefore `200` — before `page.tsx` had read anything; `notFound()` then ran too late to set the status. A **segment `layout.tsx` renders above that boundary**, so awaiting the read there blocks the flush and `notFound()` keeps the status. The skeletons stay and still cover client-side navigation, and `unstable_cache` is keyed on the slug so the page's own call is the same entry, not a second query. `dynamicParams = false` would also have worked and was rejected: it would 404 any product added after a build, which is exactly what ADR-0006's revalidation path exists to prevent.
 
 - **`M5.6` Real catalogue content** — `M`
   ~~Enter the initial genuine products through the Supabase dashboard — the admin app does not arrive until M7.~~ **Revised 2026-08-16: enter them through the Android app**, which now exists. Its build must point at the production project first (see [database.md](docs/deployment/database.md) §4).
@@ -655,11 +663,19 @@ Put the customer website in production on a real domain, backed by the productio
 
   Doing this through the app rather than the SQL dashboard is not only easier — it is the first real exercise of M7's upload path, M7.13's under-30-seconds target and M8's management screens, against production, with the owner driving. Several M7 and M8 acceptance criteria can be signed off while it happens.
 
-- **`M5.7` Launch smoke checklist** — `S`
+- **`M5.7` Launch smoke checklist** — `S` — ◐ **run and committed; the product route and a physical device remain**
   Every route, every conversion button, mobile and desktop, console clean, no placeholder content.
   *Done when:* the checklist is completed and committed with its results.
 
-- **`M5.8` Baseline measurement and deployment docs** — `S` — ◐ **the runbook is written; the baseline needs a deployment**
+  [launch-checklist.md](docs/deployment/launch-checklist.md), written to be re-runnable from a terminal rather than from memory. **All 16 public routes 200**, all eleven categories checked individually rather than sampled; unknown routes 404; placeholder and fixture sweep clean; `service_role` absent from every served chunk; the live bundle points at `vknetcfjyercyollrzeb`, not development. **No console errors** on any Lighthouse run.
+
+  **The mobile-layout pass found a real defect**, which is the point of doing it in a browser rather than by eye. At 412px the header rendered **both** wordmarks plus the `sm`-only WhatsApp button, and the flex row squashed the brand mark — the monogram to 34×36 from a square source, the lockup to 67×44 instead of 71×44, on every page.
+
+  **The cause is `cn`.** It joins classes and does not resolve them, so `className="hidden sm:inline-flex"` on a component whose base already says `inline-flex` leaves both in the attribute at equal specificity, and stylesheet order decides — not the order written. `hidden` lost, twice, silently. `max-lg:hidden` and `max-sm:hidden` fix it because a variant does outrank the bare utility, which is why the neighbouring `lg:hidden` worked and hid the bug. `cn`'s own comment claimed the project had "no runtime class conflicts to resolve"; it now records the one it had.
+
+  **Outstanding:** `/product/<slug>` has never been smoke tested because no product exists — so the gallery, the related row, and M4.12's WhatsApp-message criteria are still unchecked. And everything here is headless Chrome with device emulation; the conversion buttons still need a **physical phone**.
+
+- **`M5.8` Baseline measurement and deployment docs** — `S` — ✅ **complete** (baseline recorded against an empty catalogue — re-run after M5.6)
   Record a baseline Lighthouse run (performance, accessibility, SEO) as the reference M11 and M12 improve against, and write `docs/deployment/`.
   *Done when:* baseline scores are committed to the repository and the deployment runbook covers deploy, rollback, and environment variable changes.
 
@@ -669,7 +685,11 @@ Put the customer website in production on a real domain, backed by the productio
 
   **The free tier's backup story is stated where it will be read**, not discovered: point-in-time recovery is a paid feature, so on the free tier a migration that overwrites rows has a daily backup as its entire safety net.
 
-  **Outstanding:** the Lighthouse baseline itself, which needs a deployed URL. `launch-checklist.md` is M5.7's and is deliberately not written yet — a checklist committed before anyone can run it is a document that gets ticked from memory.
+  **The baseline is recorded** in [launch-checklist.md §3](docs/deployment/launch-checklist.md). Lighthouse 12.8.2 against the live site: mobile **99 / 100 / 96 / 100** on the home page (median of three), desktop **100 / 100 / 100 / 100**. **CLS is 0.000 on every route**, which is the fixed-aspect-ratio rule in CLAUDE.md §8 doing exactly what it was for. LCP 1.90–2.06 s mobile; TTFB 82–154 ms unthrottled from India.
+
+  **The mobile 96 on best practices is the squashed logo above** — `image-aspect-ratio` is the only failing audit in the category. It passes on a local build of the fix.
+
+  **The baseline's honest limitation, stated where it will be read: the catalogue was empty.** Every page measured is the shell — no product photography, no image grid, no gallery. CLAUDE.md §8 calls images "the performance story" and none of it is in these numbers, so a 99 here is not evidence that a page showing forty photographs scores 99. **Re-run after M5.6 and treat that as the reference M11 and M12 improve against**, keeping this one: the difference between them is the honest cost of the catalogue's images.
 
 ### Dependencies
 
@@ -1928,7 +1948,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 
 | 17 | **Storage and egress projection.** Roughly 500 products × how many photographs each, at what average size? | M5 | Decides the Supabase tier before launch. High-resolution jewellery photography is heavy on both storage and egress, and the free tier's ceilings are reachable. Feeds the compression target in M7.6. |
 | 18 | **Social links and a Maps location.** Partly answered 2026-07-27: **there is no map**, so the embed was removed and M4.10's map criterion is superseded. Social handles remain pending, and no coordinates have been supplied. | M11.3 | Social links hide cleanly per ADR-0010, so nothing is blocked. Two things still ride on a location, and neither is the embed: **Get Directions** (M4.12, a PRD-required conversion action) renders nothing without `geo` or `mapsUrl`, and M11.3's `LocalBusiness` structured data wants real coordinates. A plain Google Maps share link into `mapsUrl` satisfies the first; coordinates satisfy both. |
-| 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
+| 19 | ~~**Domain name.** Not yet purchased; no Vercel account.~~ **Resolved 2026-08-16:** `snjewellery.in` live on Vercel, apex canonical, HTTPS and `www` redirect verified. | M5.2, M5.4 | Closed. |
 | 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
 | 22 | ~~**The development Supabase project appears to be gone.**~~ **Resolved 2026-08-16.** The project was *paused* by Supabase after a stretch of no development, which removes its DNS record — hence the hostname not resolving. The owner resumed it; `GET /rest/v1/products` returns 200 with real rows again. | — | Closed. Worth knowing for next time: a free-tier pause looks exactly like a deleted project from the outside, and the tell is that it comes back untouched. The read-path query shapes written while it was down have now been checked against it (M8.1, M8.2); the **admin-session** paths — archived rows, hidden categories, every write — still need a signed-in app, because `curl` with the anon key cannot exercise them. |
 | 23 | **Nothing can add a purity.** `purities` is owner-managed data by the same reasoning as categories — schema.md says adding 14K or platinum "is one INSERT" — but no screen was ever built to manage it. The Add Product form only reads the list, so the three in `seeds/lookups.sql` are the only ones that will ever exist. | — | The same shape as the metal-rates gap (Open Question 21), found the same way: a lookup table designed to be owner-managed, with no client that can manage it. Not urgent — purity is optional on a piece, it is no longer shown to customers (M4.15), and three cover the shop's stock. It needs a decision rather than code: either a small screen beside the Options one, or an explicit note that purities change by migration after all. |
