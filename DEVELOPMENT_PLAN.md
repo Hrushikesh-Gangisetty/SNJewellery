@@ -630,8 +630,10 @@ Put the customer website in production on a real domain, backed by the productio
   **Not verified: a deliberately broken route on a deployment.** Needs the site deployed.
 
 - **`M5.6` Real catalogue content** — `M`
-  Enter the initial genuine products through the Supabase dashboard — the admin app does not arrive until M7.
+  ~~Enter the initial genuine products through the Supabase dashboard — the admin app does not arrive until M7.~~ **Revised 2026-08-16: enter them through the Android app**, which now exists. Its build must point at the production project first (see [database.md](docs/deployment/database.md) §4).
   *Done when:* the live catalogue contains real products with real photographs, and no seed sample data remains visible.
+
+  Doing this through the app rather than the SQL dashboard is not only easier — it is the first real exercise of M7's upload path, M7.13's under-30-seconds target and M8's management screens, against production, with the owner driving. Several M7 and M8 acceptance criteria can be signed off while it happens.
 
 - **`M5.7` Launch smoke checklist** — `S`
   Every route, every conversion button, mobile and desktop, console clean, no placeholder content.
@@ -1425,6 +1427,24 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Four new tests**, 28 on this screen, 133 in the project.
 
+- **`M8.12` Options screen — today's metal rates** — `S` — ◐ **built and tested; the website end needs M5 deployed**
+  A screen where the owner sets today's gold and silver rate per gram.
+  *Done when:* setting both rates makes the website's rates panel appear, and clearing one hides it again.
+
+  **Added 2026-08-16, and it is not new scope — it is a requirement nobody owned.** The PRD's amendment of 2026-07-27 removed per-piece purity and weight from the website and put *today's rate per gram* in their place, "updated daily by the owner **from the Android app**". M4.14 built the website half — table, policy, panel. Open Question 21 recorded that nothing could set the numbers and pointed at M7 — but M7 was product upload and never included it, and M8 closed without it. So the panel has been correctly invisible since M4.14, and would have stayed invisible through launch. Found while sequencing M5. This closes Open Question 21.
+
+  **Each metal saves on its own.** Two independent columns, so two independent writes: one button for both would make a partial failure ambiguous — the owner would not know which number the catalogue ended up with — and each row can then show its own *last set*, which is what they actually check each morning.
+
+  **An empty field unpublishes; it is not a way of skipping the write.** "We are not quoting a rate today" is a state the shop genuinely has, and the schema supports it: `rate_per_gram` and `updated_at` are null together, held by a CHECK *and* a trigger, so an unpublished rate can never keep yesterday's date. Only `rate_per_gram` is ever sent — the timestamp is the trigger's, and this app could not compute it correctly even if it tried.
+
+  **The row comes back from the database after a write**, so the timestamp on screen is the one Postgres wrote rather than one the phone guessed at — and `select()` on the update means a 204 over zero rows is `Missing` rather than silent success (§2.6d).
+
+  **"The website shows both or neither" is stated on the screen.** The panel renders only when gold *and* silver are published, so a half-finished morning achieves nothing a customer can see — a consequence that is otherwise completely invisible from the phone.
+
+  **Verified by test** (14 new, 147 in the project): both metals ordered gold-first whatever order they arrive in; a whole-rupee rate with no trailing `.0` in the field; an empty field unpublishing; non-numeric and zero rates never reaching the server; a failed save leaving the published rate alone while keeping what was typed; a 204 over zero rows not reported as saved; one metal's save leaving the other alone; and the half-published notice.
+
+  **Not verified: the panel appearing.** Needs an admin session and a deployed site.
+
 ### Dependencies
 
 **M7** — reuses the product form, image pipeline, and upload plumbing.
@@ -1891,7 +1911,7 @@ What remains genuinely unresolved. Each names the milestone it blocks.
 | 19 | **Domain name.** Not yet purchased; no Vercel account. | M5.2, M5.4 | Deployment is documented but cannot be executed. Does not block M1–M4. Needed before the launch milestone. |
 | 20 | **Purity and weight are hidden, not unpublished.** The owner's decision of 2026-07-27 removed them from every website surface, but the anon key still returns `purity_id` and `weight_grams`, and both appear in the RSC payload of any page rendering a product card. | — | Nothing sensitive: purity is readable from the API regardless, and no customer sees it. But "hidden on the site" is not "not published". If it must be genuinely unavailable, that is a column-privilege or view change in RLS — the security boundary — not a UI change, and it should be asked for explicitly. |
 | 22 | ~~**The development Supabase project appears to be gone.**~~ **Resolved 2026-08-16.** The project was *paused* by Supabase after a stretch of no development, which removes its DNS record — hence the hostname not resolving. The owner resumed it; `GET /rest/v1/products` returns 200 with real rows again. | — | Closed. Worth knowing for next time: a free-tier pause looks exactly like a deleted project from the outside, and the tell is that it comes back untouched. The read-path query shapes written while it was down have now been checked against it (M8.1, M8.2); the **admin-session** paths — archived rows, hidden categories, every write — still need a signed-in app, because `curl` with the anon key cannot exercise them. |
-| 21 | **Nobody can set a metal rate until M7.** `metal_rates` ships with both rows unpublished and the website hides the panel, which is correct — but the rate stays invisible until the Android app has a screen for it. | M7 | The panel is dead on the live site until then. If rates are wanted sooner, the interim is a direct SQL update by the owner, which needs a documented runbook. |
+| 21 | ~~**Nobody can set a metal rate until M7.**~~ **Resolved 2026-08-16 by M8.12.** The Options screen sets both rates. Worth recording *why* it stayed open so long: this question pointed at M7, but M7 was product upload and never included it, and M8 closed without it — so a PRD requirement sat unowned by any task for three milestones, invisible because the website behaves correctly when it is unmet. Found only by sequencing M5. | — | Closed. The lesson is that "blocks: M*n*" in this table is not the same as a task inside M*n*, and only the task list makes something get built. |
 
 ---
 

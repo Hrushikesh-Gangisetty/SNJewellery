@@ -10,6 +10,7 @@ import com.snjewellery.admin.ui.screens.addproduct.AddProductScreen
 import com.snjewellery.admin.ui.screens.catalogue.CatalogueScreen
 import com.snjewellery.admin.ui.screens.categories.CategoriesScreen
 import com.snjewellery.admin.ui.screens.dashboard.DashboardScreen
+import com.snjewellery.admin.ui.screens.options.OptionsScreen
 import com.snjewellery.admin.ui.screens.productsaved.ProductSavedScreen
 
 /**
@@ -44,7 +45,12 @@ fun AdminNavHost(
                 onAddProduct = { navController.navigate(AddProduct) },
                 onViewCatalogue = { navController.navigate(Catalogue()) },
                 onManageCategories = { navController.navigate(Categories) },
+                onOpenOptions = { navController.navigate(Options) },
             )
+        }
+
+        composable<Options> {
+            OptionsScreen(onBack = { navController.popBackStack() })
         }
 
         composable<Categories> {

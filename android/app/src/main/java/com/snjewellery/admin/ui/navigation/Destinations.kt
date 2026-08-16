@@ -55,6 +55,10 @@ data class Catalogue(val categoryId: String? = null)
 @Serializable
 data object Categories
 
+/** The owner's options — today's metal rates (M8.12). */
+@Serializable
+data object Options
+
 /**
  * The confirmation after a piece is saved (M7.12).
  *

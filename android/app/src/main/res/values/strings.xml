@@ -526,6 +526,50 @@
          setting the categories up is what an owner does BEFORE the first
          upload, which is exactly when the catalogue is empty. -->
     <string name="dashboard_categories">Categories</string>
+    <string name="dashboard_options">Options</string>
+
+    <!-- ── Options — today's rates (M8.12) ───────────────────────────
+      The PRD's amendment of 2026-07-27 replaced per-piece purity and
+      weight on the website with today's gold and silver rate per gram,
+      "updated daily by the owner from the Android app". The website side
+      shipped in M4.14; this is the half that sets the numbers.
+
+      "Rate", not "price": the shop quotes a metal rate per gram, and a
+      customer asking the price of a piece is asking something else.
+    -->
+    <string name="options_title">Options</string>
+    <string name="options_back">Back</string>
+    <string name="options_rates_title">Today\'s rates</string>
+    <string name="options_rates_body">Shown on the website\'s home page and contact page. Set them each morning.</string>
+    <string name="options_rates_loading">Loading today\'s rates…</string>
+
+    <string name="options_rate_gold">Gold</string>
+    <string name="options_rate_silver">Silver</string>
+    <string name="options_rate_per_gram">₹ per gram</string>
+    <string name="options_rate_save">Save</string>
+    <string name="options_rate_saving">Saving…</string>
+    <string name="options_rate_saved">Saved</string>
+
+    <!-- Says what the CATALOGUE has, which is not always what is in the
+         field above it — that difference is the whole point of the line. -->
+    <string name="options_rate_set_at">Last set %1$s</string>
+    <string name="options_rate_never">never</string>
+    <!-- A normal state, not a fault: the shop has not quoted a rate. -->
+    <string name="options_rate_unpublished">Not showing on the website. Leave empty to keep it that way.</string>
+
+    <!-- The consequence is invisible without saying so: the website
+         renders nothing at all until BOTH metals are published. -->
+    <string name="options_rates_half">The website shows both rates together or neither, so nothing appears until gold and silver are both set.</string>
+
+    <string name="options_rate_not_a_number">A rate should be a number, like 9240 or 92.50.</string>
+    <string name="options_rate_not_positive">A rate should be more than zero. Leave it empty if you are not quoting one today.</string>
+
+    <string name="options_rate_offline">No connection, so the rate was not saved. Check your signal and tap Save again.</string>
+    <string name="options_rate_error">The rate could not be saved (%1$s). Please try again.</string>
+    <string name="options_rates_offline">No connection, so today\'s rates could not be loaded. Check your signal and tap Try again.</string>
+    <string name="options_rates_error">Today\'s rates could not be loaded (%1$s).</string>
+    <string name="options_no_detail">no details</string>
+    <string name="options_retry">Try again</string>
     <!-- M6.11 left the dashboard's empty state without a next step because
          the one it wanted had nowhere to go. M7 built the destination. -->
     <string name="dashboard_add_first_product">Add your first product</string>

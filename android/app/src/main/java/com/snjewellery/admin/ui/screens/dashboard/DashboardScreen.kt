@@ -73,6 +73,7 @@ fun DashboardScreen(
     onAddProduct: () -> Unit,
     onViewCatalogue: () -> Unit,
     onManageCategories: () -> Unit,
+    onOpenOptions: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -89,6 +90,7 @@ fun DashboardScreen(
         onAddProduct = onAddProduct,
         onViewCatalogue = onViewCatalogue,
         onManageCategories = onManageCategories,
+        onOpenOptions = onOpenOptions,
         onSyncNow = viewModel::syncNow,
         onRetry = viewModel::load,
         modifier = modifier,
@@ -104,6 +106,7 @@ internal fun DashboardScreen(
     onAddProduct: () -> Unit = {},
     onViewCatalogue: () -> Unit = {},
     onManageCategories: () -> Unit = {},
+    onOpenOptions: () -> Unit = {},
     onSyncNow: () -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
@@ -210,6 +213,14 @@ internal fun DashboardScreen(
                         .heightIn(min = Tokens.Layout.touchTarget),
                 ) {
                     Text(stringResource(R.string.dashboard_categories))
+                }
+                OutlinedButton(
+                    onClick = onOpenOptions,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = Tokens.Layout.touchTarget),
+                ) {
+                    Text(stringResource(R.string.dashboard_options))
                 }
             }
         }
