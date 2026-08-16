@@ -29,8 +29,15 @@ export function Header({ categories }: { categories: readonly Category[] }) {
         {/* Monogram below lg — neither the 28-character name nor the full
             lockup fits, and the lockup's "& Silver Palace" line would be
             about three pixels tall (brand.md §4). */}
+        {/* Both hide with a `max-*` variant rather than a bare `hidden`.
+            `cn` concatenates and does not resolve conflicts, so a plain
+            `hidden` sits alongside the component's own `inline-flex` at
+            equal specificity and loses on stylesheet order — which put
+            the monogram AND the lockup in the mobile header at once,
+            each squashed by the flex row. A variant outranks the base
+            utility, so this cannot silently lose. See wordmark.tsx. */}
         <Wordmark compact eager className="lg:hidden" />
-        <Wordmark eager className="hidden lg:inline-flex" />
+        <Wordmark eager className="max-lg:hidden" />
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           <NavLink href="/catalogue">All jewellery</NavLink>
@@ -57,7 +64,10 @@ export function Header({ categories }: { categories: readonly Category[] }) {
           >
             <PhoneIcon />
           </a>
-          <WhatsAppButton className="text-body-s hidden sm:inline-flex" />
+          {/* `max-sm:hidden`, not `hidden sm:inline-flex`, for the reason
+              given at the wordmarks above — the button's own base class
+              sets `inline-flex` too. */}
+          <WhatsAppButton className="text-body-s max-sm:hidden" />
 
           <button
             ref={triggerRef}
