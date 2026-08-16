@@ -876,6 +876,8 @@ class AddProductSaveTest {
             else -> KEPT_PREFIX + uri.removePrefix(STAGED_PREFIX)
         }
 
+        override suspend fun discardRetainedExcept(keep: Set<String>) = Unit
+
         override suspend fun discard(uri: String) {
             discarded += uri
         }

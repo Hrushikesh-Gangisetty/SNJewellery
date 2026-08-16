@@ -7,6 +7,7 @@ import com.snjewellery.admin.domain.auth.AdminAccessRepository
 import com.snjewellery.admin.domain.auth.AuthRepository
 import com.snjewellery.admin.domain.auth.AuthState
 import com.snjewellery.admin.domain.auth.SessionState
+import com.snjewellery.admin.domain.draft.DraftSync
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -45,7 +46,21 @@ import javax.inject.Inject
 class RootViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val adminAccessRepository: AdminAccessRepository,
+    private val draftSync: DraftSync,
 ) : ViewModel() {
+
+    init {
+        // Started here because this is the one place that knows the
+        // session has been admitted, and every write the sync makes needs
+        // an admin session — RLS refuses otherwise. Starting it in the
+        // Application would mean a signed-out phone recording refusals
+        // against the owner's drafts. `start` is idempotent, because this
+        // state re-emits Admin whenever the app returns to the
+        // foreground.
+        viewModelScope.launch {
+            sessionState.collect { if (it is SessionState.Admin) draftSync.start() }
+        }
+    }
 
     /**
      * Bumped to re-run a check that could not be completed. A counter

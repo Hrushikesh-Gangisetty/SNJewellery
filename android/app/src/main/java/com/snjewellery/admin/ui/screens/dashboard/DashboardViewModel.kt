@@ -9,7 +9,9 @@ import com.snjewellery.admin.domain.dashboard.DashboardMetrics
 import com.snjewellery.admin.domain.dashboard.DashboardRepository
 import com.snjewellery.admin.domain.dashboard.MetricsResult
 import com.snjewellery.admin.domain.draft.DraftRepository
+import com.snjewellery.admin.domain.draft.DraftSync
 import com.snjewellery.admin.domain.draft.PendingDraft
+import com.snjewellery.admin.domain.draft.SyncState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +54,8 @@ data class DashboardUiState(
      * exactly when there are likely to be some.
      */
     val pending: List<PendingDraft> = emptyList(),
+    /** What the background sync is doing right now (M8.10). */
+    val sync: SyncState = SyncState(),
 )
 
 /**
@@ -69,6 +73,7 @@ data class DashboardUiState(
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val dashboardRepository: DashboardRepository,
+    private val draftSync: DraftSync,
     draftRepository: DraftRepository,
     configRepository: ConfigRepository,
 ) : ViewModel() {
@@ -95,7 +100,22 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update { it.copy(pending = drafts) }
             }
         }
+
+        viewModelScope.launch {
+            draftSync.state.collect { sync ->
+                _uiState.update { it.copy(sync = sync) }
+            }
+        }
     }
+
+    /**
+     * The owner asking for a retry directly.
+     *
+     * Offered as well as the automatic pass, because "wait for a
+     * reconnection" is not an instruction anyone can act on when the
+     * signal is technically present and something else went wrong.
+     */
+    fun syncNow() = draftSync.syncNow()
 
     /**
      * Deliberately **not** called from `init`. The screen loads on

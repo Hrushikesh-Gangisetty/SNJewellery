@@ -1,6 +1,7 @@
 package com.snjewellery.admin.domain.product
 
 import com.snjewellery.admin.domain.RequestFailure
+import kotlinx.serialization.Serializable
 
 /** Where one photograph ended up, once it is in the bucket. */
 sealed interface UploadImageResult {
@@ -34,6 +35,36 @@ data class UploadedImage(
     /** 4:5 rather than the square default. See responsive.md §2. */
     val portrait: Boolean,
 )
+
+/**
+ * One staged photograph that is now in the bucket.
+ *
+ * Not [UploadedImage], which is the row payload and carries a
+ * `display_order`. That is deliberately **not** recorded here: the order
+ * is the index in the list on screen at the moment the rows are written,
+ * so a photograph promoted between two attempts still lands where the
+ * owner put it. What this remembers is only where the object went and
+ * which staged file it came from.
+ *
+ * In `domain` rather than beside the form since M8.10, because two things
+ * now keep this record: the interactive save, and the background sync of
+ * a draft that was left unfinished. Both have to know which photographs
+ * are already in Storage, or they send them twice and pay for the copies.
+ */
+@Serializable
+data class StagedUpload(
+    val localUri: String,
+    val storagePath: String,
+    val url: String,
+    val portrait: Boolean,
+) {
+    fun toRow(displayOrder: Int) = UploadedImage(
+        storagePath = storagePath,
+        url = url,
+        displayOrder = displayOrder,
+        portrait = portrait,
+    )
+}
 
 /** Whether the rows landed. */
 sealed interface WriteImagesResult {

@@ -3,6 +3,7 @@ package com.snjewellery.admin.di
 import android.content.Context
 import androidx.room.Room
 import com.snjewellery.admin.data.local.AdminDatabase
+import com.snjewellery.admin.data.local.MIGRATION_1_2
 import com.snjewellery.admin.data.local.PendingDraftDao
 import dagger.Module
 import dagger.Provides
@@ -28,7 +29,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AdminDatabase =
-        Room.databaseBuilder(context, AdminDatabase::class.java, DATABASE_NAME).build()
+        Room.databaseBuilder(context, AdminDatabase::class.java, DATABASE_NAME)
+            .addMigrations(MIGRATION_1_2)
+            .build()
 
     @Provides
     fun providePendingDraftDao(database: AdminDatabase): PendingDraftDao = database.pendingDrafts()

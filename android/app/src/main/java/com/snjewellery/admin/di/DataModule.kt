@@ -9,6 +9,7 @@ import com.snjewellery.admin.data.config.BuildConfigRepository
 import com.snjewellery.admin.data.dashboard.SupabaseDashboardRepository
 import com.snjewellery.admin.data.local.RoomDraftRepository
 import com.snjewellery.admin.data.media.CacheStagedImages
+import com.snjewellery.admin.data.remote.AndroidConnectivityMonitor
 import com.snjewellery.admin.data.product.SupabaseProductImageRepository
 import com.snjewellery.admin.data.product.SupabaseProductRepository
 import com.snjewellery.admin.domain.auth.AdminAccessRepository
@@ -20,6 +21,7 @@ import com.snjewellery.admin.domain.config.ConfigRepository
 import com.snjewellery.admin.domain.dashboard.DashboardRepository
 import com.snjewellery.admin.domain.draft.DraftRepository
 import com.snjewellery.admin.domain.media.StagedImages
+import com.snjewellery.admin.domain.net.ConnectivityMonitor
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
 import dagger.Binds
@@ -104,4 +106,10 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindDraftRepository(impl: RoomDraftRepository): DraftRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindConnectivityMonitor(
+        impl: AndroidConnectivityMonitor,
+    ): ConnectivityMonitor
 }

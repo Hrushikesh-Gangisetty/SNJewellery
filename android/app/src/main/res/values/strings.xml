@@ -73,6 +73,21 @@
     <string name="dashboard_pending_offline">%1$s · waiting for a connection</string>
     <string name="dashboard_pending_failed">%1$s · the last attempt did not go through</string>
 
+    <!-- ── Sync status (M8.10) ───────────────────────────────────────
+      The sync runs by itself when a connection comes back, so most of
+      what this says is status rather than instruction. Try now exists
+      because "wait for a reconnection" is not something anyone can act
+      on when the signal is present and something else went wrong.
+
+      The taken-name case is worded apart and coloured as an error
+      because it is the one failure that will not clear itself: the sync
+      has stopped retrying it, and only a different name will help.
+    -->
+    <string name="dashboard_pending_sending">%1$s · sending now…</string>
+    <string name="dashboard_pending_name_taken">%1$s · there are too many pieces with this name. Open it and give it a slightly different one.</string>
+    <string name="dashboard_pending_try_now">Try sending now</string>
+    <string name="dashboard_pending_sending_now">Sending…</string>
+
     <!-- ── Add Product (M7.1) ────────────────────────────────────────
       The PRD's Add Product section names eight fields and this uses its
       words for all of them, per CLAUDE.md §5.

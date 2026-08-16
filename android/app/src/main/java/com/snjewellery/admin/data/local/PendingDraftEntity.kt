@@ -8,6 +8,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -47,6 +50,11 @@ data class PendingDraftEntity(
     val featured: Boolean,
     /** JSON array, in the owner's order. The first is the main image. */
     val photoUris: String,
+    /**
+     * JSON array of `StagedUpload` — the photographs already in Storage
+     * from an attempt that stopped part-way (M8.10). Added in version 2.
+     */
+    val uploaded: String,
     val savedAt: Long,
     val failureOffline: Boolean?,
     val failureDetail: String?,
@@ -84,7 +92,25 @@ interface PendingDraftDao {
  * `room.schemaLocation` note in build.gradle.kts. A migration written
  * against a schema nobody kept is written against a guess.
  */
-@Database(entities = [PendingDraftEntity::class], version = 1, exportSchema = true)
+@Database(entities = [PendingDraftEntity::class], version = 2, exportSchema = true)
 abstract class AdminDatabase : RoomDatabase() {
     abstract fun pendingDrafts(): PendingDraftDao
+}
+
+/**
+ * Version 1 → 2: the photographs a part-finished attempt already sent.
+ *
+ * A migration rather than `fallbackToDestructiveMigration`, which is the
+ * usual line at this point and would drop the owner's unsent drafts —
+ * the one thing this table exists to prevent. Existing rows get an empty
+ * list, which is exactly right: version 1 recorded no uploads, so as far
+ * as anything knows none had happened. The cost of being wrong is a
+ * photograph uploaded twice, not a piece lost.
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE pending_drafts ADD COLUMN uploaded TEXT NOT NULL DEFAULT '[]'",
+        )
+    }
 }

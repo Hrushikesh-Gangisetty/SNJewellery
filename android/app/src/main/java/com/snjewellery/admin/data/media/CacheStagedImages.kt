@@ -114,6 +114,19 @@ class CacheStagedImages @Inject constructor(
         if (moved) uriFor(target) else null
     }
 
+    override suspend fun discardRetainedExcept(keep: Set<String>): Unit =
+        withContext(Dispatchers.IO) {
+            val directory = File(context.filesDir, DRAFT_DIRECTORY)
+            val files = directory.listFiles() ?: return@withContext
+
+            files.forEach { file ->
+                // Compared as URIs rather than as names, because a URI is
+                // what a draft records — deriving one from the file is
+                // the same function that produced it in the first place.
+                if (uriFor(file) !in keep) file.delete()
+            }
+        }
+
     override suspend fun discard(uri: String): Unit = withContext(Dispatchers.IO) {
         val target = uri.toUri()
 

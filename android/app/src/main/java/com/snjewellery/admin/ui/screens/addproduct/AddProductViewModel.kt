@@ -19,6 +19,7 @@ import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.domain.product.ProductFormRules
 import com.snjewellery.admin.domain.product.ProductImageRepository
 import com.snjewellery.admin.domain.product.ProductRepository
+import com.snjewellery.admin.domain.product.StagedUpload
 import com.snjewellery.admin.domain.product.RemoveImagesResult
 import com.snjewellery.admin.domain.product.StoredPhoto
 import com.snjewellery.admin.domain.product.UploadImageResult
@@ -262,31 +263,6 @@ internal val SaveState.inFlight: Boolean
     get() = this is SaveState.Uploading ||
         this is SaveState.Saving ||
         this is SaveState.Discarding
-
-/**
- * One staged photograph that is now in the bucket.
- *
- * Not [UploadedImage], which is the row payload and carries a
- * `display_order`. That is deliberately **not** recorded here: the order
- * is the index in the list on screen at the moment the rows are written,
- * so a photograph promoted between two attempts still lands where the
- * owner put it. What this remembers is only where the object went and
- * which staged file it came from.
- */
-@Serializable
-internal data class StagedUpload(
-    val localUri: String,
-    val storagePath: String,
-    val url: String,
-    val portrait: Boolean,
-) {
-    fun toRow(displayOrder: Int) = UploadedImage(
-        storagePath = storagePath,
-        url = url,
-        displayOrder = displayOrder,
-        portrait = portrait,
-    )
-}
 
 /**
  * What a save attempt has already achieved, so the next one does not do
@@ -1150,6 +1126,10 @@ class AddProductViewModel @Inject constructor(
                     productId = attempt.productId,
                     draft = _uiState.value.form.toDraft(categoryId),
                     photoUris = photos,
+                    // Read after retainPhotos, which rewrites these to
+                    // the moved URIs. Carried so M8.10's sync sends only
+                    // what is missing rather than everything again.
+                    uploaded = progress?.uploaded.orEmpty(),
                     savedAt = System.currentTimeMillis(),
                     failure = failure,
                 ),

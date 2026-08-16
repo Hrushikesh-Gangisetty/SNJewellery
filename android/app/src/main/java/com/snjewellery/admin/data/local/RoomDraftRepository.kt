@@ -4,6 +4,7 @@ import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.draft.DraftRepository
 import com.snjewellery.admin.domain.draft.PendingDraft
 import com.snjewellery.admin.domain.product.ProductDraft
+import com.snjewellery.admin.domain.product.StagedUpload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
@@ -52,6 +53,9 @@ class RoomDraftRepository @Inject constructor(
             featured = featured,
         ),
         photoUris = photoUris.decodeList(),
+        uploaded = runCatching {
+            Json.decodeFromString<List<StagedUpload>>(uploaded)
+        }.getOrDefault(emptyList()),
         savedAt = savedAt,
         // Null together: no attempt has failed since this was written.
         failure = failureOffline?.let { RequestFailure(offline = it, detail = failureDetail) },
@@ -67,6 +71,7 @@ class RoomDraftRepository @Inject constructor(
         tags = Json.encodeToString(draft.tags),
         featured = draft.featured,
         photoUris = Json.encodeToString(photoUris),
+        uploaded = Json.encodeToString(uploaded),
         savedAt = savedAt,
         failureOffline = failure?.offline,
         failureDetail = failure?.detail,

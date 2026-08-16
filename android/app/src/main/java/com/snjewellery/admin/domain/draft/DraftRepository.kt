@@ -2,6 +2,7 @@ package com.snjewellery.admin.domain.draft
 
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.product.ProductDraft
+import com.snjewellery.admin.domain.product.StagedUpload
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -26,6 +27,16 @@ data class PendingDraft(
     val draft: ProductDraft,
     /** Staged photographs, in the order the owner put them in. */
     val photoUris: List<String>,
+    /**
+     * The ones already in Storage from an attempt that stopped part-way.
+     *
+     * Without this, finishing the draft would upload every photograph
+     * again and the earlier objects would become orphans under
+     * `products/{id}/…` that nothing points at and nobody can name —
+     * paid for indefinitely, which is the cost ADR-0005 names. It is also
+     * several megabytes re-sent on the connection that just failed.
+     */
+    val uploaded: List<StagedUpload> = emptyList(),
     /** When it was last written, epoch milliseconds. */
     val savedAt: Long,
     /**

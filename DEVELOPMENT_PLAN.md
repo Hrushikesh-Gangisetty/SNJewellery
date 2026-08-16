@@ -1353,9 +1353,33 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Not verified: airplane mode and force-stop on a device.** That is the *Done when*, and it needs a phone — the JVM tests prove the pipeline, not the platform. **Also outstanding:** a file under `files/drafts/` can be left with no draft row if the owner rolls back an interrupted save and then abandons the screen without saving. Bounded and small, but it is a leak; M8.10 sweeps it, since the sync coordinator is the natural owner of "files no draft refers to".
 
-- **`M8.10` Draft sync and failure surfacing** — `M`
+- **`M8.10` Draft sync and failure surfacing** — `M` — ◐ **built and tested; the reconnect itself needs a device**
   Automatic sync on reconnect, with visible sync status and surfaced failures.
   *Done when:* a pending draft uploads intact with all images on reconnect, and a failed draft remains retryable rather than silently disappearing.
+
+  **No WorkManager, and the cost is stated rather than hidden: nothing syncs while the app is closed.** WorkManager is the textbook answer and it is a dependency, a worker, a Hilt integration and a scheduling model — for a job whose whole lifetime is "the owner has the app open and the signal came back". The sync runs in an application-scoped coroutine instead, which CLAUDE.md §3.7 asks for. A draft written in a basement therefore uploads when the owner next opens the app with a signal, not silently overnight — acceptable because the drafts are the first thing on the dashboard, and because sending several megabytes of photographs in the background is not obviously the kinder behaviour on a metered connection. If background sync is wanted, it is WorkManager wrapped around `DraftUploader`, not a rewrite.
+
+  **Started only once the session is admitted.** Every write the sync makes needs an admin session — RLS refuses otherwise — so it hangs off `RootViewModel`, the one place that knows. Starting it in the `Application` would leave a signed-out phone recording refusals against the owner's own drafts.
+
+  **The draft now records what already reached Storage.** This was the real gap left by M8.9: `PendingDraft` held the photograph list but not which of them were already objects in the bucket, so finishing a draft would have uploaded every photograph again — several megabytes on the connection that just failed — and left the earlier objects orphaned under `products/{id}/`, paid for indefinitely. Room went to **version 2 with a real migration**, not `fallbackToDestructiveMigration`, which is the usual line at this point and would drop the owner's unsent drafts. Existing rows get an empty list, which is exactly right: version 1 recorded no uploads, so as far as anything knows none had happened.
+
+  **Each photograph is persisted as it lands, before the next starts.** A pass cut short — the signal drops again, the process is killed — otherwise forgets which objects exist and sends them a second time.
+
+  **A failure is written onto the draft, not thrown away.** The dashboard reads it, so the owner is told *why* a piece is still waiting, and the draft stays in the list either way. A draft that vanished on failure is the silent loss this whole feature exists to prevent. **An offline failure stops the pass** rather than marking every remaining piece failed, because the connection will not have improved for the next one.
+
+  **A name with no free slug is worded apart and coloured as an error**, because it is the one failure that will not clear itself: the sync stops retrying it, and only a different name will help.
+
+  **Try sending now, as well as the automatic pass**, because "wait for a reconnection" is not something anyone can act on when the signal is present and something else went wrong. Inert while a pass is running; a `Mutex` makes a second pass impossible rather than merely unlikely.
+
+  **`StagedUpload` moved into `domain/product/`**, since two things now keep that record — the interactive save and the sync.
+
+  **The M8.9 leak is swept.** `files/drafts/` is not reclaimable by the system, so a file left there is left forever; each sync pass deletes any retained photograph no draft refers to.
+
+  **A duplication worth naming.** `DraftUploader` and the Add Product form's pipeline are two implementations of the same *ordering* — photographs first, the row last. They are not merged because the form's version additionally reports per-image progress, clears objects abandoned by reordering, handles the edit case and offers a rollback, all of which exist because a person is watching. They share the repositories, the `StagedUpload` record and the rule; the rule is stated once, in [android-app.md §2.6c](docs/architecture/android-app.md). If a third caller ever appears, extract it then.
+
+  **Verified by test** (9 new, 129 in the project): a waiting draft going up intact, in the owner's order, when the connection returns; photographs already in Storage not sent again; each one recorded before the next starts; a failed draft still present with its reason; a sent piece taking its retained files with it; offline stopping the pass; a taken name stopping the retries; the orphan sweep; and a second pass being unable to start over the first.
+
+  **Not verified: the reconnection itself.** `ConnectivityManager` is a platform service and the JVM tests drive a fake — the *Done when*'s "on reconnect" needs a phone with airplane mode. The pipeline it triggers is proved here.
 
 - **`M8.11` Refresh and state consistency** — `S` — ◐ **done for the catalogue and for categories; M8.7–M8.8 have nothing of their own yet**
   Pull-to-refresh and consistent empty, loading, and error states per M1.10 throughout.

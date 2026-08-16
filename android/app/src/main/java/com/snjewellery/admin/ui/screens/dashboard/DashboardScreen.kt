@@ -42,6 +42,7 @@ import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.dashboard.DashboardMetrics
 import com.snjewellery.admin.domain.dashboard.RecentProduct
 import com.snjewellery.admin.domain.draft.PendingDraft
+import com.snjewellery.admin.domain.draft.SyncState
 import com.snjewellery.admin.domain.product.ProductDraft
 import com.snjewellery.admin.ui.theme.SnTheme
 import com.snjewellery.admin.ui.theme.Tokens
@@ -88,6 +89,7 @@ fun DashboardScreen(
         onAddProduct = onAddProduct,
         onViewCatalogue = onViewCatalogue,
         onManageCategories = onManageCategories,
+        onSyncNow = viewModel::syncNow,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -102,6 +104,7 @@ internal fun DashboardScreen(
     onAddProduct: () -> Unit = {},
     onViewCatalogue: () -> Unit = {},
     onManageCategories: () -> Unit = {},
+    onSyncNow: () -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
     Scaffold(
@@ -161,7 +164,11 @@ internal fun DashboardScreen(
             // to act on, and it is most likely to exist exactly when the
             // counts below it cannot be loaded.
             if (uiState.pending.isNotEmpty()) {
-                PendingUploads(uiState.pending)
+                PendingUploads(
+                    pending = uiState.pending,
+                    sync = uiState.sync,
+                    onSyncNow = onSyncNow,
+                )
             }
 
             when (val state = uiState.state) {
@@ -224,7 +231,11 @@ internal fun DashboardScreen(
  * itself, the other will not.
  */
 @Composable
-private fun PendingUploads(pending: List<PendingDraft>) {
+private fun PendingUploads(
+    pending: List<PendingDraft>,
+    sync: SyncState,
+    onSyncNow: () -> Unit,
+) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(Tokens.Space.s4),
@@ -261,11 +272,34 @@ private fun PendingUploads(pending: List<PendingDraft>) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = draft.waitingReason(),
+                        text = draft.waitingReason(sync),
                         style = MaterialTheme.snTextStyles.label,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (draft.productId == sync.nameUnavailable) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                 }
+            }
+
+            // Offered as well as the automatic pass: "wait for a
+            // reconnection" is not something anyone can act on when the
+            // signal is present and something else went wrong. Inert
+            // while a pass is running, so a second tap cannot start one
+            // over the top of it.
+            TextButton(
+                onClick = onSyncNow,
+                enabled = sync.sending == null,
+                modifier = Modifier.heightIn(min = Tokens.Layout.touchTarget),
+            ) {
+                Text(
+                    text = if (sync.sending == null) {
+                        stringResource(R.string.dashboard_pending_try_now)
+                    } else {
+                        stringResource(R.string.dashboard_pending_sending_now)
+                    },
+                )
             }
         }
     }
@@ -273,7 +307,7 @@ private fun PendingUploads(pending: List<PendingDraft>) {
 
 /** Photographs waiting, and why this one has not gone up. */
 @Composable
-private fun PendingDraft.waitingReason(): String {
+private fun PendingDraft.waitingReason(sync: SyncState): String {
     val photos = pluralStringResource(
         R.plurals.dashboard_pending_photos,
         photoUris.size,
@@ -281,6 +315,14 @@ private fun PendingDraft.waitingReason(): String {
     )
 
     return when {
+        productId == sync.sending -> stringResource(R.string.dashboard_pending_sending, photos)
+
+        // Named separately because it is the one failure that will not
+        // clear itself: the sync has stopped retrying it, and only a
+        // different name will help.
+        productId == sync.nameUnavailable ->
+            stringResource(R.string.dashboard_pending_name_taken, photos)
+
         failure == null -> photos
         failure.offline -> stringResource(R.string.dashboard_pending_offline, photos)
         else -> stringResource(R.string.dashboard_pending_failed, photos)

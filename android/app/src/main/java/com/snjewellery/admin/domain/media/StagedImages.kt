@@ -86,6 +86,20 @@ interface StagedImages {
     suspend fun retain(uri: String): String?
 
     /**
+     * Deletes retained photographs that are not in [keep].
+     *
+     * The counterpart to [retain], and it is needed because the place
+     * that method moves files to is **not** reclaimable by the system:
+     * anything left there is left forever. That happens when an
+     * interrupted save is rolled back and the screen abandoned — the
+     * draft row goes and its files do not.
+     *
+     * Only ever touches retained files. Photographs in the cache and on a
+     * form being filled in are none of its business.
+     */
+    suspend fun discardRetainedExcept(keep: Set<String>)
+
+    /**
      * Throws away a staged photograph the owner has removed.
      *
      * Nothing depends on it having worked — the photograph is already off
