@@ -42,6 +42,15 @@ data class CategoriesUiState(
     val notice: CategoriesNotice? = null,
     /** A move is being written. The arrows are inert until it lands. */
     val reordering: Boolean = false,
+    /**
+     * A refresh the owner asked for by pulling.
+     *
+     * Separate from [loading] because they look different on purpose: a
+     * first load draws skeletons where the rows will be, and a pull draws
+     * the spinner the gesture already put on screen. The catalogue makes
+     * the same distinction for the same reason (M8.11).
+     */
+    val refreshing: Boolean = false,
 ) {
     /** Only true once a load has succeeded — see [loading]. */
     val isEmpty: Boolean get() = categories.isEmpty() && !loading && failure == null
@@ -64,6 +73,14 @@ sealed interface CategoriesNotice {
     data object ReorderMissing : CategoriesNotice
 
     data class ReorderFailed(val failure: RequestFailure) : CategoriesNotice
+
+    /**
+     * A re-read the owner asked for did not arrive. Its own case because
+     * the rows on screen are kept — they are the last thing known to be
+     * true, and taking them away to report that nothing changed would be
+     * worse than saying so.
+     */
+    data class RefreshFailed(val failure: RequestFailure) : CategoriesNotice
 }
 
 /**
@@ -162,6 +179,40 @@ class CategoriesViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * The pull gesture: the same read, drawn differently.
+     *
+     * The rows stay on screen under the spinner rather than being
+     * replaced by skeletons — the owner is looking at them, and they
+     * pulled to check the list is current, not to make it disappear.
+     */
+    fun pullToRefresh() {
+        if (_uiState.value.refreshing) return
+
+        _uiState.update { it.copy(refreshing = true, notice = null) }
+        viewModelScope.launch {
+            reload(CategoriesNotice::RefreshFailed)
+            _uiState.update { it.copy(refreshing = false) }
+        }
+    }
+
+    /**
+     * Coming back to the screen.
+     *
+     * Quiet: no skeletons and no spinner, because the list is already on
+     * screen and this is the app checking rather than the owner asking.
+     * A failure is silent for the same reason — nothing was lost, and the
+     * rows shown are still the last thing known to be true.
+     *
+     * The catalogue does a *full* refresh on resume instead, because its
+     * paging cursor has to start again. This list has no cursor.
+     */
+    fun onResumed() {
+        if (_uiState.value.loading || _uiState.value.refreshing) return
+
+        viewModelScope.launch { reload(onFailure = null) }
     }
 
     fun onAddRequested() =
@@ -353,14 +404,14 @@ class CategoriesViewModel @Inject constructor(
                 // the server knows which half.
                 is ReorderResult.Missing -> {
                     _uiState.update { it.copy(notice = CategoriesNotice.ReorderMissing) }
-                    reload()
+                    reload(onFailure = null)
                 }
 
                 is ReorderResult.Failed -> {
                     _uiState.update {
                         it.copy(notice = CategoriesNotice.ReorderFailed(result.failure))
                     }
-                    reload()
+                    reload(onFailure = null)
                 }
             }
         }
@@ -386,16 +437,23 @@ class CategoriesViewModel @Inject constructor(
      * for would take the list away to tell them it is unchanged. The
      * notice beside it is what says something went wrong.
      */
-    private suspend fun reload() {
+    private suspend fun reload(onFailure: ((RequestFailure) -> CategoriesNotice)?) {
         when (val result = catalogueRepository.categories()) {
             is CatalogueResult.Loaded -> _uiState.update {
                 it.copy(categories = result.items, reordering = false)
             }
 
-            // The order on screen is now known to be wrong and could not
-            // be corrected. The notice already says so; a second error
-            // would be the same news twice.
-            is CatalogueResult.Failed -> _uiState.update { it.copy(reordering = false) }
+            // The rows on screen are kept either way: they are the last
+            // thing known to be true, and replacing a working list with
+            // an error is throwing away what the owner already had.
+            //
+            // Whether to *say* so depends on who asked. After a failed
+            // move the notice already explains it and a second message
+            // would be the same news twice; after a pull, this is the
+            // only thing that can answer the gesture.
+            is CatalogueResult.Failed -> _uiState.update {
+                it.copy(reordering = false, notice = onFailure?.invoke(result.failure) ?: it.notice)
+            }
         }
     }
 

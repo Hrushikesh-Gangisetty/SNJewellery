@@ -420,6 +420,66 @@ class CategoriesViewModelTest {
         assertTrue("the optimistic value must not stick", state.categories.first().isVisible)
     }
 
+    // ── Refresh (M8.11) ──────────────────────────────────────────────
+
+    @Test
+    fun `a pull keeps the rows on screen instead of showing skeletons`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        lists.gate = CompletableDeferred()
+
+        viewModel.pullToRefresh()
+
+        val during = viewModel.uiState.value
+        assertTrue("the gesture already drew a spinner", during.refreshing)
+        assertTrue("skeletons would take away what they are looking at", !during.loading)
+        assertEquals(2, during.categories.size)
+
+        lists.gate?.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(!viewModel.uiState.value.refreshing)
+    }
+
+    @Test
+    fun `a pull that fails keeps the rows and says so`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        lists.failure = OFFLINE
+
+        viewModel.pullToRefresh()
+
+        val state = viewModel.uiState.value
+        assertEquals("a failed check is not a reason to empty the screen", 2, state.categories.size)
+        assertEquals(CategoriesNotice.RefreshFailed(OFFLINE), state.notice)
+        assertNull("and not the full-screen error", state.failure)
+        assertTrue(!state.refreshing)
+    }
+
+    @Test
+    fun `coming back to the screen re-reads quietly`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        lists.categories = lists.categories + Category("3", "Bangles", isVisible = true, displayOrder = 12)
+
+        viewModel.onResumed()
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf("Bridal", "Necklaces", "Bangles"), state.categories.map { it.name })
+        assertTrue("the app is checking, not the owner asking", !state.refreshing && !state.loading)
+    }
+
+    @Test
+    fun `a quiet re-read that fails says nothing`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        lists.failure = OFFLINE
+
+        viewModel.onResumed()
+
+        // Nothing was lost and nothing was asked for. The rows on screen
+        // are still the last thing known to be true.
+        val state = viewModel.uiState.value
+        assertEquals(2, state.categories.size)
+        assertNull(state.notice)
+        assertNull(state.failure)
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────
 
     private fun viewModel() = CategoriesViewModel(lists, categories)

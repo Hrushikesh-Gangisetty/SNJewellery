@@ -482,6 +482,13 @@
     <string name="categories_reorder_missing">One of those categories is no longer there — it looks like it was deleted somewhere else. The list has been refreshed.</string>
     <string name="categories_notice_dismiss">OK</string>
 
+    <!-- A pull that could not be answered. The rows stay on screen —
+         they are the last thing known to be true, and taking them away
+         to report that nothing changed would be worse than saying so. -->
+    <string name="categories_refresh_failed_title">The list could not be checked</string>
+    <string name="categories_refresh_offline">No connection, so the categories could not be checked for changes. What you can see is what was last loaded.</string>
+    <string name="categories_refresh_error">The categories could not be checked for changes (%1$s). What you can see is what was last loaded.</string>
+
     <string name="categories_error_name_blank">Give the category a name.</string>
     <!-- The database allows it — only the slug is unique — but two
          categories with one name are indistinguishable in the Add Product

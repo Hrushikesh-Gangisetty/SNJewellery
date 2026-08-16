@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.snjewellery.admin.R
 import com.snjewellery.admin.domain.RequestFailure
@@ -76,11 +79,18 @@ fun CategoriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // A category added or renamed elsewhere — including on the catalogue
+    // screen this one navigates to and back from — leaves this list
+    // stale. Quiet: the rows stay put and no spinner appears, because the
+    // app is checking rather than the owner asking.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumed() }
+
     CategoriesScreen(
         uiState = uiState,
         onBack = onBack,
         onShowPieces = onShowPieces,
         onRetry = viewModel::load,
+        onRefresh = viewModel::pullToRefresh,
         onAddRequested = viewModel::onAddRequested,
         onEditRequested = viewModel::onEditRequested,
         onMoveEarlier = viewModel::onMoveEarlier,
@@ -106,6 +116,7 @@ internal fun CategoriesScreen(
     onBack: () -> Unit = {},
     onShowPieces: (String) -> Unit = {},
     onRetry: () -> Unit = {},
+    onRefresh: () -> Unit = {},
     onAddRequested: () -> Unit = {},
     onEditRequested: (Category) -> Unit = {},
     onMoveEarlier: (Category) -> Unit = {},
@@ -153,7 +164,14 @@ internal fun CategoriesScreen(
             )
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        PullToRefreshBox(
+            // `loading` is the first-load state, which already draws
+            // skeletons. Binding the spinner to it as well would show two
+            // indicators for one request.
+            isRefreshing = uiState.refreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+        ) {
             when {
                 uiState.loading -> CategoriesSkeleton()
 
@@ -193,7 +211,7 @@ internal fun CategoriesScreen(
     uiState.notice?.let { notice ->
         AlertDialog(
             onDismissRequest = onNoticeDismissed,
-            title = { Text(stringResource(R.string.categories_reorder_failed_title)) },
+            title = { Text(stringResource(notice.titleRes())) },
             text = { Text(notice.message()) },
             confirmButton = {
                 TextButton(onClick = onNoticeDismissed) {
@@ -204,6 +222,12 @@ internal fun CategoriesScreen(
     }
 }
 
+/** A move that could not be kept, or a re-read that did not arrive. */
+private fun CategoriesNotice.titleRes(): Int = when (this) {
+    is CategoriesNotice.RefreshFailed -> R.string.categories_refresh_failed_title
+    else -> R.string.categories_reorder_failed_title
+}
+
 @Composable
 private fun CategoriesNotice.message(): String = when (this) {
     is CategoriesNotice.ReorderMissing -> stringResource(R.string.categories_reorder_missing)
@@ -212,6 +236,15 @@ private fun CategoriesNotice.message(): String = when (this) {
     } else {
         stringResource(
             R.string.categories_reorder_error,
+            failure.detail ?: stringResource(R.string.categories_no_detail),
+        )
+    }
+
+    is CategoriesNotice.RefreshFailed -> if (failure.offline) {
+        stringResource(R.string.categories_refresh_offline)
+    } else {
+        stringResource(
+            R.string.categories_refresh_error,
             failure.detail ?: stringResource(R.string.categories_no_detail),
         )
     }

@@ -1381,7 +1381,7 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Not verified: the reconnection itself.** `ConnectivityManager` is a platform service and the JVM tests drive a fake — the *Done when*'s "on reconnect" needs a phone with airplane mode. The pipeline it triggers is proved here.
 
-- **`M8.11` Refresh and state consistency** — `S` — ◐ **done for the catalogue and for categories; M8.7–M8.8 have nothing of their own yet**
+- **`M8.11` Refresh and state consistency** — `S` — ✅ **done**
   Pull-to-refresh and consistent empty, loading, and error states per M1.10 throughout.
   *Done when:* every screen in the milestone handles all three states.
 
@@ -1391,7 +1391,17 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   The catalogue's five states are now: skeletons, full-screen error, *nothing matched* (with Clear filters), *nothing exists* (with Add product), and the list — plus the two page-level states beneath it. **Four new tests**, 68 in the project.
 
-  **Outstanding:** M8.6 brought the categories screen with its own skeleton, error, empty and loaded states, so the only thing left is whatever surface M8.7 and M8.8 add — a *Done when* that cannot be met before it exists. Pull-to-refresh is deliberately not on that screen: it is a short list read on entry, and the one case a refresh answers — a category changed on another device — already offers **Refresh the list** at the point the owner meets it, which is a rename that matched no row.
+  **Closed once every M8 screen existed.** The categories screen had shipped with skeleton, error, empty and loaded states, and the sweep for this task found a real gap in it: **it never re-read after being navigated away from**. Its view model loads in `init` and survives the back stack, so M8.8's *Show these pieces* → Back returned to a list that could be minutes stale. The catalogue had solved this at M8.1 with a resume hook; categories had nothing.
+
+  Fixed with **both** refreshes the catalogue has, and the same distinction between them:
+  - **On resume, quietly** — no skeletons, no spinner, and a failure says nothing. The app is checking, not the owner asking, and the rows on screen are still the last thing known to be true. (The catalogue does a *full* refresh on resume instead, because its paging cursor has to start again. This list has no cursor.)
+  - **On a pull, visibly** — the rows stay under the spinner, and a failure is reported without taking them away.
+
+  That also retires the argument M8.6 made for leaving pull-to-refresh off this screen, which was thin: "the one case a refresh answers is offered where the owner meets it" only covered a rename that matched no row, not a category added on another device.
+
+  **The dashboard's pending panel** (M8.9) needs no third state: it reads the device's own database, it is absent when there is nothing waiting, and each row carries its own reason for still being there.
+
+  **Four new tests**, 28 on this screen, 133 in the project.
 
 ### Dependencies
 
