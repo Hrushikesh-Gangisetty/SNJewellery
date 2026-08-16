@@ -421,6 +421,31 @@
     <string name="categories_delete_note">This cannot be undone. A category with pieces filed under it cannot be deleted.</string>
     <string name="categories_delete_button">Delete</string>
 
+    <!-- ── Order and visibility (M8.7) ───────────────────────────────
+      Arrows rather than a drag, which is the pattern M7.5 already chose
+      for the photographs: a long-press drag has no affordance, cannot be
+      operated by a screen reader, and is the harder gesture to land
+      one-handed over a counter. Each one names the category it moves,
+      because a column of identical "Move up" buttons is unusable read
+      aloud.
+    -->
+    <string name="categories_move_earlier">Move %1$s earlier</string>
+    <string name="categories_move_later">Move %1$s later</string>
+
+    <!-- Hiding takes the pieces with it. That is the RLS policy's doing
+         and not something anyone would guess, so the switch says it. -->
+    <string name="categories_visible">Shown on the website</string>
+    <string name="categories_visible_effect">Customers can see this category and the pieces in it.</string>
+    <string name="categories_hidden_effect">Removed from the website, along with every piece filed under it. Kept here, and you can put it back.</string>
+
+    <!-- The order on screen has just been re-read, so this says why it
+         moved back rather than only that something failed. -->
+    <string name="categories_reorder_failed_title">The order was not saved</string>
+    <string name="categories_reorder_offline">No connection, so the new order could not be saved. The list has been put back to what the catalogue has.</string>
+    <string name="categories_reorder_error">The new order could not be saved (%1$s). The list has been put back to what the catalogue has.</string>
+    <string name="categories_reorder_missing">One of those categories is no longer there — it looks like it was deleted somewhere else. The list has been refreshed.</string>
+    <string name="categories_notice_dismiss">OK</string>
+
     <string name="categories_error_name_blank">Give the category a name.</string>
     <!-- The database allows it — only the slug is unique — but two
          categories with one name are indistinguishable in the Add Product

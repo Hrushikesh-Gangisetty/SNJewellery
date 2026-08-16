@@ -623,7 +623,7 @@ class CatalogueViewModelTest {
 
     private class FakeCategoriesRepository : CatalogueRepository {
         override suspend fun categories() =
-            CatalogueResult.Loaded(listOf(Category(CATEGORY_ID, "Necklaces", isVisible = true)))
+            CatalogueResult.Loaded(listOf(Category(CATEGORY_ID, "Necklaces", isVisible = true, displayOrder = 1)))
 
         override suspend fun purities() = CatalogueResult.Loaded(listOf(Purity("p", "22K", "22K")))
     }

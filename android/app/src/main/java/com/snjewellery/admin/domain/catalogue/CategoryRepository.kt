@@ -51,6 +51,32 @@ sealed interface DeleteCategoryResult {
     data class Failed(val failure: RequestFailure) : DeleteCategoryResult
 }
 
+sealed interface UpdateVisibilityResult {
+    data object Updated : UpdateVisibilityResult
+
+    /** Nothing matched — see [RenameCategoryResult.Missing]. */
+    data object Missing : UpdateVisibilityResult
+
+    data class Failed(val failure: RequestFailure) : UpdateVisibilityResult
+}
+
+/** One category's new place in the owner's order. */
+data class CategoryPosition(val id: String, val displayOrder: Int)
+
+sealed interface ReorderResult {
+    data object Reordered : ReorderResult
+
+    /**
+     * A category in the move is no longer there, so the order on screen
+     * describes a list that no longer exists. Its own case because the
+     * fix is to re-read, and because part of the move may already have
+     * been written — which is exactly what a re-read resolves.
+     */
+    data object Missing : ReorderResult
+
+    data class Failed(val failure: RequestFailure) : ReorderResult
+}
+
 /**
  * Writing the owner's categories. Reading them is [CatalogueRepository],
  * which the Add Product form and the catalogue filter already use — this
@@ -64,11 +90,11 @@ sealed interface DeleteCategoryResult {
  * something as small as fixing a typo. A URL is a promise; a display name
  * is not.
  *
- * ── Visibility and order are not here ────────────────────────────────
- * `is_visible` and `display_order` are M8.7's, and each is one column
- * written on its own for the reason `ProductRepository.setStatus` gives:
- * sending a whole row back from a screen the owner has had open lets a
- * stale value overwrite a change made elsewhere. [create] is the one
+ * ── One column per write ─────────────────────────────────────────────
+ * [rename], [setVisible] and [reorder] each write the one column they
+ * own, for the reason `ProductRepository.setStatus` gives: sending a
+ * whole row back from a screen the owner has had open for a minute lets
+ * a stale value overwrite a change made elsewhere. [create] is the one
  * exception, because a row has to start somewhere.
  */
 interface CategoryRepository {
@@ -84,6 +110,31 @@ interface CategoryRepository {
 
     /** Changes the display name. The slug stays as it is — see above. */
     suspend fun rename(id: String, name: String): RenameCategoryResult
+
+    /**
+     * Hides or shows the category.
+     *
+     * Hiding removes it **and every piece filed under it** from the
+     * public site. That is the RLS policy's doing, not a filter a query
+     * could forget — `categories_public_read` admits only visible rows,
+     * and the products policy joins through it.
+     */
+    suspend fun setVisible(id: String, visible: Boolean): UpdateVisibilityResult
+
+    /**
+     * Writes the given categories' positions.
+     *
+     * Takes only the rows that moved. A reorder in this app is a swap of
+     * two adjacent categories, so that is two writes rather than a
+     * renumbering of the whole list — which would rewrite every row the
+     * owner did not touch, and would need the list to have no gaps.
+     *
+     * There is no transaction across the two: PostgREST cannot express
+     * one, and an RPC would be a migration for a list of a dozen rows.
+     * A half-written move is therefore possible, and is reported so the
+     * caller re-reads rather than trusting what is on screen.
+     */
+    suspend fun reorder(positions: List<CategoryPosition>): ReorderResult
 
     /**
      * Removes the category.

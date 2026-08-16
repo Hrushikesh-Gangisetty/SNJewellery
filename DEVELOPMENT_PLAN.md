@@ -1289,9 +1289,25 @@ Give the owner full control of an existing catalogue — edit, delete, feature, 
 
   **Not verified: the website end, and the 23503 path.** "Appears on the website's shortcuts after revalidation" needs a deployed site and M9's revalidation, neither of which has run. The `InUse` branch needs an admin session to attempt a real blocked delete; the constraint it depends on is declared `on delete restrict` in `20260726000100_core_tables.sql`, and the mapping is covered by test rather than by the database.
 
-- **`M8.7` Category reorder and visibility** — `S`
+- **`M8.7` Category reorder and visibility** — `S` — ◐ **built and tested; the website's order needs M5 deployed**
   Drag-to-reorder writing `display_order`; hide and show.
   *Done when:* reordering in the app changes the website's category order, and hiding removes the category and its products from every public page.
+
+  **Arrows, not a drag — a deliberate departure from the task's wording.** M7.5 already made this choice for the photographs on the Add Product form, and the reasons are the same: a long-press drag has no affordance, cannot be operated by a screen reader at all, and is the harder gesture to land one-handed over a counter, which is this app's whole context. Each arrow names the category it moves, so a column of them is usable read aloud. The *Done when* is about the website's order changing, and that is the same either way.
+
+  **A move swaps the two rows' `display_order` values; it does not renumber the list.** Renumbering by list index is the obvious implementation and is wrong twice over: it rewrites every row the owner did not touch, and it assumes the column is 0, 1, 2 with no gaps. The seed numbers categories 1 to 12, so it never was. The test uses gapped, 1-based values for exactly that reason — against 0, 1, 2 an index-based implementation would have passed.
+
+  **`Category` carries `displayOrder` now**, for the same reason: the position has to be the column's value rather than where the row happens to sit on screen.
+
+  **A failed move re-reads instead of putting the old order back.** Two rows means two requests — PostgREST cannot give two rows two different values in one statement, and an RPC would be a migration for a list of a dozen rows — so half the swap may already be written and only the server knows which half. The list is re-read *without* skeletons, because the owner is looking at it, and a notice says why it moved.
+
+  **Visibility is written the moment the switch is flipped**, optimistically, with a rollback that restores the previous value rather than flipping back — M8.5's rule, for M8.5's reason. It sits in the edit dialog with its effect stated underneath, because *hidden takes every piece in the category with it* is not something anyone would guess.
+
+  **Verified by test** (7 new, 23 on this screen, 111 in the project): the swap writing gapped values rather than indices; the ends of the list refusing to move; a failed move re-reading and a vanished category refreshing; an optimistic hide, its rollback, and a hide that matched no row.
+
+  **Verified against the live project** by `npm run db:test-rls` — **30 passed, 0 failed**, including *hidden category is invisible to anon*, *featured product inside a hidden category does NOT leak*, and *hidden category product's images are NOT reachable via `product_images`*. That is the second half of the *Done when* proved at the layer that enforces it. An anonymous `PATCH` of `is_visible` and of `display_order` both answered 204 and changed nothing.
+
+  **Not verified: the website's rendered order.** Needs a deployed site — M5 has not run.
 
 - **`M8.8` Category deletion with products** — `S`
   Block deletion of a non-empty category with an explanation, or require reassignment. Decide and document.

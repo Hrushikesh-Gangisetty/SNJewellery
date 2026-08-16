@@ -3,10 +3,13 @@ package com.snjewellery.admin.data.catalogue
 import com.snjewellery.admin.data.remote.RequestFailureClassifier
 import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.catalogue.Category
+import com.snjewellery.admin.domain.catalogue.CategoryPosition
 import com.snjewellery.admin.domain.catalogue.CategoryRepository
 import com.snjewellery.admin.domain.catalogue.CreateCategoryResult
 import com.snjewellery.admin.domain.catalogue.DeleteCategoryResult
 import com.snjewellery.admin.domain.catalogue.RenameCategoryResult
+import com.snjewellery.admin.domain.catalogue.ReorderResult
+import com.snjewellery.admin.domain.catalogue.UpdateVisibilityResult
 import com.snjewellery.admin.domain.product.Slugs
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
@@ -67,6 +70,7 @@ class SupabaseCategoryRepository @Inject constructor(
         @SerialName("id") val id: String,
         @SerialName("name") val name: String,
         @SerialName("is_visible") val isVisible: Boolean,
+        @SerialName("display_order") val displayOrder: Int,
     )
 
     @Serializable
@@ -92,7 +96,12 @@ class SupabaseCategoryRepository @Inject constructor(
                     .decodeSingle<WrittenRow>()
 
                 return CreateCategoryResult.Created(
-                    Category(id = created.id, name = created.name, isVisible = created.isVisible),
+                    Category(
+                        id = created.id,
+                        name = created.name,
+                        isVisible = created.isVisible,
+                        displayOrder = created.displayOrder,
+                    ),
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -128,6 +137,46 @@ class SupabaseCategoryRepository @Inject constructor(
         throw e
     } catch (e: Exception) {
         RenameCategoryResult.Failed(failures.classify(e))
+    }
+
+    override suspend fun setVisible(id: String, visible: Boolean): UpdateVisibilityResult = try {
+        val changed = client.postgrest.from(TABLE_CATEGORIES)
+            .update({ set(COLUMN_IS_VISIBLE, visible) }) {
+                select()
+                filter { eq("id", id) }
+            }
+            .decodeList<WrittenRow>()
+
+        if (changed.isEmpty()) UpdateVisibilityResult.Missing else UpdateVisibilityResult.Updated
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        UpdateVisibilityResult.Failed(failures.classify(e))
+    }
+
+    override suspend fun reorder(positions: List<CategoryPosition>): ReorderResult {
+        // One request per moved row, in order. PostgREST has no way to
+        // give two rows two different values in one statement, and an
+        // upsert cannot be used because the insert half would need every
+        // NOT NULL column — including the slug this must never touch.
+        for (position in positions) {
+            try {
+                val changed = client.postgrest.from(TABLE_CATEGORIES)
+                    .update({ set(COLUMN_DISPLAY_ORDER, position.displayOrder) }) {
+                        select()
+                        filter { eq("id", position.id) }
+                    }
+                    .decodeList<WrittenRow>()
+
+                if (changed.isEmpty()) return ReorderResult.Missing
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return ReorderResult.Failed(failures.classify(e))
+            }
+        }
+
+        return ReorderResult.Reordered
     }
 
     override suspend fun delete(id: String): DeleteCategoryResult = try {
@@ -182,6 +231,7 @@ class SupabaseCategoryRepository @Inject constructor(
     private companion object {
         const val TABLE_CATEGORIES = "categories"
         const val COLUMN_DISPLAY_ORDER = "display_order"
+        const val COLUMN_IS_VISIBLE = "is_visible"
 
         /** Postgres `unique_violation`. */
         const val UNIQUE_VIOLATION = "23505"

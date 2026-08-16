@@ -13,16 +13,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -74,6 +80,10 @@ fun CategoriesScreen(
         onRetry = viewModel::load,
         onAddRequested = viewModel::onAddRequested,
         onEditRequested = viewModel::onEditRequested,
+        onMoveEarlier = viewModel::onMoveEarlier,
+        onMoveLater = viewModel::onMoveLater,
+        onVisibilityChange = viewModel::onVisibilityChange,
+        onNoticeDismissed = viewModel::onNoticeDismissed,
         onNameChange = viewModel::onNameChange,
         onSave = viewModel::onSave,
         onDeleteRequested = viewModel::onDeleteRequested,
@@ -94,6 +104,10 @@ internal fun CategoriesScreen(
     onRetry: () -> Unit = {},
     onAddRequested: () -> Unit = {},
     onEditRequested: (Category) -> Unit = {},
+    onMoveEarlier: (Category) -> Unit = {},
+    onMoveLater: (Category) -> Unit = {},
+    onVisibilityChange: (Boolean) -> Unit = {},
+    onNoticeDismissed: () -> Unit = {},
     onNameChange: (String) -> Unit = {},
     onSave: () -> Unit = {},
     onDeleteRequested: () -> Unit = {},
@@ -143,7 +157,13 @@ internal fun CategoriesScreen(
 
                 uiState.isEmpty -> EmptyCategories(onAddRequested)
 
-                else -> CategoryList(uiState.categories, onEditRequested)
+                else -> CategoryList(
+                    categories = uiState.categories,
+                    reordering = uiState.reordering,
+                    onEdit = onEditRequested,
+                    onMoveEarlier = onMoveEarlier,
+                    onMoveLater = onMoveLater,
+                )
             }
         }
     }
@@ -152,6 +172,7 @@ internal fun CategoriesScreen(
         CategoryDialog(
             editor = editor,
             onNameChange = onNameChange,
+            onVisibilityChange = onVisibilityChange,
             onSave = onSave,
             onDeleteRequested = onDeleteRequested,
             onDeleteCancelled = onDeleteCancelled,
@@ -160,30 +181,92 @@ internal fun CategoriesScreen(
             onDismiss = onDismissEditor,
         )
     }
+
+    // A move the list could not keep. A dialog rather than an inline
+    // line, because the order on screen has just been re-read underneath
+    // it and the owner needs to know why it moved back.
+    uiState.notice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = onNoticeDismissed,
+            title = { Text(stringResource(R.string.categories_reorder_failed_title)) },
+            text = { Text(notice.message()) },
+            confirmButton = {
+                TextButton(onClick = onNoticeDismissed) {
+                    Text(stringResource(R.string.categories_notice_dismiss))
+                }
+            },
+        )
+    }
 }
 
 @Composable
-private fun CategoryList(categories: List<Category>, onEdit: (Category) -> Unit) {
+private fun CategoriesNotice.message(): String = when (this) {
+    is CategoriesNotice.ReorderMissing -> stringResource(R.string.categories_reorder_missing)
+    is CategoriesNotice.ReorderFailed -> if (failure.offline) {
+        stringResource(R.string.categories_reorder_offline)
+    } else {
+        stringResource(
+            R.string.categories_reorder_error,
+            failure.detail ?: stringResource(R.string.categories_no_detail),
+        )
+    }
+}
+
+@Composable
+private fun CategoryList(
+    categories: List<Category>,
+    reordering: Boolean,
+    onEdit: (Category) -> Unit,
+    onMoveEarlier: (Category) -> Unit,
+    onMoveLater: (Category) -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = Tokens.Space.s2),
     ) {
-        items(categories, key = { it.id }) { category ->
-            CategoryRow(category, onClick = { onEdit(category) })
+        itemsIndexed(categories, key = { _, category -> category.id }) { index, category ->
+            CategoryRow(
+                category = category,
+                index = index,
+                total = categories.size,
+                reordering = reordering,
+                onClick = { onEdit(category) },
+                onMoveEarlier = { onMoveEarlier(category) },
+                onMoveLater = { onMoveLater(category) },
+            )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
 
+/**
+ * ── Arrows, not a drag ───────────────────────────────────────────────
+ * The plan's wording is "drag-to-reorder", and this is the pattern M7.5
+ * already chose for the photographs on the Add Product form: two arrows
+ * with a spoken description each. A long-press drag has no affordance,
+ * cannot be operated by a screen reader, and is the harder gesture to
+ * land one-handed over a counter — which is the app's whole context. The
+ * *Done when* is about the website's order changing, and that is the same
+ * either way.
+ */
 @Composable
-private fun CategoryRow(category: Category, onClick: () -> Unit) {
+private fun CategoryRow(
+    category: Category,
+    index: Int,
+    total: Int,
+    reordering: Boolean,
+    onClick: () -> Unit,
+    onMoveEarlier: () -> Unit,
+    onMoveLater: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .heightIn(min = ROW_HEIGHT)
-            .padding(horizontal = Tokens.Space.s4, vertical = Tokens.Space.s2),
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3),
+            .padding(start = Tokens.Space.s4, end = Tokens.Space.s2)
+            .padding(vertical = Tokens.Space.s2),
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -211,6 +294,27 @@ private fun CategoryRow(category: Category, onClick: () -> Unit) {
                     .padding(horizontal = Tokens.Space.s2, vertical = Tokens.Space.s1),
             )
         }
+
+        // Each says which category it moves: a column of identical "Move
+        // up" buttons is unusable with a screen reader.
+        IconButton(onClick = onMoveEarlier, enabled = !reordering && index > 0) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowUp,
+                contentDescription = stringResource(
+                    R.string.categories_move_earlier,
+                    category.name,
+                ),
+            )
+        }
+        IconButton(onClick = onMoveLater, enabled = !reordering && index < total - 1) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(
+                    R.string.categories_move_later,
+                    category.name,
+                ),
+            )
+        }
     }
 }
 
@@ -225,6 +329,7 @@ private fun CategoryRow(category: Category, onClick: () -> Unit) {
 private fun CategoryDialog(
     editor: CategoryEditor,
     onNameChange: (String) -> Unit,
+    onVisibilityChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     onDeleteRequested: () -> Unit,
     onDeleteCancelled: () -> Unit,
@@ -282,6 +387,17 @@ private fun CategoryDialog(
                         )
 
                         if (editor.category != null) {
+                            // Written the moment it is flipped, not on
+                            // Save: it is one column of its own, and the
+                            // effect is stated under it because "hidden"
+                            // taking the pieces with it is not something
+                            // anyone would guess.
+                            VisibilityToggle(
+                                visible = editor.category.isVisible,
+                                enabled = !editor.working,
+                                onChange = onVisibilityChange,
+                            )
+
                             TextButton(
                                 onClick = onDeleteRequested,
                                 enabled = !editor.working,
@@ -342,6 +458,40 @@ private fun CategoryDialog(
             }
         },
     )
+}
+
+/**
+ * Shown or hidden, and what that does to a customer.
+ *
+ * The same shape as the piece-level toggles in `ProductActionsSheet`, and
+ * for the same reason: the place a shop owner will actually read what a
+ * switch means is under the switch.
+ */
+@Composable
+private fun VisibilityToggle(visible: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = Tokens.Layout.touchTarget),
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.categories_visible),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = if (visible) {
+                    stringResource(R.string.categories_visible_effect)
+                } else {
+                    stringResource(R.string.categories_hidden_effect)
+                },
+                style = MaterialTheme.snTextStyles.label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = visible, onCheckedChange = onChange, enabled = enabled)
+    }
 }
 
 /** Each failure says what the owner can do about it, or that nothing will. */
@@ -444,9 +594,9 @@ private fun CategoriesPreview() {
             uiState = CategoriesUiState(
                 loading = false,
                 categories = listOf(
-                    Category("1", "Bridal Jewellery", isVisible = true),
-                    Category("2", "Necklaces", isVisible = true),
-                    Category("3", "Unreleased Collection", isVisible = false),
+                    Category("1", "Bridal Jewellery", isVisible = true, displayOrder = 1),
+                    Category("2", "Necklaces", isVisible = true, displayOrder = 2),
+                    Category("3", "Unreleased Collection", isVisible = false, displayOrder = 3),
                 ),
             ),
         )
@@ -466,9 +616,9 @@ private fun CategoryDialogPreview() {
         CategoriesScreen(
             uiState = CategoriesUiState(
                 loading = false,
-                categories = listOf(Category("1", "Necklaces", isVisible = true)),
+                categories = listOf(Category("1", "Necklaces", isVisible = true, displayOrder = 1)),
                 editor = CategoryEditor(
-                    category = Category("1", "Necklaces", isVisible = true),
+                    category = Category("1", "Necklaces", isVisible = true, displayOrder = 1),
                     name = "Necklaces",
                     error = CategoryEditorError.InUse,
                 ),

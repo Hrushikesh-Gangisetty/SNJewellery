@@ -4,11 +4,14 @@ import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
+import com.snjewellery.admin.domain.catalogue.CategoryPosition
 import com.snjewellery.admin.domain.catalogue.CategoryRepository
 import com.snjewellery.admin.domain.catalogue.CreateCategoryResult
 import com.snjewellery.admin.domain.catalogue.DeleteCategoryResult
 import com.snjewellery.admin.domain.catalogue.Purity
 import com.snjewellery.admin.domain.catalogue.RenameCategoryResult
+import com.snjewellery.admin.domain.catalogue.ReorderResult
+import com.snjewellery.admin.domain.catalogue.UpdateVisibilityResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -220,7 +223,7 @@ class CategoriesViewModelTest {
         viewModel.onNameChange("Bridal Jewellery")
         viewModel.onSave()
 
-        lists.categories = listOf(Category("2", "Necklaces", isVisible = true))
+        lists.categories = listOf(Category("2", "Necklaces", isVisible = true, displayOrder = 9))
         viewModel.onMissingAcknowledged()
 
         // A refresh, not a retry: the list behind the dialog is what was
@@ -290,14 +293,124 @@ class CategoriesViewModelTest {
         assertEquals(2, viewModel.uiState.value.categories.size)
     }
 
+    // ── Order and visibility (M8.7) ──────────────────────────────────
+
+    @Test
+    fun `a move swaps the two rows' positions rather than renumbering`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+
+        viewModel.onMoveLater(viewModel.uiState.value.categories.first())
+
+        // The seed numbers categories 1..11, so the values are gapped.
+        // Renumbering by list index would write 0 and 1 here and collide
+        // with whatever else already holds them.
+        assertEquals(
+            listOf(CategoryPosition("1", 9), CategoryPosition("2", 4)),
+            categories.positions,
+        )
+        assertEquals(
+            listOf("Necklaces", "Bridal"),
+            viewModel.uiState.value.categories.map { it.name },
+        )
+    }
+
+    @Test
+    fun `the ends of the list do not move`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        val (first, last) = viewModel.uiState.value.categories.let { it.first() to it.last() }
+
+        viewModel.onMoveEarlier(first)
+        viewModel.onMoveLater(last)
+
+        assertEquals(emptyList<CategoryPosition>(), categories.positions)
+        assertEquals(
+            listOf("Bridal", "Necklaces"),
+            viewModel.uiState.value.categories.map { it.name },
+        )
+    }
+
+    @Test
+    fun `a failed move re-reads rather than putting the old order back`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        categories.failure = OFFLINE
+
+        viewModel.onMoveLater(viewModel.uiState.value.categories.first())
+
+        // Half the swap may already be written and only the server knows
+        // which half, so the list is re-read and the owner is told.
+        val state = viewModel.uiState.value
+        assertEquals(CategoriesNotice.ReorderFailed(OFFLINE), state.notice)
+        assertEquals(listOf("Bridal", "Necklaces"), state.categories.map { it.name })
+        assertEquals("one read on construction, one after the failure", 2, lists.reads)
+        assertTrue(!state.reordering)
+    }
+
+    @Test
+    fun `a move naming a category that is gone refreshes the list`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        categories.reorderMissing = true
+        lists.categories = listOf(Category("2", "Necklaces", isVisible = true, displayOrder = 9))
+
+        viewModel.onMoveLater(viewModel.uiState.value.categories.first())
+
+        val state = viewModel.uiState.value
+        assertEquals(CategoriesNotice.ReorderMissing, state.notice)
+        assertEquals(listOf("Necklaces"), state.categories.map { it.name })
+    }
+
+    @Test
+    fun `hiding shows immediately and writes the new value`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.onEditRequested(viewModel.uiState.value.categories.first())
+
+        viewModel.onVisibilityChange(false)
+
+        assertEquals(listOf("1" to false), categories.visibilityWrites)
+        assertTrue("the row must show it", !viewModel.uiState.value.categories.first().isVisible)
+        assertTrue(
+            "and so must the open dialog",
+            viewModel.uiState.value.editor?.category?.isVisible == false,
+        )
+    }
+
+    @Test
+    fun `a failed hide rolls back to the true value`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.onEditRequested(viewModel.uiState.value.categories.first())
+        categories.failure = OFFLINE
+
+        viewModel.onVisibilityChange(false)
+
+        val state = viewModel.uiState.value
+        assertTrue("a stale optimistic value is worse than none", state.categories.first().isVisible)
+        assertTrue(state.editor?.category?.isVisible == true)
+        assertEquals(CategoryEditorError.Failed(OFFLINE), state.editor?.error)
+    }
+
+    @Test
+    fun `hiding a category that is gone is not reported as done`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.onEditRequested(viewModel.uiState.value.categories.first())
+        categories.visibilityMissing = true
+
+        viewModel.onVisibilityChange(false)
+
+        val state = viewModel.uiState.value
+        assertEquals(CategoryEditorError.Missing, state.editor?.error)
+        assertTrue("the optimistic value must not stick", state.categories.first().isVisible)
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────
 
     private fun viewModel() = CategoriesViewModel(lists, categories)
 
     private class FakeCatalogueRepository : CatalogueRepository {
+        // 1-based and gapped, exactly as the seed numbers them — an
+        // index-based reorder would pass against 0, 1, 2 and be wrong
+        // against real data.
         var categories = listOf(
-            Category("1", "Bridal", isVisible = true),
-            Category("2", "Necklaces", isVisible = true),
+            Category("1", "Bridal", isVisible = true, displayOrder = 4),
+            Category("2", "Necklaces", isVisible = true, displayOrder = 9),
         )
         var failure: RequestFailure? = null
 
@@ -322,9 +435,17 @@ class CategoriesViewModelTest {
         val renamed = mutableListOf<Pair<String, String>>()
         val deleted = mutableListOf<String>()
 
+        /** Every visibility write, in order: (id, value). */
+        val visibilityWrites = mutableListOf<Pair<String, Boolean>>()
+
+        /** Every position written, in the order the rows were sent. */
+        val positions = mutableListOf<CategoryPosition>()
+
         var slugExhausted = false
         var renameMissing = false
         var inUse = false
+        var visibilityMissing = false
+        var reorderMissing = false
         var failure: RequestFailure? = null
 
         override suspend fun create(name: String): CreateCategoryResult {
@@ -332,7 +453,12 @@ class CategoriesViewModelTest {
             if (slugExhausted) return CreateCategoryResult.SlugExhausted
             created += name
             return CreateCategoryResult.Created(
-                Category(id = "new-${created.size}", name = name, isVisible = true),
+                Category(
+                    id = "new-${created.size}",
+                    name = name,
+                    isVisible = true,
+                    displayOrder = NEXT_POSITION,
+                ),
             )
         }
 
@@ -341,6 +467,20 @@ class CategoriesViewModelTest {
             if (renameMissing) return RenameCategoryResult.Missing
             renamed += id to name
             return RenameCategoryResult.Renamed
+        }
+
+        override suspend fun setVisible(id: String, visible: Boolean): UpdateVisibilityResult {
+            failure?.let { return UpdateVisibilityResult.Failed(it) }
+            if (visibilityMissing) return UpdateVisibilityResult.Missing
+            visibilityWrites += id to visible
+            return UpdateVisibilityResult.Updated
+        }
+
+        override suspend fun reorder(positions: List<CategoryPosition>): ReorderResult {
+            failure?.let { return ReorderResult.Failed(it) }
+            if (reorderMissing) return ReorderResult.Missing
+            this.positions += positions
+            return ReorderResult.Reordered
         }
 
         override suspend fun delete(id: String): DeleteCategoryResult {
@@ -352,6 +492,7 @@ class CategoriesViewModelTest {
     }
 
     private companion object {
+        const val NEXT_POSITION = 12
         val OFFLINE = RequestFailure(offline = true)
     }
 }

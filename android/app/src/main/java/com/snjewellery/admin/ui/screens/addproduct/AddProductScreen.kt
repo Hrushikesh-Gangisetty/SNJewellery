@@ -679,8 +679,8 @@ private fun AddProductPreview() {
                 form = ProductForm(name = "Kundan Choker Set", tags = "kundan, bridal"),
                 options = OptionsState.Loaded(
                     categories = listOf(
-                        Category("1", "Bridal Jewellery", isVisible = true),
-                        Category("2", "Unreleased Collection", isVisible = false),
+                        Category("1", "Bridal Jewellery", isVisible = true, displayOrder = 1),
+                        Category("2", "Unreleased Collection", isVisible = false, displayOrder = 2),
                     ),
                     purities = listOf(Purity("1", "22K", "22K Gold")),
                 ),

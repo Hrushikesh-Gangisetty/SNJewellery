@@ -15,6 +15,15 @@ data class Category(
     val id: String,
     val name: String,
     val isVisible: Boolean,
+    /**
+     * The owner's own position for it, as `display_order` holds it.
+     *
+     * Carried rather than derived from the list index because M8.7
+     * reorders by **swapping the two rows' values**, and an index would
+     * only be the same thing while the column happened to be numbered
+     * 0, 1, 2 with no gaps. The seed is 1-based, so it never was.
+     */
+    val displayOrder: Int,
 )
 
 /**

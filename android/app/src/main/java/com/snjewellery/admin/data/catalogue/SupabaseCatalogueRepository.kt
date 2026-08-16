@@ -39,7 +39,14 @@ class SupabaseCatalogueRepository @Inject constructor(
         client.postgrest.from(TABLE_CATEGORIES)
             .select { order(COLUMN_DISPLAY_ORDER, Order.ASCENDING) }
             .decodeList<CategoryRow>()
-            .map { Category(id = it.id, name = it.name, isVisible = it.isVisible) }
+            .map {
+                Category(
+                    id = it.id,
+                    name = it.name,
+                    isVisible = it.isVisible,
+                    displayOrder = it.displayOrder,
+                )
+            }
     }
 
     override suspend fun purities(): CatalogueResult<Purity> = fetch {

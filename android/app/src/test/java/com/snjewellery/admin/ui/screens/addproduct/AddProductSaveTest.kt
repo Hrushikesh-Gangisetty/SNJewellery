@@ -732,7 +732,7 @@ class AddProductSaveTest {
 
     private class FakeCatalogueRepository : CatalogueRepository {
         override suspend fun categories() =
-            CatalogueResult.Loaded(listOf(Category(CATEGORY_ID, "Bridal Jewellery", true)))
+            CatalogueResult.Loaded(listOf(Category(CATEGORY_ID, "Bridal Jewellery", isVisible = true, displayOrder = 1)))
 
         override suspend fun purities() =
             CatalogueResult.Loaded(listOf(Purity("p1", "22K", "22K Gold")))

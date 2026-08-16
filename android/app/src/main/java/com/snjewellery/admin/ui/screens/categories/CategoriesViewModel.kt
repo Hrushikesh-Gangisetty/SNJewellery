@@ -6,10 +6,13 @@ import com.snjewellery.admin.domain.RequestFailure
 import com.snjewellery.admin.domain.catalogue.CatalogueRepository
 import com.snjewellery.admin.domain.catalogue.CatalogueResult
 import com.snjewellery.admin.domain.catalogue.Category
+import com.snjewellery.admin.domain.catalogue.CategoryPosition
 import com.snjewellery.admin.domain.catalogue.CategoryRepository
 import com.snjewellery.admin.domain.catalogue.CreateCategoryResult
 import com.snjewellery.admin.domain.catalogue.DeleteCategoryResult
 import com.snjewellery.admin.domain.catalogue.RenameCategoryResult
+import com.snjewellery.admin.domain.catalogue.ReorderResult
+import com.snjewellery.admin.domain.catalogue.UpdateVisibilityResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,9 +35,35 @@ data class CategoriesUiState(
     val failure: RequestFailure? = null,
     /** The open dialog. Null when the owner is just looking at the list. */
     val editor: CategoryEditor? = null,
+    /**
+     * Something that happened to the list itself rather than to a
+     * category the owner has open. Null when there is nothing to say.
+     */
+    val notice: CategoriesNotice? = null,
+    /** A move is being written. The arrows are inert until it lands. */
+    val reordering: Boolean = false,
 ) {
     /** Only true once a load has succeeded — see [loading]. */
     val isEmpty: Boolean get() = categories.isEmpty() && !loading && failure == null
+}
+
+/**
+ * What a move could not do.
+ *
+ * Its own thing rather than a [CategoryEditorError] because reordering
+ * happens on the list, with no dialog open to put a message in — and
+ * because both cases end the same way: the list is re-read, so what the
+ * owner is looking at afterwards is the truth rather than their attempt.
+ */
+sealed interface CategoriesNotice {
+    /**
+     * A category in the move is no longer there. Part of the move may
+     * have been written, which is why the list is re-read rather than
+     * put back.
+     */
+    data object ReorderMissing : CategoriesNotice
+
+    data class ReorderFailed(val failure: RequestFailure) : CategoriesNotice
 }
 
 /**
@@ -234,6 +263,104 @@ class CategoriesViewModel @Inject constructor(
      */
     fun onMissingAcknowledged() = load()
 
+    // ── Visibility and order (M8.7) ──────────────────────────────────
+
+    /**
+     * Hides or shows the category, on screen first and on the server
+     * after.
+     *
+     * Optimistic with a rollback that **restores the previous value
+     * rather than flipping back**, for the reason M8.5 established: the
+     * naive undo is another flip, which is wrong the moment a second
+     * change lands in between.
+     */
+    fun onVisibilityChange(visible: Boolean) {
+        val editor = _uiState.value.editor ?: return
+        val category = editor.category ?: return
+        if (editor.working) return
+
+        val before = category
+        replaceCategory(category.copy(isVisible = visible))
+        updateEditor { it.copy(working = true, error = null) }
+
+        viewModelScope.launch {
+            when (val result = categoryRepository.setVisible(category.id, visible)) {
+                is UpdateVisibilityResult.Updated ->
+                    updateEditor { it.copy(working = false) }
+
+                is UpdateVisibilityResult.Missing -> {
+                    replaceCategory(before)
+                    failEditor(CategoryEditorError.Missing)
+                }
+
+                is UpdateVisibilityResult.Failed -> {
+                    replaceCategory(before)
+                    failEditor(CategoryEditorError.Failed(result.failure))
+                }
+            }
+        }
+    }
+
+    fun onMoveEarlier(category: Category) = move(category, by = -1)
+
+    fun onMoveLater(category: Category) = move(category, by = 1)
+
+    /**
+     * Swaps a category with its neighbour.
+     *
+     * The two rows **exchange their `display_order` values** rather than
+     * the list being renumbered by index. Renumbering would rewrite every
+     * row the owner did not touch, and would be wrong wherever the column
+     * has gaps — the seed is 1-based, so it always has.
+     */
+    private fun move(category: Category, by: Int) {
+        val current = _uiState.value
+        if (current.reordering) return
+
+        val from = current.categories.indexOfFirst { it.id == category.id }
+        val to = from + by
+        if (from < 0 || to !in current.categories.indices) return
+
+        val neighbour = current.categories[to]
+        val moved = category.copy(displayOrder = neighbour.displayOrder)
+        val displaced = neighbour.copy(displayOrder = category.displayOrder)
+
+        val reordered = current.categories.toMutableList()
+        reordered[from] = displaced
+        reordered[to] = moved
+
+        _uiState.update { it.copy(categories = reordered, reordering = true, notice = null) }
+
+        viewModelScope.launch {
+            val positions = listOf(
+                CategoryPosition(moved.id, moved.displayOrder),
+                CategoryPosition(displaced.id, displaced.displayOrder),
+            )
+
+            when (val result = categoryRepository.reorder(positions)) {
+                is ReorderResult.Reordered ->
+                    _uiState.update { it.copy(reordering = false) }
+
+                // Both failures re-read rather than putting the old order
+                // back: half the swap may already be written, and only
+                // the server knows which half.
+                is ReorderResult.Missing -> {
+                    _uiState.update { it.copy(notice = CategoriesNotice.ReorderMissing) }
+                    reload()
+                }
+
+                is ReorderResult.Failed -> {
+                    _uiState.update {
+                        it.copy(notice = CategoriesNotice.ReorderFailed(result.failure))
+                    }
+                    reload()
+                }
+            }
+        }
+    }
+
+    fun onNoticeDismissed() = _uiState.update { it.copy(notice = null) }
+
     private fun validate(name: String, editing: Category?): CategoryEditorError? = when {
         name.isBlank() -> CategoryEditorError.NameBlank
 
@@ -242,6 +369,37 @@ class CategoriesViewModel @Inject constructor(
         } -> CategoryEditorError.NameTaken
 
         else -> null
+    }
+
+    /**
+     * Re-reads the list without the skeleton.
+     *
+     * A move that failed leaves rows on screen the owner is looking at,
+     * and replacing them with skeletons for a request they did not ask
+     * for would take the list away to tell them it is unchanged. The
+     * notice beside it is what says something went wrong.
+     */
+    private suspend fun reload() {
+        when (val result = catalogueRepository.categories()) {
+            is CatalogueResult.Loaded -> _uiState.update {
+                it.copy(categories = result.items, reordering = false)
+            }
+
+            // The order on screen is now known to be wrong and could not
+            // be corrected. The notice already says so; a second error
+            // would be the same news twice.
+            is CatalogueResult.Failed -> _uiState.update { it.copy(reordering = false) }
+        }
+    }
+
+    /** Keeps the list and the open dialog looking at the same row. */
+    private fun replaceCategory(category: Category) = _uiState.update { state ->
+        state.copy(
+            categories = state.categories.map { if (it.id == category.id) category else it },
+            editor = state.editor?.takeIf { it.category?.id == category.id }
+                ?.copy(category = category)
+                ?: state.editor,
+        )
     }
 
     private fun failEditor(error: CategoryEditorError) =
