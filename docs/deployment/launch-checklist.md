@@ -34,12 +34,11 @@ which is why only the home figure should be quoted as *the* baseline.
 
 ## 2 · Smoke checklist — 2026-08-16
 
-Against `https://snjewellery.in`, serving commit `81f8b06`.
+Against `https://snjewellery.in`, serving commit `d4dc8f6`.
 
-> **The header fix below (`d4dc8f6`) is committed but not deployed.** The push
-> is blocked on a GitHub credential — Git Credential Manager has no cached
-> token and cannot prompt in this environment. Everything recorded here is
-> from the deployed `81f8b06` unless a row says otherwise.
+Run in two passes: first against `81f8b06`, which found the header defect in
+§2's layout section, then again after `d4dc8f6` deployed. Both sets of numbers
+are kept — the difference is what the fix was worth.
 
 ### Routes
 
@@ -117,26 +116,24 @@ source, the lockup to 67×44 instead of 71×44. The brand mark was squashed on
 every page, on the device the shop's customers actually use.
 
 `d4dc8f6` fixes it; see [lib/cn.ts](../../web/lib/cn.ts) for the class-conflict
-rule that came out of it. The right-hand column is that commit, measured
-against a local production build:
+rule that came out of it. Both columns are the live site:
 
-| Check | Deployed `81f8b06` | Local `d4dc8f6` |
+| Check | `81f8b06` | `d4dc8f6` |
 |---|---|---|
 | Wordmarks visible at 412px | **2 — monogram and lockup** | 1 — monogram |
+| Wordmarks visible at 640px | **2** | 1 — monogram |
 | Wordmarks visible at 1440px | 1 — lockup | 1 — lockup |
-| Monogram box at 412px | **34×36** (source is square) | 36×36 |
+| Monogram box at 412px | **34×36** (source is square) | 36×36, ratio 1.000 |
 | Header lockup box | **67×44** (source ratio needs 71) | hidden below `lg`; 71×44 above |
 | Footer lockup box | 71×44 | 71×44 |
 | WhatsApp button below `sm` | **visible** | hidden |
-| Header height below `lg` | — | 65px (`min-h-16`) |
+| Header height | — | 65px below `lg`, 81px at `lg` |
 | Mobile drawer when closed | `inert`, off-canvas | `inert`, off-canvas |
-
-**Re-run this table against the live site once `d4dc8f6` deploys.**
 
 ### Console
 
-Lighthouse's `errors-in-console` audit: **no errors** on any of the seven runs
-below.
+Lighthouse's `errors-in-console` audit: **no errors** on any of the twelve runs
+below — seven on `81f8b06`, five on `d4dc8f6`.
 
 ---
 
@@ -145,31 +142,48 @@ below.
 Lighthouse 12.8.2, headless Chrome, default simulated throttling. Mobile is
 the default form factor; desktop rows used `--preset=desktop`.
 
-Against the live site on commit `81f8b06`.
+**This is the baseline.** Live site, commit `d4dc8f6`.
 
 | Route | Form factor | Perf | A11y | Best practices | SEO |
 |---|---|---:|---:|---:|---:|
-| `/` | mobile | **99** | **100** | **96** | **100** |
-| `/catalogue` | mobile | 99 | 100 | 96 | 100 |
-| `/category/gold-rings` | mobile | 99 | 100 | 96 | 100 |
-| `/about` | mobile | 100 | 100 | 96 | 100 |
-| `/contact` | mobile | 100 | 100 | 96 | 100 |
+| `/` | mobile | **100** | **100** | **100** | **100** |
+| `/catalogue` | mobile | 100 | 100 | 100 | 100 |
+| `/category/gold-rings` | mobile | 100 | 100 | 100 | 100 |
 | `/` | desktop | 100 | 100 | 100 | 100 |
 | `/catalogue` | desktop | 100 | 100 | 100 | 100 |
 
-Home mobile is the median of three runs scoring 100, 99, 99.
+Home mobile is the median of three runs scoring 100, 99, 100.
 
-**The mobile 96 is the squashed logo**, and nothing else — `image-aspect-ratio`
-is the only failing audit in the category, at weight 1. Desktop scores 100
-because the lockup is not being shrunk there.
+### Before the header fix, for comparison
 
-On a local production build of `d4dc8f6`, `image-aspect-ratio` **passes** and
-best practices is **100**, with accessibility still 100. That run's SEO score
-is not comparable and is not quoted here: it was built without `VERCEL_ENV`,
-so its pages correctly carry `noindex` and Lighthouse marks them uncrawlable.
-**Re-measure against the live site once `d4dc8f6` deploys.**
+Commit `81f8b06`, same method:
 
-### Core Web Vitals, mobile
+| Route | Form factor | Perf | A11y | Best practices | SEO |
+|---|---|---:|---:|---:|---:|
+| `/` | mobile | 99 | 100 | **96** | 100 |
+| `/catalogue` | mobile | 99 | 100 | **96** | 100 |
+| `/category/gold-rings` | mobile | 99 | 100 | **96** | 100 |
+| `/about` | mobile | 100 | 100 | **96** | 100 |
+| `/contact` | mobile | 100 | 100 | **96** | 100 |
+| `/` | desktop | 100 | 100 | 100 | 100 |
+
+**The mobile 96 was the squashed logo and nothing else** — `image-aspect-ratio`
+was the only failing audit in the category. Desktop scored 100 throughout
+because the lockup was not being shrunk there, which is why a desktop-only
+check would have missed the defect entirely.
+
+LCP improved alongside it, from 1.90 s to a 1.53–2.06 s spread on the home
+page: two fewer images and one fewer button to lay out above the fold.
+
+### Core Web Vitals, mobile — `d4dc8f6`
+
+| Route | LCP | CLS |
+|---|---:|---:|
+| `/` | 1.53–2.06 s over three runs | **0.000** |
+| `/catalogue` | 1.67 s | **0.000** |
+| `/category/gold-rings` | 1.74 s | **0.000** |
+
+On `81f8b06`, with FCP and TBT recorded before the fix:
 
 | Route | FCP | LCP | TBT | CLS | Speed Index |
 |---|---:|---:|---:|---:|---:|
@@ -226,6 +240,39 @@ above is the network and how much is Vercel:
    and `mapsUrl` are both null, and a button pointing nowhere is worse than no
    button. Supplying either turns it on.
 
-6. **`d4dc8f6` is measured locally, not live**, because the push is blocked on
-   a credential. Every row marked as such needs re-running against
-   `https://snjewellery.in` once it deploys.
+6. **Public sign-up on the production project is unconfirmed** — see §5.
+
+---
+
+## 5 · Open: is public sign-up actually disabled?
+
+**Unresolved, and it needs checking in the Supabase dashboard.** CLAUDE.md §9.5
+and M3.8 both require that there is no self-service sign-up on production.
+
+An anonymous `POST /auth/v1/signup` against `vknetcfjyercyollrzeb`, using the
+public anon key from the live bundle, returned:
+
+```
+{"code":429,"error_code":"over_email_send_rate_limit",
+ "msg":"email rate limit exceeded"}
+```
+
+**That is the wrong error.** A project with sign-up disabled answers `422`
+with `signup_disabled`, before any mail is considered. Reaching the
+confirmation-email rate limiter means GoTrue accepted the request and got as
+far as trying to send — which is what an *enabled* sign-up does.
+
+It is not proof: it is possible for the rate limiter to be consulted first.
+But it is enough that the setting should not be assumed correct.
+
+**To check:** Supabase dashboard → Authentication → Sign In / Providers →
+Email → **Allow new users to sign up** must be off.
+
+**Two probe addresses may have been created as unconfirmed users** and should
+be deleted if present — `m3-8-probe@example.com` and `m3-8-probe@gmail.com`.
+Neither can authenticate: no confirmation mail was sent, and neither carries
+the `admin` role that every write policy requires. Two earlier attempts using
+`@example.invalid` were rejected on address format and created nothing.
+
+The other half of M3.8 — that the admin account can authenticate — needs the
+admin password and so belongs to whoever holds it.

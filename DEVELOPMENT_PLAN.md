@@ -426,9 +426,13 @@ Stand up the backend and **freeze the schema contract** both clients code agains
   Public role: `SELECT` only, and only where the product is not archived and its category `is_visible`. Admin role: full write on products, images, categories. Storage: public read, admin-only write. `users`: self-read only, role not self-assignable.
   *Done when:* the adversarial checks in this milestone's acceptance criteria all pass.
 
-- **`M3.8` Authentication configuration** — `S` — ◐ **config.toml done**; the hosted project still needs signup disabled and the first admin created in the dashboard
+- **`M3.8` Authentication configuration** — `S` — ⚠ **config.toml done; the production sign-up setting looks wrong and must be checked**
   Email/password enabled, public sign-up disabled, first admin user created with `role = 'admin'`.
   *Done when:* the admin can authenticate and a self-service sign-up attempt is rejected.
+
+  The admin account exists — created by the owner in the dashboard, 2026-08-16.
+
+  **The sign-up half did not pass.** An anonymous `POST /auth/v1/signup` against production, using the public anon key from the live bundle, returned `429 over_email_send_rate_limit` — not the `422 signup_disabled` a project with sign-up off answers with. Reaching the confirmation-email rate limiter means GoTrue accepted the request and got as far as trying to send, which is what an *enabled* sign-up does. Not conclusive — the limiter may simply be consulted first — but not something to assume correct either, given CLAUDE.md §9.5. **Check Authentication → Sign In / Providers → Email → *Allow new users to sign up*.** Details and the two probe addresses to delete are in [launch-checklist.md §5](docs/deployment/launch-checklist.md).
 
 - **`M3.9` Seed data** — `S` — ✅ **complete** (applied to the dev project)
   The eleven categories the PRD names — Gold Rings, Earrings, Chains, Necklaces, Pendants, Bangles, Bracelets, Bridal Jewellery, Diamond Jewellery, Silver Jewellery, Kids Collection — plus sample products with images.
@@ -673,6 +677,8 @@ Put the customer website in production on a real domain, backed by the productio
 
   **The cause is `cn`.** It joins classes and does not resolve them, so `className="hidden sm:inline-flex"` on a component whose base already says `inline-flex` leaves both in the attribute at equal specificity, and stylesheet order decides — not the order written. `hidden` lost, twice, silently. `max-lg:hidden` and `max-sm:hidden` fix it because a variant does outrank the bare utility, which is why the neighbouring `lg:hidden` worked and hid the bug. `cn`'s own comment claimed the project had "no runtime class conflicts to resolve"; it now records the one it had.
 
+  **Re-measured live after the fix deployed:** one wordmark at each of 412, 640 and 1440, both at their true aspect ratio, header 65px then 81px, and best practices back to 100 on every mobile route.
+
   **Outstanding:** `/product/<slug>` has never been smoke tested because no product exists — so the gallery, the related row, and M4.12's WhatsApp-message criteria are still unchecked. And everything here is headless Chrome with device emulation; the conversion buttons still need a **physical phone**.
 
 - **`M5.8` Baseline measurement and deployment docs** — `S` — ✅ **complete** (baseline recorded against an empty catalogue — re-run after M5.6)
@@ -685,9 +691,9 @@ Put the customer website in production on a real domain, backed by the productio
 
   **The free tier's backup story is stated where it will be read**, not discovered: point-in-time recovery is a paid feature, so on the free tier a migration that overwrites rows has a daily backup as its entire safety net.
 
-  **The baseline is recorded** in [launch-checklist.md §3](docs/deployment/launch-checklist.md). Lighthouse 12.8.2 against the live site: mobile **99 / 100 / 96 / 100** on the home page (median of three), desktop **100 / 100 / 100 / 100**. **CLS is 0.000 on every route**, which is the fixed-aspect-ratio rule in CLAUDE.md §8 doing exactly what it was for. LCP 1.90–2.06 s mobile; TTFB 82–154 ms unthrottled from India.
+  **The baseline is recorded** in [launch-checklist.md §3](docs/deployment/launch-checklist.md). Lighthouse 12.8.2 against the live site on `d4dc8f6`: **100 / 100 / 100 / 100 on mobile and desktop**, home mobile the median of three. **CLS is 0.000 on every route**, which is the fixed-aspect-ratio rule in CLAUDE.md §8 doing exactly what it was for. LCP 1.53–2.06 s mobile; TTFB 82–154 ms unthrottled from India.
 
-  **The mobile 96 on best practices is the squashed logo above** — `image-aspect-ratio` is the only failing audit in the category. It passes on a local build of the fix.
+  **The pre-fix run is kept alongside it**, at best practices 96 on every mobile route and 100 on desktop — the squashed logo, and the reason a desktop-only check would have missed it.
 
   **The baseline's honest limitation, stated where it will be read: the catalogue was empty.** Every page measured is the shell — no product photography, no image grid, no gallery. CLAUDE.md §8 calls images "the performance story" and none of it is in these numbers, so a 99 here is not evidence that a page showing forty photographs scores 99. **Re-run after M5.6 and treat that as the reference M11 and M12 improve against**, keeping this one: the difference between them is the honest cost of the catalogue's images.
 
