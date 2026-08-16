@@ -611,9 +611,23 @@ Put the customer website in production on a real domain, backed by the productio
   Custom domain with HTTPS; choose the canonical host and redirect the other.
   *Done when:* HTTP redirects to HTTPS and the non-canonical host redirects to the canonical one.
 
-- **`M5.5` Production error handling and robots** — `S`
+- **`M5.5` Production error handling and robots** — `S` — ◐ **built and verified in the build output; the broken-route check needs a deployment**
   `error.tsx`, `not-found.tsx`, a global error boundary, and `robots.txt`. Preview deployments excluded from indexing.
   *Done when:* a deliberately broken route renders the styled error page, and previews are non-indexable.
+
+  **Two of the four already existed.** `error.tsx` and `not-found.tsx` shipped with M4.8. What was missing is the boundary *above* them and the robots handling.
+
+  **`global-error.tsx` exists because the root layout does real work.** `error.tsx` renders *inside* the layout, so it cannot catch a failure *in* it — and `getVisibleCategories` runs there, once, so the header and footer share one read. If that throws, `error.tsx` never renders and the customer meets the browser's own blank failure page. It repeats `<html>` and `<body>` and imports the stylesheet itself because it replaces the root layout rather than sitting inside it — Next's contract, not a stylistic choice — and everything visual still comes from the tokens, since a hand-written colour here would be the one place the site does not match itself, on the page seen when it is already broken. **It offers no link to another route**: if the layout cannot render, neither can any page inside it, so "browse the catalogue" would lead back to this page. The shop's phone number is the honest alternative.
+
+  **Not indexable is two mechanisms, and only one of them works.** `robots.txt` asks a crawler not to *fetch*; it does not stop a URL being indexed when something links to it, and a disallowed page can still surface as a bare link. The `noindex` robots directive in the root layout is what actually removes it. Both read one function, `isIndexable()`, so they cannot drift into a preview that politely asks not to be crawled while telling search engines to index it.
+
+  **An absent `VERCEL_ENV` reads as "development", deliberately.** The variable is platform-injected and absent everywhere else — local, CI, a container. Both possible defaults are wrong somewhere; this one is wrong towards *not indexed*, which costs a rebuild, rather than towards *indexed*, which puts a preview of an unreleased catalogue in Google's index on somebody else's timetable.
+
+  **Verified against the built output, both ways.** With no `VERCEL_ENV`: `robots.txt` is `Disallow: /` and every page carries `noindex, nofollow, nocache`. With `VERCEL_ENV=production`: `Allow: /` with the canonical host, and `index, follow`. `npm run verify` and `npm run build` pass — 33 routes, 40 data-contract tests.
+
+  **A search of the built output found no `service_role`** anywhere in `.next/static` or `.next/server` — M5.3's criterion, checked early because it is cheap and the answer must never change.
+
+  **Not verified: a deliberately broken route on a deployment.** Needs the site deployed.
 
 - **`M5.6` Real catalogue content** — `M`
   Enter the initial genuine products through the Supabase dashboard — the admin app does not arrive until M7.

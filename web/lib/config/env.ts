@@ -137,3 +137,49 @@ export const serverEnv = {
     return serverGetters.revalidationSecret();
   },
 };
+
+/**
+ * Which deployment this is.
+ *
+ * ── Why this one is not validated like the others ──────────────────
+ * `VERCEL_ENV` is set by the platform, not by a person, and it is
+ * absent everywhere else — a local `next dev`, a CI build, a container.
+ * Treating an absent value as a misconfiguration would make the site
+ * refuse to start anywhere but Vercel, so it falls back rather than
+ * throwing.
+ *
+ * ── Why the fallback is "development" and not "production" ─────────
+ * Deliberately the cautious direction. Everything that reads this makes
+ * the same choice — index this deployment, or keep it out of search —
+ * and being wrong towards *not indexed* costs a rebuild, while being
+ * wrong towards *indexed* puts a preview of an unreleased catalogue in
+ * Google's index, where removing it is somebody else's timetable.
+ *
+ * Server-only: `VERCEL_ENV` carries no `NEXT_PUBLIC_` prefix, so it is
+ * not inlined into the browser bundle. Read it from Server Components
+ * and metadata routes only.
+ */
+export type Deployment = "production" | "preview" | "development";
+
+export function deployment(): Deployment {
+  switch (process.env.VERCEL_ENV) {
+    case "production":
+      return "production";
+    case "preview":
+      return "preview";
+    default:
+      return "development";
+  }
+}
+
+/**
+ * Whether this deployment may appear in search results.
+ *
+ * The one question every caller actually has, asked once here so that
+ * `robots.txt` and the page-level robots meta tag cannot disagree —
+ * which is the failure mode that puts a preview in the index while the
+ * text file politely asks otherwise.
+ */
+export function isIndexable(): boolean {
+  return deployment() === "production";
+}
