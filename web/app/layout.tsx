@@ -3,7 +3,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { fontVariables } from "@/lib/fonts";
 import { site } from "@/lib/config/site";
-import { isIndexable } from "@/lib/config/env";
+import { isIndexable, publicEnv } from "@/lib/config/env";
 import { getVisibleCategories } from "@/lib/data/cache";
 import "./globals.css";
 
@@ -20,17 +20,35 @@ import "./globals.css";
  *
  * `nocache` and the image and snippet limits are what stop a preview
  * leaving a cached copy behind if it was crawled before this shipped.
+ *
+ * ── Why the canonical tag, when `www` already redirects ──────────────
+ * The redirect in `next.config.ts` folds `www` into the apex, but the
+ * Vercel deployment alias (`*.vercel.app`) serves the same pages on a
+ * third host and cannot be redirected without breaking Vercel's own
+ * per-deployment URLs. The canonical tag is what tells a crawler which
+ * of the three is the real address. `"./"` resolves against
+ * `metadataBase` per route, so every page declares its own canonical
+ * URL rather than every page claiming to be the home page.
+ *
+ * ── Why this is a function and not a `metadata` const ────────────────
+ * `publicEnv` validates lazily, on first access, so that the site still
+ * starts before a Supabase project exists (see lib/config/env.ts). A
+ * module-level const would read `siteUrl` at import time and undo that.
  */
-export const metadata: Metadata = {
-  title: {
-    default: site.name,
-    template: `%s · ${site.shortName}`,
-  },
-  description: site.description,
-  robots: isIndexable()
-    ? { index: true, follow: true }
-    : { index: false, follow: false, nocache: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    metadataBase: new URL(publicEnv.siteUrl),
+    title: {
+      default: site.name,
+      template: `%s · ${site.shortName}`,
+    },
+    description: site.description,
+    alternates: { canonical: "./" },
+    robots: isIndexable()
+      ? { index: true, follow: true }
+      : { index: false, follow: false, nocache: true },
+  };
+}
 
 export default async function RootLayout({
   children,

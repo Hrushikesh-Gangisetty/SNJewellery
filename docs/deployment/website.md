@@ -88,14 +88,27 @@ other clone. Prefer a new commit — CLAUDE.md §10.
 
 1. Vercel → the project → **Settings → Domains**
 2. Add both `example.com` and `www.example.com`
-3. Choose which is canonical, and set the other to **Redirect** to it
+3. Set `NEXT_PUBLIC_SITE_URL` to the canonical host, with no trailing slash
 
 **Pick one and mean it.** Serving the same catalogue on two hosts splits its
-search ranking between them and makes every canonical URL ambiguous. Vercel's
-redirect is a 308, which is permanent and preserves the path.
+search ranking between them and makes every canonical URL ambiguous.
 
-`NEXT_PUBLIC_SITE_URL` must then be the canonical host, with no trailing slash —
-it is what canonical URLs, Open Graph tags and the sitemap are built from (M11).
+**The redirect is in the repository, not in the dashboard.** `next.config.ts`
+derives it from `NEXT_PUBLIC_SITE_URL` and redirects the `www` host to the
+canonical one with a path-preserving 308. Setting Vercel's own domain-level
+redirect as well is harmless but redundant, and it is a rule nobody can see from
+the code — the version here is reviewable and testable in a local `next start`.
+So `NEXT_PUBLIC_SITE_URL` is the single control: change it and the redirect,
+the canonical tags and `robots.txt` all follow.
+
+### The third host
+
+The `*.vercel.app` deployment alias serves the same pages, and it is
+deliberately **not** redirected — doing so would break Vercel's per-deployment
+URLs, which are how a build is inspected before it is promoted. The canonical
+tag in the root layout is what keeps it out of search results instead. Expect
+`https://<project>.vercel.app` to return `200` with a canonical pointing at the
+real domain; that is correct, not a misconfiguration.
 
 ### DNS
 
@@ -121,6 +134,10 @@ curl -sI https://www.example.com   | head -1   # expect 30x, if www is not canon
 curl -sI https://example.com       | head -1   # expect 200
 ```
 
+Note that the `www` redirect ships in the build, so it only appears once a
+deployment carrying it has gone live — a freshly added domain will serve `200`
+on both hosts until then.
+
 ---
 
 ## 5 · After the first production deploy
@@ -131,5 +148,10 @@ curl -sI https://example.com       | head -1   # expect 200
 - [ ] A preview deployment's `/robots.txt` says `Disallow: /`
 - [ ] View source on the home page: `<meta name="robots" content="index, follow">`
 - [ ] `https://<domain>/does-not-exist` renders the styled 404, not a stack trace
+- [ ] `curl -o /dev/null -w '%{http_code}' https://<domain>/product/does-not-exist`
+      returns **404**, not 200. The styled page rendering is not enough — a soft
+      404 looks identical in a browser and keeps the URL in Google's index
+- [ ] `https://www.<domain>/catalogue` redirects to `https://<domain>/catalogue`,
+      preserving the path
 - [ ] The rates panel — see the note in M5's plan entry if it is missing
 - [ ] Run the smoke checklist (M5.7) and record the Lighthouse baseline (M5.8)
