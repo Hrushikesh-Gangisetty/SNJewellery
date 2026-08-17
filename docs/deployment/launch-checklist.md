@@ -276,3 +276,78 @@ the `admin` role that every write policy requires. Two earlier attempts using
 
 The other half of M3.8 — that the admin account can authenticate — needs the
 admin password and so belongs to whoever holds it.
+
+---
+
+## 6 · Sync freshness — M9.6
+
+How long a change made on the phone takes to appear on production, measured
+from a cold client. The mechanism is documented in
+[architecture/sync.md](../architecture/sync.md); this records what it actually
+does.
+
+**The PRD's budget is 60 seconds for the create path.** The other three are
+recorded because a delete that lags is what prompted M9 being finished, and a
+number nobody wrote down is a number nobody can check later.
+
+### Prerequisite
+
+The webhook must be configured first — [sync.md §5](../architecture/sync.md#5--configuring-the-webhook).
+Without it these measurements record the 10-minute ISR fallback, not the
+mechanism, and every row will read ~600s.
+
+### How to run it
+
+`tools/measure-freshness.mjs` polls a URL with a cache-buster and
+`no-store` until the expected content appears, then prints the elapsed
+time. Start it **before** tapping Save, so the clock includes the upload —
+which is what "visible within one minute of upload" means.
+
+```bash
+# Create: watch the catalogue for a new piece's name
+node tools/measure-freshness.mjs https://your-domain/catalogue \
+  --expect "Test Piece M9"
+
+# Edit: watch the product page for the new name
+node tools/measure-freshness.mjs https://your-domain/product/test-piece-m9 \
+  --expect "Renamed Piece"
+
+# Delete: watch until it is gone (a 404 also counts)
+node tools/measure-freshness.mjs https://your-domain/product/test-piece-m9 \
+  --expect-gone "Test Piece M9"
+
+# Featured toggle: watch the home page
+node tools/measure-freshness.mjs https://your-domain/ \
+  --expect "Test Piece M9"
+```
+
+It exits non-zero if the content never appears, or appears after 60s.
+
+### Results — not yet measured
+
+| Path | Measured | Budget | Result |
+|---|---:|---:|---|
+| Create — upload to visible on `/catalogue` | — | 60s | not run |
+| Edit — rename to visible on `/product/<slug>` | — | — | not run |
+| Delete — delete to gone from `/product/<slug>` | — | — | not run |
+| Featured toggle — to visible on `/` | — | — | not run |
+
+**These rows are deliberately empty.** The measurement needs a phone, the
+production deployment, and the webhook configured; it cannot be run from a
+development machine and must not be estimated. M9.6 is not complete until
+they are filled in.
+
+Record the `elapsed` figure the script prints, and note the date and whether
+the webhook was confirmed active in the Supabase logs at the time.
+
+### What this will not measure
+
+1. **Time to the shop owner's own phone.** These poll from a development
+   machine. A customer on mobile data sees the same cache but a slower
+   network, and that difference belongs to M12, not here.
+2. **Whether the image itself is visible.** The script matches on text in
+   the HTML. A product whose page renders before its photograph has finished
+   propagating through the storage CDN would still count as visible.
+3. **Repeat runs.** One measurement per path is a data point, not a
+   distribution. If a number lands near the 60s budget, run it three times
+   before believing it.

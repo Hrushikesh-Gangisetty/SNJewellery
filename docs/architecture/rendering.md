@@ -2,7 +2,7 @@
 
 Produced by **M4.7**. Implements [ADR-0006](../adr/0006-cache-revalidation-strategy.md), which chose the mechanism; this records what was actually built.
 
-The one-sentence version: **every customer-facing route is static HTML with ISR, every read carries a cache tag, and M9 will invalidate those tags from a database webhook.**
+The one-sentence version: **every customer-facing route is static HTML with ISR, every read carries a cache tag, and a database webhook invalidates those tags — see [sync.md](sync.md).**
 
 ---
 
@@ -78,16 +78,19 @@ The server action behind "Load more" reads through the same cached layer, so a s
 
 ---
 
-## 5 · What M9 must do
+## 5 · What invalidates these tags
 
-Nothing here invalidates anything yet — no webhook exists. M9 adds:
+Built in M9. `POST /api/revalidate` receives a Supabase database webhook and
+clears the tags a changed row affects; the mutation → tag map is `tagsFor` in
+`web/lib/data/revalidate.ts`.
 
-| Task | What it needs from this file |
-|---|---|
-| M9.1 / M9.2 | A secret-protected route calling `revalidateTag` with the names in §2 |
-| M9.3 | The mutation → tag map. §2's right-hand column is the draft |
-| M9.5 | Confirmation that a dropped webhook degrades to §3's interval rather than to permanent staleness |
-| M9.6 | The end-to-end measurement: upload to visible, under 60 seconds |
+**[sync.md](sync.md) owns that mechanism** — the endpoint's contract, the
+webhook configuration, and the runbook for a page that will not update. This
+file stops at the tag vocabulary those tags are drawn from.
+
+One consequence belongs here rather than there: an untagged read (see §4) is
+invisible to the whole mechanism. It cannot be invalidated, and it goes stale
+in production without any error anywhere.
 
 ---
 

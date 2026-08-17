@@ -30,8 +30,11 @@ import type { Category, MetalRate, Page, Product } from "./types";
  * rebuilds; the PRD's one-minute budget is met by the webhook.
  *
  * M9.5 tests this by disabling the webhook deliberately.
+ *
+ * Exported so the revalidation endpoint can name the interval in its
+ * failure log without hard-coding a second copy of the number.
  */
-const REVALIDATE_SECONDS = 600;
+export const REVALIDATE_SECONDS = 600;
 
 /**
  * The tag vocabulary. `tagsFor` in ./revalidate.ts maps each mutation to

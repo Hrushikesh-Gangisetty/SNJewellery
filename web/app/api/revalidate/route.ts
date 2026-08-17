@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { revalidateTag } from "next/cache";
 import { serverEnv } from "@/lib/config/env";
+import { REVALIDATE_SECONDS } from "@/lib/data/cache";
 import { parseWebhookPayload, tagsFor } from "@/lib/data/revalidate";
 
 /**
@@ -44,6 +45,13 @@ export const dynamic = "force-dynamic";
 
 /** The header the webhook presents the shared secret in. */
 const SECRET_HEADER = "x-revalidation-secret";
+
+/**
+ * How long a dropped webhook leaves the site stale, for the failure log.
+ * Derived from the ISR interval rather than written out, so the number in
+ * the log cannot drift from the number that governs the behaviour.
+ */
+const FALLBACK_MINUTES = Math.round(REVALIDATE_SECONDS / 60);
 
 /**
  * Constant-time comparison, so the response time does not reveal how much
@@ -95,13 +103,22 @@ export async function POST(request: Request): Promise<Response> {
     for (const tag of tags) revalidateTag(tag);
   } catch (cause) {
     console.error(
-      `[revalidate] failed for ${payload.type} on ${payload.table}; tags: ${tags.join(", ")}`,
+      `[revalidate] FAILED ${payload.type} on ${payload.table}; tags: ${tags.join(", ")}; ` +
+        `the site stays stale until the ${FALLBACK_MINUTES}-minute ISR interval expires`,
       cause,
     );
     // 500 so the webhook retries. The handler is idempotent, so a retry
     // that partially succeeded the first time is harmless.
     return Response.json({ error: "revalidation failed" }, { status: 500 });
   }
+
+  // Logged on success too, not only on failure. A stale page is diagnosed
+  // by asking "did the webhook arrive, and what did it clear?" — and the
+  // absence of a line answers the first half. One line per mutation on a
+  // catalogue edited a few times a day is not log noise.
+  console.info(
+    `[revalidate] ${payload.type} on ${payload.table}; cleared: ${tags.join(", ")}`,
+  );
 
   return Response.json({ revalidated: tags });
 }

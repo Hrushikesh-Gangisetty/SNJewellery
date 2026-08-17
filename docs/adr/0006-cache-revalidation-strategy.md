@@ -60,10 +60,12 @@ Cache tags must be placed correctly during M4.7, before M9 exists. Retrofitting 
 
 ## Open sub-questions
 
+All four are now settled. The implementation is documented in [docs/architecture/sync.md](../architecture/sync.md).
+
 - ~~The mechanism itself~~ — **decided 2026-07-25: webhook + `revalidateTag`.**
-- **The fallback ISR interval.** Long enough not to waste rebuilds, short enough to bound a webhook failure. Set in M9.5.
-- Whether image reordering and status toggles need distinct tags or can share a product-level tag. Decided in M9.3.
-- Whether to alert on revalidation failure, or only log it (M9.5).
+- ~~The fallback ISR interval~~ — **decided 2026-08-17 (M9.5): 600 seconds.** Ten minutes wastes almost no rebuilds on a catalogue edited a few times a day, and bounds a dropped webhook to an annoyance. `REVALIDATE_SECONDS` in `web/lib/data/cache.ts` is the single source; the endpoint imports it rather than restating the number.
+- ~~Whether image reordering and status toggles need distinct tags~~ — **decided 2026-08-17 (M9.3): they share the product-level tag.** A `product_images` row carries `product_id` and no slug, so a slug-scoped tag would need a database query on a path that must not fail. The cost is that a reorder updates cards immediately but the detail gallery may wait for the interval. Revisit if that becomes a real complaint.
+- ~~Whether to alert on revalidation failure~~ — **decided 2026-08-17 (M9.5): log only, no alerting.** Every delivery logs one line, success or failure, and the failure line names the tags and the fallback interval. Alerting on a failure that self-corrects within ten minutes, on a site with one maintainer, would be noise. The success line matters as much as the failure one: diagnosing a stale page starts with "did the webhook arrive at all", and only a success log answers that.
 
 ## References
 

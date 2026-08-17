@@ -46,10 +46,49 @@ async function canonicalHostRedirects() {
   ];
 }
 
+/**
+ * Cache headers (M9.4).
+ *
+ * ── What is deliberately NOT here ────────────────────────────────────
+ * The catalogue pages set no `Cache-Control`. That is not an omission.
+ * Each carries `export const revalidate = 600`, and Vercel derives the
+ * CDN's `s-maxage` from that same value — so the edge cache and the ISR
+ * cache expire together and `revalidateTag` purges both. Writing an
+ * explicit header over the top is how the two drift apart: the tag would
+ * clear Next's cache while the edge kept serving the old HTML until its
+ * own, separately-specified age ran out. That is precisely the "stale
+ * edge cache defeats revalidation" failure M9.4 exists to prevent, and
+ * the way to avoid it is to let one value drive both.
+ *
+ * ── What is here, and why it needs saying ────────────────────────────
+ * The revalidation endpoint. `dynamic = "force-dynamic"` stops Next
+ * caching it, but that governs Next, not whatever sits in front of it —
+ * a proxy or a corporate intermediary is entitled to cache a 200 to a
+ * POST it was not told about. A cached revalidation response would be
+ * answered without the handler ever running, which fails silently and
+ * leaves the site stale: the exact bug this milestone is about. The
+ * header costs nothing on a route called a few times a day.
+ */
+async function cacheHeaders() {
+  return [
+    {
+      source: "/api/revalidate",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "no-store, no-cache, must-revalidate",
+        },
+      ],
+    },
+  ];
+}
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(import.meta.dirname, ".."),
 
   redirects: canonicalHostRedirects,
+
+  headers: cacheHeaders,
 
   images: {
     /**

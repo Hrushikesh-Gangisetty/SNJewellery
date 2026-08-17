@@ -151,6 +151,46 @@ ok(
 );
 revalidateThrows = false;
 
+// ── Logging (M9.5) ───────────────────────────────────────────────────
+// A dropped revalidation is invisible by construction, so the log line is
+// the only evidence a delivery arrived. Captured rather than eyeballed,
+// because "it prints something" is not a criterion anyone can re-check.
+const captured = { info: [], error: [] };
+const realInfo = console.info,
+  realError = console.error;
+console.info = (...a) => captured.info.push(a.join(" "));
+console.error = (...a) => captured.error.push(a.join(" "));
+
+await post(productChange, SECRET);
+ok(
+  "a successful revalidation logs the tags it cleared",
+  captured.info.some(
+    (line) => line.includes("[revalidate]") && line.includes("products"),
+  ),
+  captured.info.join(" | "),
+);
+
+captured.error.length = 0;
+revalidateThrows = true;
+await post(productChange, SECRET);
+revalidateThrows = false;
+ok(
+  "a failed revalidation logs the fallback interval so staleness is bounded",
+  captured.error.some((line) => line.includes("10-minute")),
+  captured.error.join(" | "),
+);
+
+captured.error.length = 0;
+await post(productChange, "wrong-secret-here");
+ok(
+  "a rejected request logs nothing - an unauthenticated caller cannot fill the log",
+  captured.error.length === 0 && captured.info.length > 0,
+  captured.error.join(" | "),
+);
+
+console.info = realInfo;
+console.error = realError;
+
 // ── The tag map (M9.3) ───────────────────────────────────────────────
 // The criterion is that revalidating one product leaves unrelated pages
 // cached, so each case asserts what is ABSENT as much as what is present.

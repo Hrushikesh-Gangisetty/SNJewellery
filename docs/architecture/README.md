@@ -37,7 +37,7 @@ flowchart LR
 | `android-app.md` | Admin app package layout, layering rules, DI, screen structure | M6.3, M6.4 |
 | `sync.md` | Revalidation mechanism, mutation→tag map, stale-page diagnosis runbook | M9.7 |
 
-Both are near-term deliverables. This README carries the system overview until they exist.
+This README carries the system overview; each document above owns its area.
 
 ## Structural invariants
 
