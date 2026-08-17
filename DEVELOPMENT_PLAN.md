@@ -1548,31 +1548,37 @@ Close the loop between the two clients and prove the PRD's headline promise: a p
 
 ### Tasks
 
-- **`M9.1` Choose the mechanism** — `S`
+- **`M9.1` Choose the mechanism** — `S` — ✅ **complete**
   Decide between a database webhook or Edge Function calling a secured revalidation route, and Supabase Realtime. Record the trade-offs.
   *Done when:* the mechanism is implemented as [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md) specifies — webhook plus `revalidateTag`.
+  Needed no separate decision: ADR-0006 was already Accepted and names the mechanism. Satisfied by M9.2/M9.3 implementing it.
 
-- **`M9.2` Secured revalidation endpoint** — `M`
+- **`M9.2` Secured revalidation endpoint** — `M` — ✅ **complete**
   Implement it with a shared secret so third parties cannot trigger it, and make it idempotent.
   *Done when:* a request without the correct secret is rejected, and a duplicate delivery causes no error or double-work.
+  `web/app/api/revalidate/route.ts`. Verified against a real `next start`: 401 without the secret, byte-identical 200 on a duplicate delivery.
 
-- **`M9.3` Mutation-to-tag mapping** — `M`
+- **`M9.3` Mutation-to-tag mapping** — `M` — ✅ **complete**
   Map each mutation — product create, update, delete, status toggle, category change, image reorder — to the cache tags it must invalidate, so a single edit does not purge the site.
   *Done when:* revalidating one product leaves unrelated cached pages untouched, verified by observing cache status.
+  `tagsFor` in `web/lib/data/revalidate.ts`. `product_images` shares the product-level tag — see [ADR-0006](docs/adr/0006-cache-revalidation-strategy.md).
 
-- **`M9.4` Cache header tuning** — `S`
+- **`M9.4` Cache header tuning** — `S` — ✅ **complete**
   Tune CDN and cache headers so revalidation is not defeated by a stale edge cache.
   *Done when:* a revalidated page serves fresh content to a cold client with a cleared cache.
+  Catalogue pages deliberately set no `Cache-Control` so one `revalidate` value drives both the ISR and edge caches; the endpoint gets `no-store`.
 
-- **`M9.5` Failure logging and ISR fallback** — `S`
+- **`M9.5` Failure logging and ISR fallback** — `S` — ✅ **complete**
   Log revalidation failures, and set a fallback ISR interval so a failed webhook cannot leave the site stale forever.
   *Done when:* with the webhook deliberately disabled, the page still becomes correct within the documented fallback interval.
+  Fallback fixed at 600s (`REVALIDATE_SECONDS`). Every delivery logs one line; the failure line names the interval.
 
-- **`M9.6` Timed end-to-end measurement** — `M`
+- **`M9.6` Timed end-to-end measurement** — `M` — ⛔ **blocked — needs a phone and the production webhook**
   Upload from the phone; measure until visible on production from a cold client. Repeat for edit, delete, and featured toggle.
   *Done when:* all four measurements are recorded in the repository and the create path is under 60 seconds.
+  Harness written (`tools/measure-freshness.mjs`) and the table is in place at [launch-checklist.md §6](docs/deployment/launch-checklist.md#6--sync-freshness--m96), deliberately empty. **The webhook must be configured in the Supabase dashboard first** — see [sync.md §5](docs/architecture/sync.md#5--configuring-the-webhook); without it these numbers record the 10-minute fallback, not the mechanism.
 
-- **`M9.7` Sync architecture documentation** — `S`
+- **`M9.7` Sync architecture documentation** — `S` — ✅ **complete**
   Write `docs/architecture/sync.md` including how to diagnose a stale page.
   *Done when:* the document explains the mechanism, the tag map, and a diagnosis procedure.
 
