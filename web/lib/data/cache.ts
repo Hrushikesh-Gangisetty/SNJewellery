@@ -6,9 +6,13 @@ import type { Category, MetalRate, Page, Product } from "./types";
  * The cached read layer. Implements [ADR-0006](../../../docs/adr/0006-cache-revalidation-strategy.md).
  *
  * Every page reads through here rather than through `catalogue` directly,
- * so that each cacheable route carries a tag before M9 exists to trigger
- * one. ADR-0006's consequences section is explicit that retrofitting tags
- * across a built site costs more than placing them as pages are written.
+ * so that each cacheable route carries a tag. ADR-0006's consequences
+ * section is explicit that retrofitting tags across a built site costs
+ * more than placing them as pages are written.
+ *
+ * These tags are invalidated by `app/api/revalidate/route.ts`, which a
+ * Supabase database webhook calls on every mutation. The mapping from a
+ * changed row to the tags it clears lives in ./revalidate.ts.
  *
  * ── Why unstable_cache and not fetch tags ────────────────────────────
  * Next's tagging is built on `fetch`, and these reads go through
@@ -30,10 +34,11 @@ import type { Category, MetalRate, Page, Product } from "./types";
 const REVALIDATE_SECONDS = 600;
 
 /**
- * The tag vocabulary. M9.3 maps each mutation to the tags it invalidates,
- * and ADR-0006 warns that a mutation whose tag is missing from that map
- * is a silently stale page — so the names live here, in one place, rather
- * than as string literals spread across routes.
+ * The tag vocabulary. `tagsFor` in ./revalidate.ts maps each mutation to
+ * the tags it invalidates, and ADR-0006 warns that a mutation whose tag
+ * is missing from that map is a silently stale page — so the names live
+ * here, in one place, rather than as string literals spread across
+ * routes.
  *
  * Lists carry `products` because any product change can reorder or
  * repopulate them. Detail pages carry their own slug, so editing one

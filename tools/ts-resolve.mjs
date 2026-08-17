@@ -15,7 +15,10 @@ export async function resolve(spec, ctx, next) {
 
   const isRel = s.startsWith("./") || s.startsWith("../");
   if (isRel || s.startsWith("file:")) {
-    const base = ctx.parentURL ? dirname(fileURLToPath(ctx.parentURL)) : WEB;
+    // parentURL is not always a file: URL - during module.register() it is
+    // a node:internal specifier, which fileURLToPath rejects outright.
+    const parentIsFile = ctx.parentURL?.startsWith("file:") === true;
+    const base = parentIsFile ? dirname(fileURLToPath(ctx.parentURL)) : WEB;
     const abs = s.startsWith("file:") ? fileURLToPath(s) : res(base, s);
     for (const cand of [abs, `${abs}.ts`, `${abs}.tsx`, res(abs, "index.ts")]) {
       if (existsSync(cand) && !cand.endsWith("/")) {
