@@ -77,8 +77,17 @@ export function ProductCard({
       </AspectBox>
 
       <div className="flex flex-col gap-1">
-        {/* Two lines reserved so cards in a row align. */}
-        <h3 className="text-heading-s text-text-primary group-hover:text-accent-text line-clamp-2 min-h-[2.8em]">
+        {/* Two lines reserved so cards in a row align. Derived from the
+            type token rather than hard-coded: `min-h-[2.8em]` was two
+            lines only because heading-s happens to have a 1.4 line
+            height, so changing that token silently broke the alignment
+            this exists to hold (CLAUDE.md §3.5). */}
+        <h3
+          className="text-heading-s text-text-primary group-hover:text-accent-text line-clamp-2"
+          style={{
+            minHeight: "calc(var(--text-heading-s--line-height) * 2em)",
+          }}
+        >
           {product.name}
         </h3>
 
