@@ -82,12 +82,19 @@ export function MobileDrawer({
   }, [open]);
 
   // Move focus in on open, and back to the trigger on close.
+  //
+  // The close branch is guarded on having actually been open. Without
+  // that, this effect runs once on mount with `open` already false and
+  // focuses the hamburger on every page load — which on a phone scrolls
+  // the header into view and shows a focus ring nobody asked for.
+  const wasOpen = useRef(false);
   useEffect(() => {
     if (open) {
       panelRef.current?.querySelector<HTMLElement>("a, button")?.focus();
-    } else {
+    } else if (wasOpen.current) {
       triggerRef.current?.focus();
     }
+    wasOpen.current = open;
     // triggerRef is a stable ref object.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -100,10 +107,10 @@ export function MobileDrawer({
         onClick={onClose}
         className={cn(
           "bg-surface/80 fixed inset-0 z-40 backdrop-blur-sm lg:hidden",
-          "ease-standard transition-opacity",
+          "ease-standard transition-[opacity,visibility]",
           open
-            ? "pointer-events-auto opacity-100 duration-[var(--sn-duration-slow)]"
-            : "pointer-events-none opacity-0 duration-[var(--sn-duration-base)]",
+            ? "pointer-events-auto visible opacity-100 duration-[var(--sn-duration-slow)]"
+            : "pointer-events-none invisible opacity-0 duration-[var(--sn-duration-base)]",
         )}
       />
 
@@ -113,14 +120,25 @@ export function MobileDrawer({
         aria-modal="true"
         aria-label="Menu"
         // Hidden from assistive tech and from Tab order when closed.
-        {...(open ? {} : { inert: "" as unknown as boolean })}
+        //
+        // `inert` must be a real boolean. Passing `""` renders NOTHING:
+        // React drops empty-string values for boolean DOM properties, so
+        // the closed drawer kept all eight of its links in the Tab order
+        // and a keyboard user tabbed into an off-screen menu.
+        inert={!open}
         className={cn(
           "bg-surface border-border fixed inset-y-0 right-0 z-50 w-[85vw] max-w-sm border-l lg:hidden",
           "flex flex-col overflow-y-auto",
-          "transition-transform",
+          // `visibility` is what keeps the closed panel from widening the
+          // page. `translate-x-full` only moves it — it still occupies
+          // scrollable area one panel-width past the right edge, which is
+          // horizontal scroll on every page at every mobile width. Hidden
+          // is not focusable and not painted, and it is a transitionable
+          // property, so the slide-out still plays before it applies.
+          "transition-[transform,visibility]",
           open
-            ? "ease-decelerate translate-x-0 duration-[var(--sn-duration-slow)]"
-            : "ease-accelerate translate-x-full duration-[var(--sn-duration-base)]",
+            ? "ease-decelerate visible translate-x-0 duration-[var(--sn-duration-slow)]"
+            : "ease-accelerate invisible translate-x-full duration-[var(--sn-duration-base)]",
         )}
       >
         <div className="border-border flex min-h-16 items-center justify-between border-b px-4">
