@@ -197,6 +197,7 @@ class SupabaseProductRepository @Inject constructor(
         @SerialName("url") val url: String,
         @SerialName("storage_path") val storagePath: String,
         @SerialName("display_order") val displayOrder: Int,
+        @SerialName("aspect") val aspect: String,
     )
 
     override suspend fun byId(id: String): LoadProductResult = try {
@@ -226,7 +227,13 @@ class SupabaseProductRepository @Inject constructor(
                     // promise M7.5 made to the owner.
                     photos = row.images
                         .sortedBy { it.displayOrder }
-                        .map { StoredPhoto(storagePath = it.storagePath, url = it.url) },
+                        .map {
+                            StoredPhoto(
+                                storagePath = it.storagePath,
+                                url = it.url,
+                                portrait = it.aspect == ASPECT_PORTRAIT,
+                            )
+                        },
                 ),
             )
         }
@@ -315,7 +322,15 @@ class SupabaseProductRepository @Inject constructor(
         /** Everything the edit form fills itself from, in one request. */
         val EDITABLE_COLUMNS = Columns.raw(
             "id,slug,name,description,category_id,purity_id,weight_grams,tags,featured," +
-                "product_images(url,storage_path,display_order)",
+                "product_images(url,storage_path,display_order,aspect)",
         )
+
+        /**
+         * The `product_image_aspect` value meaning 4:5. Spelled here as
+         * well as in SupabaseProductImageRepository because this is the
+         * read side of the same column; the two are checked against each
+         * other by AddProductSaveTest.
+         */
+        const val ASPECT_PORTRAIT = "product-portrait"
     }
 }

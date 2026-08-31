@@ -113,7 +113,21 @@ sealed interface UpdateStatusResult {
  * exactly this reason, and dropping either here would mean deriving it
  * again somewhere else.
  */
-data class StoredPhoto(val storagePath: String, val url: String)
+data class StoredPhoto(
+    val storagePath: String,
+    val url: String,
+    /**
+     * The frame the website renders it in, as it was decided when the
+     * photograph was first uploaded.
+     *
+     * Carried rather than re-derived. The aspect is measured from the
+     * file's own bounds, and the file is not on this device when a piece
+     * is being edited — so the only way to re-derive it would be to
+     * download the photograph back. Losing it instead is what made an
+     * edit silently re-crop a portrait piece to a square.
+     */
+    val portrait: Boolean,
+)
 
 /**
  * An existing piece, as the edit form needs it back.
