@@ -542,7 +542,10 @@ class AddProductSaveTest {
             val images = editViewModel().uiState.value.form.images
 
             assertEquals(
-                listOf(FormPhoto.Stored(STORED_ONE.storagePath, STORED_ONE.url), FormPhoto.Stored(STORED_TWO.storagePath, STORED_TWO.url)),
+                listOf(
+                    FormPhoto.Stored(STORED_ONE.storagePath, STORED_ONE.url, portrait = false),
+                    FormPhoto.Stored(STORED_TWO.storagePath, STORED_TWO.url, portrait = true),
+                ),
                 images,
             )
         }
@@ -607,6 +610,52 @@ class AddProductSaveTest {
         // not have destroyed a photograph, which cannot be recovered.
         assertEquals(emptyList<String>(), images.removed)
     }
+
+    @Test
+    fun `saving an edit keeps a portrait photograph's frame`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_TWO))
+        val viewModel = editViewModel()
+
+        viewModel.onNameChange("Temple Necklace II")
+        viewModel.save()
+
+        // The aspect is measured from the file, and the file is not on
+        // this device during an edit. Defaulting it instead re-cropped a
+        // 4:5 piece to a square on the website after an unrelated change.
+        assertEquals(
+            "an edit must not re-crop a published photograph",
+            listOf(true),
+            images.written.map { it.portrait },
+        )
+    }
+
+    @Test
+    fun `a removed photograph outlives a save that fails after it`() = runTest(dispatcher) {
+        products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+        val viewModel = editViewModel()
+        viewModel.onRemoveImage(0)
+        viewModel.onGallerySelection(listOf("staged-0"))
+        images.failFrom = 0
+
+        viewModel.save()
+
+        // Its `product_images` row is still live. Deleting the object
+        // before the replacement rows commit would leave the website
+        // serving a broken image on a published product page.
+        assertEquals(emptyList<String>(), images.removed)
+    }
+
+    @Test
+    fun `a removed photograph is deleted once the replacement rows commit`() =
+        runTest(dispatcher) {
+            products.existing = stored(photos = listOf(STORED_ONE, STORED_TWO))
+            val viewModel = editViewModel()
+            viewModel.onRemoveImage(0)
+
+            viewModel.save()
+
+            assertEquals(listOf(STORED_ONE.storagePath), images.removed)
+        }
 
     @Test
     fun `a new photograph on an existing piece is uploaded and the old ones are not`() =
@@ -691,7 +740,7 @@ class AddProductSaveTest {
         // is why these are a sealed type rather than parallel lists.
         assertEquals(
             listOf<FormPhoto>(
-                FormPhoto.Stored(STORED_ONE.storagePath, STORED_ONE.url),
+                FormPhoto.Stored(STORED_ONE.storagePath, STORED_ONE.url, portrait = false),
                 FormPhoto.Staged("staged-0"),
             ),
             reopened.uiState.value.form.images,
@@ -1011,8 +1060,12 @@ class AddProductSaveTest {
     private companion object {
         const val CATEGORY_ID = "11111111-1111-1111-1111-111111111111"
         const val PRODUCT_ID = "22222222-2222-2222-2222-222222222222"
-        val STORED_ONE = StoredPhoto("products/p/one.webp", "https://example.test/one.webp")
-        val STORED_TWO = StoredPhoto("products/p/two.webp", "https://example.test/two.webp")
+        val STORED_ONE =
+            StoredPhoto("products/p/one.webp", "https://example.test/one.webp", portrait = false)
+
+        /** Portrait, so an edit that flattened the aspect would show here. */
+        val STORED_TWO =
+            StoredPhoto("products/p/two.webp", "https://example.test/two.webp", portrait = true)
         const val BYTES = 1024L
         val OFFLINE = RequestFailure(offline = true)
 

@@ -115,7 +115,16 @@ sealed interface FormPhoto {
      * exactly this reason.
      */
     @Serializable
-    data class Stored(val storagePath: String, val url: String) : FormPhoto {
+    data class Stored(
+        val storagePath: String,
+        val url: String,
+        /**
+         * The frame it is already published in. Carried so that saving an
+         * edit rewrites the row it came from rather than flattening every
+         * portrait photograph to the square default.
+         */
+        val portrait: Boolean = false,
+    ) : FormPhoto {
         override val displayModel: String get() = url
         override val key: String get() = storagePath
     }
@@ -846,6 +855,37 @@ class AddProductViewModel @Inject constructor(
     }
 
     /**
+     * Deletes the photographs the owner took off a piece that is **already
+     * published**, once the rows that replaced them have been committed.
+     *
+     * ── Why this is not part of `clearAbandoned` ─────────────────────
+     * It was, and that was a bug. `clearAbandoned` runs before the
+     * uploads, so a removed photograph left Storage while its
+     * `product_images` row still pointed at it — and if anything after
+     * that failed (the connection dropping mid-upload is the ordinary
+     * case) the save stopped with the row intact and the object gone.
+     * The website then served a broken image on a live product page,
+     * which is the one outcome the pipeline's ordering exists to prevent.
+     *
+     * Deleting after the commit inverts the failure: what is left is an
+     * object nothing points at. That costs storage rather than showing a
+     * customer a broken picture, and it is the same trade the delete
+     * pipeline in M8.4 already makes.
+     *
+     * A failure here is deliberately **not** an interruption. The piece
+     * saved; telling the owner otherwise would have them retry something
+     * that already worked.
+     */
+    private suspend fun clearReplacedStored() {
+        if (removedStored.isEmpty()) return
+
+        val paths = removedStored.toList()
+        if (productImageRepository.remove(paths) is RemoveImagesResult.Removed) {
+            removedStored.clear()
+        }
+    }
+
+    /**
      * Creates the row, or updates the one being edited.
      *
      * The only step of the pipeline that differs between the two modes —
@@ -873,12 +913,12 @@ class AddProductViewModel @Inject constructor(
             .filterIsInstance<FormPhoto.Staged>()
             .map { it.localUri }
             .toSet()
+        // Only objects this save put in the bucket and no longer wants.
+        // Nothing points at them, so removing them now cannot break a
+        // page. Photographs taken off an already-published piece are
+        // *not* here — see clearReplacedStored for why they wait.
         val abandoned = attempt.abandoned +
-            attempt.uploaded.filterNot { it.localUri in wanted }.map { it.storagePath } +
-            // Photographs the owner took off a piece being edited. Removed
-            // here rather than when the button was tapped, so backing out
-            // of the form leaves them intact.
-            removedStored
+            attempt.uploaded.filterNot { it.localUri in wanted }.map { it.storagePath }
 
         if (abandoned.isEmpty()) return true
 
@@ -887,7 +927,6 @@ class AddProductViewModel @Inject constructor(
         return when (val removed = productImageRepository.remove(abandoned)) {
             is RemoveImagesResult.Removed -> {
                 progress = attempt.copy(uploaded = kept, abandoned = emptyList())
-                removedStored.clear()
                 true
             }
 
@@ -981,10 +1020,12 @@ class AddProductViewModel @Inject constructor(
                     storagePath = photo.storagePath,
                     url = photo.url,
                     displayOrder = index,
-                    // `aspect` was decided when it was first uploaded and
-                    // is not re-derived: the file has not changed, and
-                    // guessing again from a URL would need a download.
-                    portrait = false,
+                    // Read back with the row and carried through the form,
+                    // not re-derived: the file has not changed, and
+                    // measuring it again would need a download. Defaulting
+                    // it instead is what silently re-cropped a portrait
+                    // piece to a square on the next unrelated edit.
+                    portrait = photo.portrait,
                 )
 
                 is FormPhoto.Staged -> landed.landed(photo.localUri)?.toRow(index)
@@ -1025,6 +1066,9 @@ class AddProductViewModel @Inject constructor(
 
         when (val written = productImageRepository.replaceImages(productId, images)) {
             is WriteImagesResult.Written -> {
+                // After the commit, never before: the rows that pointed at
+                // these objects have just been replaced.
+                clearReplacedStored()
                 progress = null
                 clearDraft(productId)
                 _uiState.update {
@@ -1325,8 +1369,11 @@ class AddProductViewModel @Inject constructor(
  * constraint M7.2 mirrors.
  */
 /** A stored photograph as the form holds it. */
-internal fun asFormPhoto(photo: StoredPhoto) =
-    FormPhoto.Stored(storagePath = photo.storagePath, url = photo.url)
+internal fun asFormPhoto(photo: StoredPhoto) = FormPhoto.Stored(
+    storagePath = photo.storagePath,
+    url = photo.url,
+    portrait = photo.portrait,
+)
 
 internal fun ProductDraft.toForm() = ProductForm(
     name = name,
