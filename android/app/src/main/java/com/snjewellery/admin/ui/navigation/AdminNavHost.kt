@@ -26,10 +26,22 @@ import com.snjewellery.admin.ui.screens.productsaved.ProductSavedScreen
  * what makes "relaunch after logout shows sign-in" true for free: there
  * is no navigation state to get out of step with the session, because
  * the session is the only thing deciding.
+ *
+ * ── There is deliberately no sign-out here ───────────────────────────
+ * It sat in the dashboard's top bar next to **Add product** — the app's
+ * primary daily action — and one mis-tap ended the session. The phone
+ * runs a single shop account that is signed in once at setup and never
+ * again, so the owner has no password to type and a stray tap would
+ * strand them at a login screen they have never seen, mid-shop.
+ *
+ * The session is still ordinary authentication and RLS still refuses a
+ * client without one; what is gone is only the button. Signing out is a
+ * setup action, done from [AccessScreen] — which is reachable exactly
+ * when the account is refused or unverified, and where an account
+ * change is the point rather than an accident.
  */
 @Composable
 fun AdminNavHost(
-    onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
@@ -41,7 +53,6 @@ fun AdminNavHost(
     ) {
         composable<Dashboard> {
             DashboardScreen(
-                onSignOut = onSignOut,
                 onAddProduct = { navController.navigate(AddProduct) },
                 onViewCatalogue = { navController.navigate(Catalogue()) },
                 onManageCategories = { navController.navigate(Categories) },

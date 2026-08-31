@@ -68,7 +68,7 @@ private fun RootContent(viewModel: RootViewModel = hiltViewModel()) {
 
         // The authenticated graph. Everything inside it is past the gate,
         // so no screen there re-asks who this is.
-        is SessionState.Admin -> AdminNavHost(onSignOut = viewModel::signOut)
+        is SessionState.Admin -> AdminNavHost()
 
         // Signing in is not the same as being allowed in. Both blocked
         // states explain themselves and offer a way out — M6.9.

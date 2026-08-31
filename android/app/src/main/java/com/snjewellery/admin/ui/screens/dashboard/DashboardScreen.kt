@@ -69,7 +69,6 @@ import java.util.Locale
  */
 @Composable
 fun DashboardScreen(
-    onSignOut: () -> Unit,
     onAddProduct: () -> Unit,
     onViewCatalogue: () -> Unit,
     onManageCategories: () -> Unit,
@@ -86,7 +85,6 @@ fun DashboardScreen(
 
     DashboardScreen(
         uiState = uiState,
-        onSignOut = onSignOut,
         onAddProduct = onAddProduct,
         onViewCatalogue = onViewCatalogue,
         onManageCategories = onManageCategories,
@@ -102,7 +100,6 @@ fun DashboardScreen(
 internal fun DashboardScreen(
     uiState: DashboardUiState,
     modifier: Modifier = Modifier,
-    onSignOut: () -> Unit = {},
     onAddProduct: () -> Unit = {},
     onViewCatalogue: () -> Unit = {},
     onManageCategories: () -> Unit = {},
@@ -124,12 +121,6 @@ internal fun DashboardScreen(
                     TextButton(onClick = onAddProduct) {
                         Text(
                             text = stringResource(R.string.dashboard_add_product),
-                            style = MaterialTheme.snTextStyles.label,
-                        )
-                    }
-                    TextButton(onClick = onSignOut) {
-                        Text(
-                            text = stringResource(R.string.dashboard_sign_out),
                             style = MaterialTheme.snTextStyles.label,
                         )
                     }

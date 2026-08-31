@@ -49,7 +49,6 @@
 
     <!-- On the dashboard's top bar. Worded the same as the refusal
          screen's escape hatch, because they do the same thing. -->
-    <string name="dashboard_sign_out">Sign out</string>
     <string name="dashboard_add_product">Add product</string>
 
     <!-- ── Waiting to upload (M8.9) ──────────────────────────────────
