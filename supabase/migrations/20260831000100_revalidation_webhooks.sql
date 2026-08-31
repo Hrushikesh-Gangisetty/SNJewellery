@@ -18,31 +18,56 @@
 -- is a migration (20260726000400_storage.sql) rather than a dashboard
 -- click.
 --
--- ── Where the URL and the secret come from ────────────────────────────
--- Both are read from database settings at trigger time, NOT written
--- here. A secret in a migration is a secret in git, which CLAUDE.md §9
--- forbids outright. Set them once, per project:
---
---   alter database postgres
---     set app.settings.site_url = 'https://your-domain';
---   alter database postgres
---     set app.settings.revalidation_secret = 'the-same-value-as-vercel';
---
--- The secret must equal REVALIDATION_SECRET in Vercel's environment, or
--- the endpoint answers 401 and every delivery is refused.
---
--- ── Failure is loud in the logs, never in a write ─────────────────────
--- `pg_net` queues the request and returns immediately, so a webhook that
--- cannot be delivered does not slow, block or fail the app's insert. A
--- customer-facing page then stays stale until the ISR interval catches
--- it, which is the documented fallback rather than a broken write.
--- Deliveries are inspectable in `net._http_response`.
+-- ── Why a table and not `app.settings.*` ──────────────────────────────
+-- The obvious home for two config values is a database parameter set
+-- with `alter database … set`. A managed Supabase project refuses it:
+-- the SQL Editor's role is not superuser, so that statement fails with
+-- 42501 `permission denied to set parameter`. A table is the portable
+-- alternative, and it brings something the parameter did not — the
+-- secret can be put behind RLS, which is the boundary this project
+-- already trusts everywhere else (CLAUDE.md §3.2).
 -- ═══════════════════════════════════════════════════════════════════════
 
--- Supabase provisions both in a managed project. Stated explicitly so a
+-- Supabase provisions this in a managed project. Stated explicitly so a
 -- fresh database fails here, with a clear cause, rather than at the first
 -- trigger fire.
 create extension if not exists pg_net with schema extensions;
+
+
+-- ── Where the URL and the secret live ─────────────────────────────────
+-- One row, enforced by a primary key over a constant. Two columns rather
+-- than a key/value bag: there are exactly two settings, they are both
+-- required, and `not null` then says so for free.
+create table if not exists public.website_config (
+  id                  boolean primary key default true,
+  -- Origin, no trailing slash. `/api/revalidate` is appended.
+  site_url            text not null,
+  -- Must equal REVALIDATION_SECRET in Vercel, or the endpoint answers
+  -- 401 and every delivery is refused.
+  revalidation_secret text not null,
+  updated_at          timestamptz not null default now(),
+
+  constraint website_config_single_row check (id),
+  constraint website_config_site_url_absolute
+    check (site_url ~ '^https?://' and site_url !~ '/$')
+);
+
+comment on table public.website_config is
+  'Single row. Where the revalidation webhook posts, and the secret it presents. Not readable by any client — see the RLS note in 20260831000100_revalidation_webhooks.sql.';
+
+
+-- ── RLS: enabled, with NO policy, deliberately ────────────────────────
+-- This table holds a shared secret, so the correct number of policies is
+-- zero. RLS on with no policy denies every anon and authenticated
+-- request — the pattern 20260726000300_rls_policies.sql already relies on
+-- for `users` deletes. The trigger function still reads it because it is
+-- SECURITY DEFINER and RLS does not apply to the definer's own access.
+--
+-- The website never reads this table either; it gets its copy of the
+-- secret from Vercel's environment.
+alter table public.website_config enable row level security;
+
+revoke all on public.website_config from anon, authenticated;
 
 
 -- ── The trigger function ──────────────────────────────────────────────
@@ -61,23 +86,24 @@ security definer
 set search_path = public, extensions, pg_catalog
 as $$
 declare
-  site_url text := current_setting('app.settings.site_url', true);
-  secret   text := current_setting('app.settings.revalidation_secret', true);
+  config public.website_config%rowtype;
 begin
+  select * into config from public.website_config where id;
+
   -- Unconfigured is not an error the shop should feel. Skipping leaves
   -- the site on its 10-minute fallback; raising here would make every
   -- product upload fail because a website setting is missing.
-  if site_url is null or secret is null then
-    raise warning 'revalidate_website: app.settings.site_url or .revalidation_secret unset; skipping';
+  if not found then
+    raise warning 'revalidate_website: website_config is empty; skipping';
     return coalesce(new, old);
   end if;
 
   perform supabase_functions.http_request(
-    site_url || '/api/revalidate',
+    config.site_url || '/api/revalidate',
     'POST',
     jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-revalidation-secret', secret
+      'x-revalidation-secret', config.revalidation_secret
     )::text,
     '{}',
     '5000'
@@ -90,7 +116,12 @@ end;
 $$;
 
 comment on function public.revalidate_website() is
-  'Posts a row change to the website''s /api/revalidate so it can clear the affected cache tags. URL and secret come from database settings — see 20260831000100_revalidation_webhooks.sql.';
+  'Posts a row change to the website''s /api/revalidate so it can clear the affected cache tags. Reads its URL and secret from public.website_config.';
+
+-- Nothing calls this directly; it runs as a trigger, under the definer's
+-- rights. Leaving it executable would be a way to make the database emit
+-- an authenticated request on demand.
+revoke execute on function public.revalidate_website() from public, anon, authenticated;
 
 
 -- ── The three tables ──────────────────────────────────────────────────
@@ -117,3 +148,16 @@ drop trigger if exists revalidate_on_product_images on public.product_images;
 create trigger revalidate_on_product_images
   after insert or update or delete on public.product_images
   for each row execute function public.revalidate_website();
+
+
+-- ── Configuring it ────────────────────────────────────────────────────
+-- Run once per project, in the SQL Editor, with the real values. The
+-- secret is NOT in this migration and must never be committed here
+-- (CLAUDE.md §9) — it comes from Vercel's REVALIDATION_SECRET.
+--
+--   insert into public.website_config (id, site_url, revalidation_secret)
+--   values (true, 'https://your-domain', 'the-value-from-vercel')
+--   on conflict (id) do update
+--     set site_url            = excluded.site_url,
+--         revalidation_secret = excluded.revalidation_secret,
+--         updated_at          = now();
